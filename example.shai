@@ -1,0 +1,14 @@
+// fibonacci in shai
+
+fib (num) -> int {
+	if num <= 1 { 
+		print num
+	} else { 
+	    num = fib (num - 1) + fib(num - 2)
+		print num
+	}
+}
+
+fib 10
+
+
