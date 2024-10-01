@@ -97,15 +97,15 @@ pub enum Kwd {
 ///
 /// ```
 /// let token_interator = Lexer::new(input)
-/// let tokens = token_interator.collect::<Vec<Token>>(); // Stream of tokens
+/// let tokens = token_interator.collect::<Vec<Token>>(); 
 ///
 /// ```
 // ------------------------------------------------------------
 
 /// API consists of a lexer struct with the Iterator trait implemented
-struct Lexer {
+pub struct Lexer {
     position: usize,
-    input: Vec<char>,
+    input   : Vec<char>,
 }
 
 impl Lexer {
@@ -220,7 +220,7 @@ impl Iterator for Lexer {
                 }
 
                 '*' => peek_symbol(self, '=', Symbol::MultiplyAssign, Symbol::Asterisk),
-                '/' => peek_symbol(self, '=', Symbol::DivideAssign, Symbol::Asterisk),
+                '/' => peek_symbol(self, '=', Symbol::DivideAssign, Symbol::FwdSlash),
                 '=' => peek_symbol(self, '=', Symbol::Equality, Symbol::Equals),
                 '!' => peek_symbol(self, '=', Symbol::NotEquality, Symbol::Bang),
                 '&' => peek_symbol(self, '&', Symbol::And, Symbol::Ampsnd),
@@ -345,6 +345,13 @@ mod test {
         let expected = vec![Token::Literal(super::Literal::IntLiteral(3))];
         let actual = lexer.collect::<Vec<Token>>();
         assert_eq!(expected, actual);
+    }
+
+
+    #[test]
+    fn read_1_char_symbols() {
+
+
     }
     #[test]
     fn read_2_char_symbols() {
