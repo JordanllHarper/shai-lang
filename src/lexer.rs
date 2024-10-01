@@ -115,12 +115,17 @@ impl Lexer {
             input: allocated_chars,
         }
     }
+    /// Advances the lexer a single position, returning an optional char in the process.
     fn advance(&mut self) -> Option<char> {
         self.position += 1;
         self.input.get(self.position).copied()
     }
 
+    /// Steps the lexer back one step
     fn step_back(&mut self) {
+        if self.position == 0 {
+            return;
+        }
         self.position -= 1;
     }
 }
