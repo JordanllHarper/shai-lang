@@ -77,6 +77,7 @@ pub enum DataTypeKwd {
     Float,
     Int,
     String,
+    Void,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -168,6 +169,7 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
         "break" => Token::Kwd(Kwd::Break),
         "include" => Token::Kwd(Kwd::Include),
         "bool" => Token::Kwd(Kwd::DataType(DataTypeKwd::Bool)),
+        "void" => Token::Kwd(Kwd::DataType(DataTypeKwd::Void)),
         "int" => Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
         "char" => Token::Kwd(Kwd::DataType(DataTypeKwd::Char)),
         "float" => Token::Kwd(Kwd::DataType(DataTypeKwd::Float)),
