@@ -66,6 +66,8 @@ pub enum Symbol {
     Arrow,
     And,
     Or,
+    LzEq,
+    GzEq,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -89,20 +91,17 @@ pub enum Kwd {
     Include,
     Else,
 }
-// ------------------------------------------------------------
-///
-/// API
+/// Lexer component for transforming raw string slice into a [Token] stream.
+/// Implements [Iterator], and will provide a token on each `.next()`. 
 ///
 /// Usage:
 ///
 /// ```
-/// let token_interator = Lexer::new(input)
-/// let tokens = token_interator.collect::<Vec<Token>>(); 
+/// let token_iterator = Lexer::new(input)
+/// // Get a Vec of Tokens.
+/// let tokens = token_iterator.collect::<Vec<Token>>(); 
 ///
 /// ```
-// ------------------------------------------------------------
-
-/// API consists of a lexer struct with the Iterator trait implemented
 pub struct Lexer {
     position: usize,
     input   : Vec<char>,
@@ -139,6 +138,9 @@ fn peek_symbol(lexer: &mut Lexer, test: char, matched: Symbol, not_matched: Symb
     }
 }
 
+/// Advances a lexer until a non-alphanumeric delimeter and converts into an optional [Token].
+/// Returns Some if a text symbol can be found and None otherwise.
+/// e.g. whitespace, which should never happen unless there is a "  " double space.
 fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
     let current = lexer.input.get(lexer.position)?;
     let mut buf = current.to_string();
@@ -150,6 +152,7 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
         }
         buf.push(ch);
     }
+
     let token = match buf.as_str() {
         "for" => Token::Kwd(Kwd::For),
         "while" => Token::Kwd(Kwd::While),
@@ -190,8 +193,6 @@ impl Iterator for Lexer {
             let token = match c {
                 '(' => Token::Symbol(Symbol::ParenOpen),
                 ')' => Token::Symbol(Symbol::ParenClose),
-                '<' => Token::Symbol(Symbol::ChevOpen),
-                '>' => Token::Symbol(Symbol::ChevClose),
                 '[' => Token::Symbol(Symbol::AngOpen),
                 ']' => Token::Symbol(Symbol::AngClose),
                 '{' => Token::Symbol(Symbol::BraceOpen),
@@ -207,6 +208,8 @@ impl Iterator for Lexer {
                 '_' => Token::Symbol(Symbol::Underscore),
                 '\n' => Token::Symbol(Symbol::Newline),
                 ' ' => Token::Symbol(Symbol::Whitespace),
+                '<' => peek_symbol(self, '=', Symbol::LzEq , Symbol::ChevOpen),
+                '>' => peek_symbol(self, '=', Symbol::GzEq , Symbol::ChevClose),
                 '+' => peek_symbol(self, '=', Symbol::PlusAssign, Symbol::Plus),
                 '-' => {
                     let final_symbol =
@@ -237,7 +240,6 @@ impl Iterator for Lexer {
 
 //  ---- TESTS ----
 
-// TODO: Single symbol tests
 
 #[cfg(test)]
 mod test {
@@ -348,6 +350,7 @@ mod test {
     }
 
 
+    // TODO: Single symbol tests
     #[test]
     fn read_1_char_symbols() {
 
@@ -408,5 +411,19 @@ mod test {
         let expected = vec![Token::Symbol(crate::lexer::Symbol::Or)];
         let actual = lexer.collect::<Vec<Token>>();
         assert_eq!(expected, actual);
+
+        let input = ">=";
+        let lexer = Lexer::new(input);
+        let expected = vec![Token::Symbol(crate::lexer::Symbol::GzEq)];
+        let actual = lexer.collect::<Vec<Token>>();
+        assert_eq!(expected, actual);
+
+        let input = "<=";
+        let lexer = Lexer::new(input);
+        let expected = vec![Token::Symbol(crate::lexer::Symbol::LzEq)];
+        let actual = lexer.collect::<Vec<Token>>();
+        assert_eq!(expected, actual);
+
+
     }
 }
