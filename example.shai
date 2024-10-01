@@ -3,12 +3,14 @@
 fib (num) -> int {
 	if num <= 1 { 
 		print num
+		return num
 	} else { 
 	    num = fib (num - 1) + fib(num - 2)
 		print num
+		return num
 	}
 }
 
-fib 10
+print (fib 10)
 
 
