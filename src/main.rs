@@ -1,9 +1,12 @@
 mod lexer;
 mod parser;
 
+use parser::Parser;
+
 use crate::lexer::Lexer;
 
 fn main() {
     let input = "x = 5";
-    let _lexer = Lexer::new(input);
+    let tokens = Lexer::new(input).collect();
+    let parser = Parser::new(tokens);
 }

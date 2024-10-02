@@ -1,117 +1,9 @@
 use crate::lexer::Token;
-// Parser Ideas
-//
-// Iterator API: each call to `.next()` will generate a new state of the AST.
-//
-// Nodes:
-// x = 5
-// where
-// x = identifier
-// op = assignment
-// 5 = expression that results in 5
-//
-// Examples:
-//
-// x = { 5 }
-// 5 is an expression of an integer literal
-//
-// More complicated
-//
-// ```
-//  x = if (true) {
-//          x = 1
-//          b = 2
-//          return x + b
-//      } else {
-//          return 6
-//      }
-//      ==
-//  x = { if (true) {
-//          x = 1
-//          b = 2
-//          return x + b
-//      } else {
-//          return 6
-//      } }
-//
-//
-//      what is an expression
-//
-//      optional collection of other expressions
-//
-//      return value
-//
-// ```
-//
-// This is an assignment expression
-// which needs a lhs + rhs
-//
-// ----
-//
-// 5 + 5
-// where
-// 5 = lhs
-// op = add
-// 5 = rhs
-//
-// This is an operation expression
-// This needs lhs, operation, rhs
-//
-// ----
-//
-// add(x) -> int {
-//    return x + x
-// }
-//
-// where
-// lhs = function signature
-// op  = assignment
-// rhs = function body { ... }
-//
-// where function signature =
-//
-// lhs = name -> add
-//
-// op  = assignment
-//
-// rhs = function information
-//
-//
-// where function information =
-//
-// lhs = args
-// op = return assignment
-// rhs = return type
-//
-// where args =
-//
-// vec of arg
-//
-// where arg =
-//
-// lhs : identifier
-// op : assignment
-// rhs : type
-//
-//
-// where type =
-// lhs = native type
-// op  = optional collection
-// rhs = optional collection type
-//
-// where collection type =
-//
-// array or dictionary
-//
-// This is a function declaration
-// which needs various types listed above
-//
-// ----
 
-/// The supported native data types in the language. 
+/// The supported native data types in the language.
 #[derive(Debug)]
 enum NativeType {
-    Void, 
+    Void,
     Char,
     Int,
     String,
@@ -155,13 +47,13 @@ struct ValueLiteral {
 ///
 /// [Expression::SingleValue] represents expressing some single value. This will evaluate to a [ValueLiteral].
 ///
-/// Example: 
+/// Example:
 ///
 /// 5 == { return 5 }
 ///
 /// ----
 ///
-///[Expression::Operation] represents doing some operation on 2 other types of [Expression], and that results to a value.
+/// [Expression::Operation] represents doing some operation on 2 other types of [Expression], and that results to a value.
 ///
 /// y + z
 /// Which is the same as
@@ -183,6 +75,18 @@ struct ValueLiteral {
 ///     z = 43
 ///     return y + z
 /// } + 5
+///
+/// ----
+///
+/// [Expression::Evaluation] is a comparison of 2 expressions that folds to a true or false
+/// statement.
+///
+/// Examples: 
+///
+/// is_true = 5 == 5
+/// where
+/// Both `5` are single value expressions 
+/// == = [EvaluationOperator]
 ///
 /// ----
 ///
@@ -218,7 +122,8 @@ enum Expression {
 }
 
 /// Defines the 4 basic math operations supported
-/// Example:
+///
+/// Examples:
 ///
 /// 4 + 5
 /// 9 * 10
@@ -293,24 +198,12 @@ type Args = Vec<Arg>;
 /// Example: (...) -> int/string/char/etc
 type ReturnType = NativeType;
 
-/// Represents a function in the language.
-///
-/// Example:
-///
-/// add(x, y) -> int { 
-///     return x + y
-/// }
-/// where
-/// add = ident
-/// (x, y) = args
-/// int = return type
-/// { return x + y } = Expression
-struct Function {
-    ident: String,
-    args : Args,
-    return_type: ReturnType,
-    body : Expression,
-}
+//
+//
+// ----
+//
+// Complex language constructs
+// These are built from above
 
 /// Represents the language construct of assigning some expression to some identifier.
 ///
@@ -322,15 +215,46 @@ struct Assignment {
     ident: String,
     rhs: Expression,
 }
+
+/// Represents a function in the language.
+///
+/// Example:
+///
+/// add(x, y) -> int {
+///     return x + y
+/// }
+/// where
+/// add = ident
+/// (x, y) = args
+/// int = return type
+/// { return x + y } = Expression
+struct Function {
+    ident: String,
+    args: Args,
+    return_type: ReturnType,
+    body: Expression,
+}
+
+//
+// ----
+// Parser specific functionality
+//
+
 /// The model which holds the generated AST.
 ///
 /// Will implement the [Iterator] trait to provide an updated 'state' of the AST on each call to
 /// .next()
 #[derive(Debug)]
-struct Parser {
+pub struct Parser {
     tokens: Vec<Token>,
     // The internal parse state of the current generated AST.
     // This will be returned after every call to .next(),
     // representing another parsing step.
     // internal_tree: Box<Node>,
+}
+
+impl Parser {
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens }
+    }
 }
