@@ -1,260 +1,90 @@
+use crate::language::*;
 use crate::lexer::Token;
-
-/// The supported native data types in the language.
-#[derive(Debug)]
-enum NativeType {
-    Void,
-    Char,
-    Int,
-    String,
-    Float,
-    // These recurse - we can have a Vector of Vectors of Integers
-    Array(Box<NativeType>),
-    // These recurse - we can have a Dictionary of Vectors to Integers
-    Dictionary {
-        key: Box<NativeType>,
-        value: Box<NativeType>,
-    },
-}
-
-/// A single value representation.
-///
-/// Example:
-///
-/// x = 5
-///     |- the value literal '5', with a native type of 'int'
-///
-/// x = 'c'
-///      |- the value literal 'c', with a native type of 'char'
-struct ValueLiteral {
-    native_type: NativeType,
-    // NOTE: This can be "5", but it might mean 5. String is for storing in a
-    // flexible format.
-    // Use native type to figure out how this should actually be utilised.
-    // E.g. "5" with a native type of int -> 5
-    representation: String,
-}
-/// Shai-lang is an expression based language. The [Expression] enum represents what expressions in the
-/// language can be.
-///
-/// An expression is defined as something which returns a value.
-///
-/// There are 3 types of expressions in Shai-lang:
-///
-/// NOTE: For below, we use '{ }' to denote both real syntax and the ideas of expressions.
-///
-/// ----
-///
-/// [Expression::SingleValue] represents expressing some single value. This will evaluate to a [ValueLiteral].
-///
-/// Example:
-///
-/// 5 == { return 5 }
-///
-/// ----
-///
-/// [Expression::Operation] represents doing some operation on 2 other types of [Expression], and that results to a value.
-///
-/// y + z
-/// Which is the same as
-/// { return { return y } + { return z } }
-///
-/// This can then be used to assign an expression to an identifier:
-/// x = y + z
-/// which is the same as
-/// x = { return { return y } + { return z } }
-///
-/// The reason why an operation takes 2 expressions (and not say, [ValueLiteral]) is that we
-/// should be able to compose them together.
-///
-/// E.g.
-/// x = (5 * 10) + (3 * 4 - 1)
-/// OR a more sophisticated example with body expressions (see below)
-/// x = {
-///     y = 3
-///     z = 43
-///     return y + z
-/// } + 5
-///
-/// ----
-///
-/// [Expression::Evaluation] is a comparison of 2 expressions that folds to a true or false
-/// statement.
-///
-/// Examples: 
-///
-/// is_true = 5 == 5
-/// where
-/// Both `5` are single value expressions 
-/// == = [EvaluationOperator]
-///
-/// ----
-///
-/// [Expression::Body] are series of the above 2 types of expressions.
-/// Body expressions are *required* to have an explicit return keyword.
-///
-/// y = {
-///  x = 5 <- Value expression
-///
-///  // A body expression within an expression
-///  if x > 3 {
-///    x = 3
-///  }
-///
-///  return x // return value
-/// }
-///
-enum Expression {
-    SingleValue(ValueLiteral),
-    Operation {
-        lhs: Box<Expression>,
-        rhs: Box<Expression>,
-        operation: Operation,
-    },
-    Evaluation {
-        lhs: Box<Expression>,
-        rhs: Box<Expression>,
-        eval: Evaluation,
-    },
-    Body {
-        body: Vec<Expression>,
-    },
-}
-
-/// Defines the 4 basic math operations supported
-///
-/// Examples:
-///
-/// 4 + 5
-/// 9 * 10
-#[derive(Debug)]
-enum MathOperation {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-}
-
-/// Representation of the operations supported in the language.
-///
-/// Examples:
-///
-/// Math operation
-/// 5 + 3
-///
-/// Assignment operation
-/// x = 5
-///
-/// Assignment operation specified with math operation
-/// x += 5
-///
-///
-///
-#[derive(Debug)]
-enum Operation {
-    Math(MathOperation),               // +, -, /, *
-    Assignment(Option<MathOperation>), // = or +=
-}
-
-#[derive(Debug)]
-enum EvaluationOperator {
-    Lz,
-    Gz,
-    Eq,
-    Neq,
-}
-
-/// Defines a method of comparison between 2 expressions.
-///
-/// For clarity, given boolean expressions:
-/// if true { ... }
-/// if false { ... }
-///
-/// lhs = expression that has the value assigned (true or false)
-/// rhs = expression that returns true constantly
-/// comparator = [EvaluationOperator::Eq]
-struct Evaluation {
-    lhs: Box<Expression>,
-    rhs: Box<Expression>,
-    comparator: EvaluationOperator,
-}
-
-/// Represents an argument in a function declaration.
-/// Example: (x) -> int { ... }
-///           |- Arg with type inferred
-///
-/// Example: (x int) -> int { ... }
-///              |- Arg type explicitly
-struct Arg {
-    ident: String,
-    native_type: NativeType,
-}
-
-/// Type alias to represent a collection of arguments in a function
-/// Example: (x, y, z) -> ...
-type Args = Vec<Arg>;
-
-/// Type alias to represent a Return Type in a function
-/// Example: (...) -> int/string/char/etc
-type ReturnType = NativeType;
-
-//
-//
-// ----
-//
-// Complex language constructs
-// These are built from above
-
-/// Represents the language construct of assigning some expression to some identifier.
-///
-/// Example: x = 5
-///
-/// ident = x
-/// rhs = expression of 5
-struct Assignment {
-    ident: String,
-    rhs: Expression,
-}
-
-/// Represents a function in the language.
-///
-/// Example:
-///
-/// add(x, y) -> int {
-///     return x + y
-/// }
-/// where
-/// add = ident
-/// (x, y) = args
-/// int = return type
-/// { return x + y } = Expression
-struct Function {
-    ident: String,
-    args: Args,
-    return_type: ReturnType,
-    body: Expression,
-}
-
-//
-// ----
-// Parser specific functionality
-//
 
 /// The model which holds the generated AST.
 ///
-/// Will implement the [Iterator] trait to provide an updated 'state' of the AST on each call to
+/// Implements the [Iterator] trait to provide an updated 'state' of the AST on each call to
 /// .next()
 #[derive(Debug)]
 pub struct Parser {
+    position: usize,
     tokens: Vec<Token>,
     // The internal parse state of the current generated AST.
     // This will be returned after every call to .next(),
     // representing another parsing step.
-    // internal_tree: Box<Node>,
+    tree_state: Box<Node>,
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens }
+    pub fn new(tokens: &[Token]) -> Self {
+        let tree_state = Node::new_base_node();
+        Self {
+            tokens: tokens.to_vec(),
+            tree_state,
+            position: 0,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Node {
+    Base(Option<Box<Node>>),
+    NativeType(NativeType),
+    Expression(Expression),
+    Function(Function),
+    Assignment(Assignment),
+}
+
+impl Node {
+    fn new_base_node() -> Box<Node> {
+        Box::new(Node::Base(None))
+    }
+}
+
+impl Iterator for Parser {
+    type Item = Node;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = &self.tokens[self.position];
+
+        self.position += 1;
+        todo!()
+    }
+    // add code here
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::language::{Assignment, ValueLiteral};
+    use crate::lexer::*;
+    use crate::parser::{Node, Parser};
+
+    #[test]
+    fn assignment_tree() {
+        // let input = "x = 5"
+        //
+        // -> lexer transforms
+        // ->
+        let tokens = vec![
+            Token::Ident("x".to_string()),
+            Token::Symbol(Symbol::Whitespace),
+            Token::Symbol(Symbol::Equals),
+            Token::Symbol(Symbol::Whitespace),
+            Token::Literal(Literal::IntLiteral(5)),
+        ];
+
+        let expected = Node::Base(Some(Box::new(Node::Assignment(
+            Assignment::new(
+                "x",
+                crate::language::Expression::SingleValue(ValueLiteral::new(
+                    crate::language::NativeType::Int,
+                    "5",
+                )),
+            ),
+        ))));
+        let actual = Parser::new(&tokens).last().unwrap();
+
+        assert_eq!(expected, actual);
+        todo!();
     }
 }
