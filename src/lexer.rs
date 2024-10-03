@@ -13,21 +13,21 @@
 // DATA STRUCTS
 
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token {
     Kwd(Kwd),
     Ident(String),
     Symbol(Symbol),
     Literal(Literal),
 }
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Literal {
     BoolLiteral(bool),
     IntLiteral(i32),
     // TODO: Consider Float literal
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Symbol {
     ParenOpen,
     ParenClose,
@@ -70,7 +70,7 @@ pub enum Symbol {
     GzEq,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DataTypeKwd {
     Bool,
     Char,
@@ -80,7 +80,7 @@ pub enum DataTypeKwd {
     Void,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Kwd {
     DataType(DataTypeKwd),
     While,
@@ -186,6 +186,7 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
             }
         }
     };
+    lexer.step_back();
     Some(token)
 }
 
@@ -430,7 +431,28 @@ mod test {
         let expected = vec![Token::Symbol(crate::lexer::Symbol::LzEq)];
         let actual = lexer.collect::<Vec<Token>>();
         assert_eq!(expected, actual);
-
-
     }
+
+    #[test]
+    fn hello_world_test() {
+
+        let input = "print \"Hello World\"";
+
+        let expected = vec![
+            Token::Ident("print".to_string()), 
+            Token::Symbol(crate::lexer::Symbol::Whitespace), 
+            Token::Symbol(crate::lexer::Symbol::Quote), 
+            Token::Ident("Hello".to_string()),
+            Token::Symbol(crate::lexer::Symbol::Whitespace), 
+            Token::Ident("World".to_string()),
+            Token::Symbol(crate::lexer::Symbol::Quote)
+        ];
+
+        let actual = Lexer::new(input).collect::<Vec<Token>>();
+        
+        assert_eq!(expected, actual);
+    }
+
+
+
 }
