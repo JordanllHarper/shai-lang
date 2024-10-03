@@ -1,12 +1,10 @@
 mod lexer;
 mod parser;
+mod language;
 
-use parser::Parser;
-
-use crate::lexer::Lexer;
+use crate::lexer::*;
 
 fn main() {
     let input = "x = 5";
-    let tokens = Lexer::new(input).collect();
-    let parser = Parser::new(tokens);
+    let tokens : Vec<Token> = Lexer::new(input).collect();
 }
