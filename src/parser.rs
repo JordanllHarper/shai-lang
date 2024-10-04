@@ -1,26 +1,6 @@
 use crate::language::*;
 use crate::lexer::*;
 
-// /// The model which holds the generated AST.
-// #[derive(Debug)]
-// pub struct Parser {
-//     position: usize,
-//     tokens: Vec<Token>,
-//     // The internal parse state of the current generated AST.
-//     tree_state: Box<Node>,
-// }
-
-// impl Parser {
-//     pub fn new(tokens: &[Token]) -> Self {
-//         let tree_state = Node::new_base_node();
-//         Self {
-//             tokens: tokens.to_vec(),
-//             tree_state,
-//             position: 0,
-//         }
-//     }
-// }
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum Node {
     NativeType(NativeType),
@@ -31,14 +11,19 @@ pub enum Node {
 
 fn handle_integer_literal(i: i32) -> Expression {
     // TODO: Handle floating point nums and operations
+    // E.g.
+    // 3_+_4
+    // or
+    // 3.14
     Expression::SingleValue(ValueLiteral::new(NativeType::Int, &i.to_string()))
 }
 
-fn on_assignment(tokens: &[Token], position: usize, ident: String) -> Node {
-    let next_token = &tokens[position];
-    println!("Testing {:?}", next_token);
-    if let Token::Literal(Literal::IntLiteral(x)) = next_token {
-        // this could still be a float
+fn on_assignment<'a, I>(tokens: &mut I, ident: String) -> Node 
+where
+    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+{
+    if let Some(Token::Literal(Literal::IntLiteral(x))) = tokens.find(|t| **t != Token::Symbol(Symbol::Whitespace)) {
+        // TODO: This could still be a float or a calculation
         let expr = handle_integer_literal(*x);
         let assign = Assignment::new(&ident, expr);
         let node = Node::Assignment(assign);
@@ -63,26 +48,25 @@ fn on_assignment(tokens: &[Token], position: usize, ident: String) -> Node {
 // Variable usage
 // y = *x* + 3
 //      |- here is usage
-fn on_identifier(tokens: &[Token], position: usize, ident: String) -> Node {
-    let mut pos = position;
-    // Ignore whitespace for after ident
-    while tokens[pos] == Token::Symbol(Symbol::Whitespace) {
-        pos +=1;
-    }
+fn on_identifier<'a, I>(tokens: &mut I, ident: String) -> Node
+where
+    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 
-    if tokens[pos] == Token::Symbol(Symbol::Equals) {
-        return on_assignment(tokens, position + 1, ident);
+{
+    // Ignore whitespace for after ident
+
+    if tokens.find(|t| **t != Token::Symbol(Symbol::Whitespace)) == Some(&Token::Symbol(Symbol::Equals)) {
+        return on_assignment(tokens, ident);
     }
     todo!()
 }
 
-pub fn parse(tokens: &[Token], position: usize) -> Option<Node> {
-    let tokens = tokens.to_vec();
-    let current = &tokens[position];
+pub fn parse(tokens: &[Token]) -> Option<Node> {
+    // TODO: Review filtering all whitespace, some might be necessary (like in strings)
+    let mut token_iter = tokens.iter();
 
-    println!("Testing {:?}", current);
-    if let Token::Ident(i) = current {
-        let node = on_identifier(&tokens, position + 1, i.to_string());
+    if let Token::Ident(ident) = token_iter.next().to_owned()? {
+        let node = on_identifier(&mut token_iter, ident.to_string());
         return Some(node);
     }
     println!("Didn't evaluate as ident");
@@ -109,7 +93,22 @@ mod tests {
             "x",
             Expression::SingleValue(ValueLiteral::new(NativeType::Int, "5")),
         ));
-        let actual = parse(&tokens, 0).unwrap();
+
+        let actual = parse(&tokens).unwrap();
+
+        assert_eq!(expected, actual);
+        // ----
+
+        // input = "x = 5"
+        let tokens = vec![
+            Token::Ident("x".to_string()),
+            Token::Symbol(Symbol::Whitespace),
+            Token::Symbol(Symbol::Equals),
+            Token::Symbol(Symbol::Whitespace),
+            Token::Literal(Literal::IntLiteral(5)),
+        ];
+
+        let actual = parse(&tokens).unwrap();
 
         assert_eq!(expected, actual);
     }
