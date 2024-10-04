@@ -29,6 +29,8 @@ where
         let node = Node::Assignment(assign);
         return node;
     }
+    // TODO: Function assignment
+    // TODO: Expression assignment
     todo!()
 
     // SingleValue(ValueLiteral),
@@ -53,11 +55,12 @@ where
     I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 
 {
-    // Ignore whitespace for after ident
-
     if tokens.find(|t| **t != Token::Symbol(Symbol::Whitespace)) == Some(&Token::Symbol(Symbol::Equals)) {
         return on_assignment(tokens, ident);
     }
+    // TODO: Function call e.g. print "Hello, World"
+    // TODO: Expression (empty statement) e.g. x + y 
+    // TODO: Variable Usage e.g. y = x + 3
     todo!()
 }
 

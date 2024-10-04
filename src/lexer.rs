@@ -12,7 +12,6 @@
 //
 // DATA STRUCTS
 
-
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token {
     Kwd(Kwd),
@@ -93,19 +92,19 @@ pub enum Kwd {
     Else,
 }
 /// Lexer component for transforming raw string slice into a [Token] stream.
-/// Implements [Iterator], and will provide a token on each `.next()`. 
+/// Implements [Iterator], and will provide a token on each `.next()`.
 ///
 /// Usage:
 ///
 /// ```
 /// let token_iterator = Lexer::new(input)
 /// // Get a Vec of Tokens.
-/// let tokens = token_iterator.collect::<Vec<Token>>(); 
+/// let tokens = token_iterator.collect::<Vec<Token>>();
 ///
 /// ```
 pub struct Lexer {
     position: usize,
-    input   : Vec<char>,
+    input: Vec<char>,
 }
 
 impl Lexer {
@@ -216,12 +215,11 @@ impl Iterator for Lexer {
                 '_' => Token::Symbol(Symbol::Underscore),
                 '\n' => Token::Symbol(Symbol::Newline),
                 ' ' => Token::Symbol(Symbol::Whitespace),
-                '<' => peek_symbol(self, '=', Symbol::LzEq , Symbol::ChevOpen),
-                '>' => peek_symbol(self, '=', Symbol::GzEq , Symbol::ChevClose),
+                '<' => peek_symbol(self, '=', Symbol::LzEq, Symbol::ChevOpen),
+                '>' => peek_symbol(self, '=', Symbol::GzEq, Symbol::ChevClose),
                 '+' => peek_symbol(self, '=', Symbol::PlusAssign, Symbol::Plus),
                 '-' => {
-                    let final_symbol =
-                        peek_symbol(self, '=', Symbol::MinusAssign, Symbol::Minus);
+                    let final_symbol = peek_symbol(self, '=', Symbol::MinusAssign, Symbol::Minus);
                     if final_symbol != Token::Symbol(Symbol::MinusAssign) {
                         self.step_back();
                         peek_symbol(self, '>', Symbol::Arrow, Symbol::Minus)
@@ -248,9 +246,10 @@ impl Iterator for Lexer {
 
 //  ---- TESTS ----
 
-
 #[cfg(test)]
 mod test {
+    use crate::Symbol;
+
     use super::{DataTypeKwd, Lexer, Token};
 
     #[test]
@@ -357,13 +356,47 @@ mod test {
         assert_eq!(expected, actual);
     }
 
+    fn test<T>(input: T, expected: Token)
+    where
+        T: ToString,
+    {
+        let mut lexer = Lexer::new(&input.to_string());
+        let actual = lexer.next().unwrap();
+        assert_eq!(expected, actual);
+    }
 
     // TODO: Single symbol tests
     #[test]
     fn read_1_char_symbols() {
-
-
+        test('(', Token::Symbol(Symbol::ParenOpen));
+        test(')', Token::Symbol(Symbol::ParenClose));
+        test('[', Token::Symbol(Symbol::AngOpen));
+        test(']', Token::Symbol(Symbol::AngClose));
+        test('{', Token::Symbol(Symbol::BraceOpen));
+        test('}', Token::Symbol(Symbol::BraceClose));
+        test('%', Token::Symbol(Symbol::Modulus));
+        test('\"', Token::Symbol(Symbol::Quote));
+        test('\'', Token::Symbol(Symbol::Apstr));
+        test(',', Token::Symbol(Symbol::Comma));
+        test('.', Token::Symbol(Symbol::Period));
+        test('\\', Token::Symbol(Symbol::BckSlash));
+        test('$', Token::Symbol(Symbol::Dollar));
+        test(':', Token::Symbol(Symbol::Colon));
+        test('_', Token::Symbol(Symbol::Underscore));
+        test('\n', Token::Symbol(Symbol::Newline));
+        test(' ', Token::Symbol(Symbol::Whitespace));
+        test('<', Token::Symbol(Symbol::ChevOpen));
+        test('>', Token::Symbol(Symbol::ChevClose));
+        test('+', Token::Symbol(Symbol::Plus));
+        test('-', Token::Symbol(Symbol::Minus));
+        test('*', Token::Symbol(Symbol::Asterisk));
+        test('/', Token::Symbol(Symbol::FwdSlash));
+        test('=', Token::Symbol(Symbol::Equals));
+        test('!', Token::Symbol(Symbol::Bang));
+        test('&', Token::Symbol(Symbol::Ampsnd));
+        test('|', Token::Symbol(Symbol::Pipe));
     }
+
     #[test]
     fn read_2_char_symbols() {
         let input = "==";
@@ -435,24 +468,20 @@ mod test {
 
     #[test]
     fn hello_world_test() {
-
         let input = "print \"Hello World\"";
 
         let expected = vec![
-            Token::Ident("print".to_string()), 
-            Token::Symbol(crate::lexer::Symbol::Whitespace), 
-            Token::Symbol(crate::lexer::Symbol::Quote), 
+            Token::Ident("print".to_string()),
+            Token::Symbol(crate::lexer::Symbol::Whitespace),
+            Token::Symbol(crate::lexer::Symbol::Quote),
             Token::Ident("Hello".to_string()),
-            Token::Symbol(crate::lexer::Symbol::Whitespace), 
+            Token::Symbol(crate::lexer::Symbol::Whitespace),
             Token::Ident("World".to_string()),
-            Token::Symbol(crate::lexer::Symbol::Quote)
+            Token::Symbol(crate::lexer::Symbol::Quote),
         ];
 
         let actual = Lexer::new(input).collect::<Vec<Token>>();
-        
+
         assert_eq!(expected, actual);
     }
-
-
-
 }
