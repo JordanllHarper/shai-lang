@@ -1,13 +1,12 @@
-// TODO: Review Function calls!!!
-
 /// The supported native data types in the language.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum NativeType {
     Void,
     Char,
     Int,
     String,
     Float,
+    Bool,
     // These recurse - we can have a Vector of Vectors of Integers
     Array(Box<NativeType>),
     // These recurse - we can have a Dictionary of Vectors to Integers
@@ -15,6 +14,7 @@ pub enum NativeType {
         key: Box<NativeType>,
         value: Box<NativeType>,
     },
+    Function,
 }
 
 /// A single value representation.
@@ -26,7 +26,7 @@ pub enum NativeType {
 ///
 /// x = 'c'
 ///      |- the value literal 'c', with a native type of 'char'
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ValueLiteral {
     native_type: NativeType,
     // NOTE: This can be "5", but it might mean 5. String is for storing in a
@@ -114,7 +114,7 @@ impl ValueLiteral {
 ///  return x // return value
 /// }
 ///
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expression {
     SingleValue(ValueLiteral),
     Operation {
@@ -138,7 +138,7 @@ pub enum Expression {
 ///
 /// 4 + 5
 /// 9 * 10
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MathOperation {
     Add,
     Subtract,
@@ -159,18 +159,23 @@ pub enum MathOperation {
 /// Assignment operation specified with math operation
 /// x += 5
 ///
+/// Function calls
+/// print "Hello, World!"
 ///
-///
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Operation {
     Math(MathOperation),               // +, -, /, *
     Assignment(Option<MathOperation>), // = or +=
+    FunctionCall, // fx args...
 }
 
-#[derive(Debug, PartialEq, Eq)]
+/// Various methods of evaluating 2 expressions
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum EvaluationOperator {
     Lz,
     Gz,
+    LzEq,
+    GzEq,
     Eq,
     Neq,
 }
@@ -184,28 +189,37 @@ pub enum EvaluationOperator {
 /// lhs = expression that has the value assigned (true or false)
 /// rhs = expression that returns true constantly
 /// comparator = [EvaluationOperator::Eq]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Evaluation {
     lhs: Box<Expression>,
     rhs: Box<Expression>,
     comparator: EvaluationOperator,
 }
 
-/// Represents an argument in a function declaration.
+
+type Arg = ValueLiteral;
+
+/// Represents an parameters in a function declaration.
 /// Example: (x) -> int { ... }
 ///           |- Arg with type inferred
 ///
 /// Example: (x int) -> int { ... }
 ///              |- Arg type explicitly
-#[derive(Debug, PartialEq, Eq)]
-pub struct Arg {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct FParameter {
     ident: String,
     native_type: NativeType,
 }
 
-/// Type alias to represent a collection of arguments in a function
+impl FParameter {
+    pub fn new(ident: String, native_type: NativeType) -> Self {
+        Self { ident, native_type }
+    }
+}
+
+/// Type alias to represent a collection of parameters in a function
 /// Example: (x, y, z) -> ...
-type Args = Vec<Arg>;
+type Params = Vec<FParameter>;
 
 /// Type alias to represent a Return Type in a function
 /// Example: (...) -> int/string/char/etc
@@ -224,7 +238,7 @@ type ReturnType = NativeType;
 ///
 /// ident = x
 /// rhs = expression of 5
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Assignment {
     ident: String,
     rhs: Expression,
@@ -251,10 +265,10 @@ impl Assignment {
 /// (x, y) = args
 /// int = return type
 /// { return x + y } = Expression
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function {
     ident: String,
-    args: Args,
+    args: Params,
     return_type: ReturnType,
     body: Expression,
 }
