@@ -12,6 +12,8 @@
 //
 // DATA STRUCTS
 
+use std::fmt::{Display, Formatter};
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token {
     Kwd(Kwd),
@@ -21,10 +23,83 @@ pub enum Token {
 }
 
 impl Token {
-    pub fn whitespace() -> Token{
+    pub fn whitespace() -> Token {
         Token::Symbol(Symbol::Whitespace)
     }
 }
+impl Display for Token {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str_rep = match self {
+            Token::Kwd(k) => match k {
+                Kwd::DataType(dt) => match dt {
+                    DataTypeKwd::Bool => "bool",
+                    DataTypeKwd::Char => "char",
+                    DataTypeKwd::Float => "float",
+                    DataTypeKwd::Int => "int",
+                    DataTypeKwd::String => "string",
+                    DataTypeKwd::Void => "void",
+                },
+                Kwd::While => "while",
+                Kwd::For => "for",
+                Kwd::If => "if",
+                Kwd::Return => "return",
+                Kwd::In => "in",
+                Kwd::Break => "break",
+                Kwd::Include => "include",
+                Kwd::Else => "else",
+            },
+            Token::Ident(i) => i,
+            Token::Symbol(s) => match  s {
+                Symbol::ParenOpen => "(",
+                Symbol::ParenClose => ")",
+                Symbol::ChevOpen => "<",
+                Symbol::ChevClose => ">",
+                Symbol::AngOpen => "[",
+                Symbol::AngClose =>"]",
+                Symbol::BraceOpen => "{",
+                Symbol::BraceClose => "}",
+                Symbol::Equals => "=",
+                Symbol::Modulus => "%",
+                Symbol::Quote => "\"",
+                Symbol::Apstr => "\'",
+                Symbol::Comma => ",",
+                Symbol::Minus => "-",
+                Symbol::Period => ".",
+                Symbol::Plus => "+",
+                Symbol::Asterisk => "*",
+                Symbol::FwdSlash => "/",
+                Symbol::BckSlash => "\\",
+                Symbol::Dollar => "$",
+                Symbol::Colon => ":",
+                Symbol::Underscore => "_",
+                Symbol::Ampsnd => "&",
+                Symbol::Pipe => "|",
+                Symbol::Whitespace => " ",
+                Symbol::Bang => "!",
+                Symbol::Newline => "\n",
+                Symbol::Equality => "==",
+                Symbol::NotEquality => "!=",
+                Symbol::PlusAssign => "+=",
+                Symbol::MinusAssign => "-=",
+                Symbol::MultiplyAssign => "*=",
+                Symbol::DivideAssign => "/=",
+                Symbol::Arrow => "->",
+                Symbol::And => "&&",
+                Symbol::Or => "||",
+                Symbol::LzEq => "<=",
+                Symbol::GzEq => ">=",
+                Symbol::EscapeQuote => "\\\"",
+                Symbol::EscapeApos => "\\\'",
+            },
+            Token::Literal(l) => match l  {
+                Literal::BoolLiteral(b) => &b.to_string(),
+                Literal::IntLiteral(i) => &i.to_string(),
+            },
+        };
+        f.write_str(str_rep)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Literal {
     BoolLiteral(bool),
@@ -73,6 +148,9 @@ pub enum Symbol {
     Or,
     LzEq,
     GzEq,
+    // Escape chars
+    EscapeQuote,
+    EscapeApos,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -149,6 +227,19 @@ fn peek_symbol(lexer: &mut Lexer, test: char, matched: Symbol, not_matched: Symb
         Token::Symbol(not_matched)
     }
 }
+fn maybe_peek(lexer: &mut Lexer, test: char, matched: Symbol) -> Option<Token> {
+    let next = lexer.advance();
+    if let Some(c) = next {
+        if c == test {
+            Some(Token::Symbol(matched))
+        } else {
+            lexer.step_back();
+            None
+        }
+    } else {
+        None
+    }
+}
 
 /// Advances a lexer until a non-alphanumeric delimeter and converts into an optional [Token].
 /// Returns Some if a text symbol can be found and None otherwise.
@@ -216,7 +307,15 @@ impl Iterator for Lexer {
                 '\'' => Token::Symbol(Symbol::Apstr),
                 ',' => Token::Symbol(Symbol::Comma),
                 '.' => Token::Symbol(Symbol::Period),
-                '\\' => Token::Symbol(Symbol::BckSlash),
+                '\\' => {
+                    if let Some(esc_quote) = maybe_peek(self, '"', Symbol::EscapeQuote) {
+                        esc_quote
+                    } else if let Some(esc_apos) = maybe_peek(self, '\'', Symbol::EscapeApos) {
+                        esc_apos
+                    } else {
+                        Token::Symbol(Symbol::BckSlash)
+                    }
+                }
                 '$' => Token::Symbol(Symbol::Dollar),
                 ':' => Token::Symbol(Symbol::Colon),
                 '_' => Token::Symbol(Symbol::Underscore),
@@ -256,8 +355,8 @@ impl Iterator for Lexer {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::fmt::Debug;
     use pretty_assertions::assert_eq;
+    use std::fmt::Debug;
 
     fn test<T>(input: &str, expected: T)
     where
@@ -419,9 +518,7 @@ add (x, y) {
 
     #[test]
     fn hello_world_test() {
-        let input = "print \"Hello World\"";
-
-        let expected = vec![
+        test("print \"Hello World\"", vec![
             Token::Ident("print".to_string()),
             Token::Symbol(Symbol::Whitespace),
             Token::Symbol(Symbol::Quote),
@@ -429,42 +526,55 @@ add (x, y) {
             Token::Symbol(Symbol::Whitespace),
             Token::Ident("World".to_string()),
             Token::Symbol(Symbol::Quote),
-        ];
+        ]);
+    }
 
-        let actual = Lexer::new(input).collect::<Vec<Token>>();
 
-        assert_eq!(expected, actual);
+    #[test]
+    fn read_escaped_characters() {
+
+        test("\\\"", vec![
+            Token::Symbol(Symbol::EscapeQuote)
+        ]);
+
+        test("\\'", vec![
+            Token::Symbol(Symbol::EscapeApos)
+        ]);
+
     }
 
     #[test]
     fn complex_variable_assignment_with_newline() {
-        test("x = if true { return 5 } else { return 4 }\n", vec![
-            Token::Ident("x".to_string()),
-            Token::whitespace(),
-            Token::Symbol(Symbol::Equals),
-            Token::whitespace(),
-            Token::Kwd(Kwd::If),
-            Token::whitespace(),
-            Token::Literal(Literal::BoolLiteral(true)),
-            Token::whitespace(),
-            Token::Symbol(Symbol::BraceOpen),
-            Token::whitespace(),
-            Token::Kwd(Kwd::Return),
-            Token::whitespace(),
-            Token::Literal(Literal::IntLiteral(5)),
-            Token::whitespace(),
-            Token::Symbol(Symbol::BraceClose),
-            Token::whitespace(),
-            Token::Kwd(Kwd::Else),
-            Token::whitespace(),
-            Token::Symbol(Symbol::BraceOpen),
-            Token::whitespace(),
-            Token::Kwd(Kwd::Return),
-            Token::whitespace(),
-            Token::Literal(Literal::IntLiteral(4)),
-            Token::whitespace(),
-            Token::Symbol(Symbol::BraceClose),
-            Token::Symbol(Symbol::Newline)
-        ]);
+        test(
+            "x = if true { return 5 } else { return 4 }\n",
+            vec![
+                Token::Ident("x".to_string()),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Equals),
+                Token::whitespace(),
+                Token::Kwd(Kwd::If),
+                Token::whitespace(),
+                Token::Literal(Literal::BoolLiteral(true)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::whitespace(),
+                Token::Kwd(Kwd::Return),
+                Token::whitespace(),
+                Token::Literal(Literal::IntLiteral(5)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceClose),
+                Token::whitespace(),
+                Token::Kwd(Kwd::Else),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::whitespace(),
+                Token::Kwd(Kwd::Return),
+                Token::whitespace(),
+                Token::Literal(Literal::IntLiteral(4)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::Newline),
+            ],
+        );
     }
 }
