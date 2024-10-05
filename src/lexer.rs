@@ -19,6 +19,12 @@ pub enum Token {
     Symbol(Symbol),
     Literal(Literal),
 }
+
+impl Token {
+    pub fn whitespace() -> Token{
+        Token::Symbol(Symbol::Whitespace)
+    }
+}
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Literal {
     BoolLiteral(bool),
@@ -136,6 +142,7 @@ fn peek_symbol(lexer: &mut Lexer, test: char, matched: Symbol, not_matched: Symb
         if c == test {
             Token::Symbol(matched)
         } else {
+            lexer.step_back();
             Token::Symbol(not_matched)
         }
     } else {
@@ -248,115 +255,19 @@ impl Iterator for Lexer {
 
 #[cfg(test)]
 mod test {
-    use crate::Symbol;
+    use super::*;
+    use std::fmt::Debug;
+    use pretty_assertions::assert_eq;
 
-    use super::{DataTypeKwd, Lexer, Token};
-
-    #[test]
-    fn read_kwd_data_type() {
-        let input = "bool";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Bool))];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "char";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Char))];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "float";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Float))];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "int";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Int))];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "string";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::String))];
-        let actual = lexer.collect::<Vec<Token>>();
+    fn test<T>(input: &str, expected: T)
+    where
+        T: FromIterator<Token> + Debug + PartialEq,
+    {
+        let actual = Lexer::new(input).collect::<T>();
         assert_eq!(expected, actual);
     }
 
-    #[test]
-    fn read_kwd_non_data_type() {
-        let input = "while";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::While)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "for";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::For)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "if";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::If)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "return";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::Return)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "in";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::In)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "break";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::Break)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "include";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::Include)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "else";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Kwd(super::Kwd::Else)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-    }
-    #[test]
-    fn read_literals() {
-        let input = "true";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Literal(super::Literal::BoolLiteral(true))];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "false";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Literal(super::Literal::BoolLiteral(false))];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "3";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Literal(super::Literal::IntLiteral(3))];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-    }
-
-    fn test<T>(input: T, expected: Token)
+    fn test_char<T>(input: T, expected: Token)
     where
         T: ToString,
     {
@@ -365,105 +276,145 @@ mod test {
         assert_eq!(expected, actual);
     }
 
-    // TODO: Single symbol tests
+    #[test]
+    fn read_kwd_data_type() {
+        test(
+            "bool",
+            vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Bool))],
+        );
+        test(
+            "char",
+            vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Char))],
+        );
+        test(
+            "float",
+            vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Float))],
+        );
+        test(
+            "int",
+            vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Int))],
+        );
+        test(
+            "string",
+            vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::String))],
+        );
+    }
+
+    #[test]
+    fn read_kwd_non_data_type() {
+        test("while", vec![Token::Kwd(Kwd::While)]);
+        test("for", vec![Token::Kwd(Kwd::For)]);
+        test("if", vec![Token::Kwd(Kwd::If)]);
+        test("return", vec![Token::Kwd(Kwd::Return)]);
+        test("in", vec![Token::Kwd(Kwd::In)]);
+        test("break", vec![Token::Kwd(Kwd::Break)]);
+        test("include", vec![Token::Kwd(Kwd::Include)]);
+        test("else", vec![Token::Kwd(Kwd::Else)]);
+    }
+    #[test]
+    fn read_literals() {
+        test("true", vec![Token::Literal(Literal::BoolLiteral(true))]);
+        test("false", vec![Token::Literal(Literal::BoolLiteral(false))]);
+        test("3", vec![Token::Literal(Literal::IntLiteral(3))]);
+    }
+
     #[test]
     fn read_1_char_symbols() {
-        test('(', Token::Symbol(Symbol::ParenOpen));
-        test(')', Token::Symbol(Symbol::ParenClose));
-        test('[', Token::Symbol(Symbol::AngOpen));
-        test(']', Token::Symbol(Symbol::AngClose));
-        test('{', Token::Symbol(Symbol::BraceOpen));
-        test('}', Token::Symbol(Symbol::BraceClose));
-        test('%', Token::Symbol(Symbol::Modulus));
-        test('\"', Token::Symbol(Symbol::Quote));
-        test('\'', Token::Symbol(Symbol::Apstr));
-        test(',', Token::Symbol(Symbol::Comma));
-        test('.', Token::Symbol(Symbol::Period));
-        test('\\', Token::Symbol(Symbol::BckSlash));
-        test('$', Token::Symbol(Symbol::Dollar));
-        test(':', Token::Symbol(Symbol::Colon));
-        test('_', Token::Symbol(Symbol::Underscore));
-        test('\n', Token::Symbol(Symbol::Newline));
-        test(' ', Token::Symbol(Symbol::Whitespace));
-        test('<', Token::Symbol(Symbol::ChevOpen));
-        test('>', Token::Symbol(Symbol::ChevClose));
-        test('+', Token::Symbol(Symbol::Plus));
-        test('-', Token::Symbol(Symbol::Minus));
-        test('*', Token::Symbol(Symbol::Asterisk));
-        test('/', Token::Symbol(Symbol::FwdSlash));
-        test('=', Token::Symbol(Symbol::Equals));
-        test('!', Token::Symbol(Symbol::Bang));
-        test('&', Token::Symbol(Symbol::Ampsnd));
-        test('|', Token::Symbol(Symbol::Pipe));
+        test_char('(', Token::Symbol(Symbol::ParenOpen));
+        test_char(')', Token::Symbol(Symbol::ParenClose));
+        test_char('[', Token::Symbol(Symbol::AngOpen));
+        test_char(']', Token::Symbol(Symbol::AngClose));
+        test_char('{', Token::Symbol(Symbol::BraceOpen));
+        test_char('}', Token::Symbol(Symbol::BraceClose));
+        test_char('%', Token::Symbol(Symbol::Modulus));
+        test_char('\"', Token::Symbol(Symbol::Quote));
+        test_char('\'', Token::Symbol(Symbol::Apstr));
+        test_char(',', Token::Symbol(Symbol::Comma));
+        test_char('.', Token::Symbol(Symbol::Period));
+        test_char('\\', Token::Symbol(Symbol::BckSlash));
+        test_char('$', Token::Symbol(Symbol::Dollar));
+        test_char(':', Token::Symbol(Symbol::Colon));
+        test_char('_', Token::Symbol(Symbol::Underscore));
+        test_char('\n', Token::Symbol(Symbol::Newline));
+        test_char(' ', Token::Symbol(Symbol::Whitespace));
+        test_char('<', Token::Symbol(Symbol::ChevOpen));
+        test_char('>', Token::Symbol(Symbol::ChevClose));
+        test_char('+', Token::Symbol(Symbol::Plus));
+        test_char('-', Token::Symbol(Symbol::Minus));
+        test_char('*', Token::Symbol(Symbol::Asterisk));
+        test_char('/', Token::Symbol(Symbol::FwdSlash));
+        test_char('=', Token::Symbol(Symbol::Equals));
+        test_char('!', Token::Symbol(Symbol::Bang));
+        test_char('&', Token::Symbol(Symbol::Ampsnd));
+        test_char('|', Token::Symbol(Symbol::Pipe));
+    }
+
+    #[test]
+    fn function_call() {
+        test(
+            "add x y",
+            vec![
+                Token::Ident("add".to_string()),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Ident("y".to_string()),
+            ],
+        );
+    }
+
+    #[test]
+    fn function_def() {
+        test(
+            r"
+add (x, y) {
+    return x + y
+}",
+            vec![
+                Token::Symbol(Symbol::Newline), // for formatting purposes
+                Token::Ident("add".to_string()),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Symbol(Symbol::ParenOpen),
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Comma),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Ident("y".to_string()),
+                Token::Symbol(Symbol::ParenClose),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                // start of indentation
+                Token::Symbol(Symbol::Whitespace),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Symbol(Symbol::Whitespace),
+                // end of indentation
+                Token::Kwd(Kwd::Return),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Symbol(Symbol::Plus),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Ident("y".to_string()),
+                Token::Symbol(Symbol::Newline),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+        );
     }
 
     #[test]
     fn read_2_char_symbols() {
-        let input = "==";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::Equality)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "!=";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::NotEquality)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "+=";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::PlusAssign)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "-=";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::MinusAssign)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "*=";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::MultiplyAssign)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "/=";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::DivideAssign)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "->";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::Arrow)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "&&";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::And)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "||";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::Or)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = ">=";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::GzEq)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
-
-        let input = "<=";
-        let lexer = Lexer::new(input);
-        let expected = vec![Token::Symbol(crate::lexer::Symbol::LzEq)];
-        let actual = lexer.collect::<Vec<Token>>();
-        assert_eq!(expected, actual);
+        test("==", vec![Token::Symbol(Symbol::Equality)]);
+        test("!=", vec![Token::Symbol(Symbol::NotEquality)]);
+        test("+=", vec![Token::Symbol(Symbol::PlusAssign)]);
+        test("-=", vec![Token::Symbol(Symbol::MinusAssign)]);
+        test("*=", vec![Token::Symbol(Symbol::MultiplyAssign)]);
+        test("/=", vec![Token::Symbol(Symbol::DivideAssign)]);
+        test("->", vec![Token::Symbol(Symbol::Arrow)]);
+        test("&&", vec![Token::Symbol(Symbol::And)]);
+        test("||", vec![Token::Symbol(Symbol::Or)]);
+        test(">=", vec![Token::Symbol(Symbol::GzEq)]);
+        test("<=", vec![Token::Symbol(Symbol::LzEq)]);
     }
 
     #[test]
@@ -472,16 +423,48 @@ mod test {
 
         let expected = vec![
             Token::Ident("print".to_string()),
-            Token::Symbol(crate::lexer::Symbol::Whitespace),
-            Token::Symbol(crate::lexer::Symbol::Quote),
+            Token::Symbol(Symbol::Whitespace),
+            Token::Symbol(Symbol::Quote),
             Token::Ident("Hello".to_string()),
-            Token::Symbol(crate::lexer::Symbol::Whitespace),
+            Token::Symbol(Symbol::Whitespace),
             Token::Ident("World".to_string()),
-            Token::Symbol(crate::lexer::Symbol::Quote),
+            Token::Symbol(Symbol::Quote),
         ];
 
         let actual = Lexer::new(input).collect::<Vec<Token>>();
 
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn complex_variable_assignment_with_newline() {
+        test("x = if true { return 5 } else { return 4 }\n", vec![
+            Token::Ident("x".to_string()),
+            Token::whitespace(),
+            Token::Symbol(Symbol::Equals),
+            Token::whitespace(),
+            Token::Kwd(Kwd::If),
+            Token::whitespace(),
+            Token::Literal(Literal::BoolLiteral(true)),
+            Token::whitespace(),
+            Token::Symbol(Symbol::BraceOpen),
+            Token::whitespace(),
+            Token::Kwd(Kwd::Return),
+            Token::whitespace(),
+            Token::Literal(Literal::IntLiteral(5)),
+            Token::whitespace(),
+            Token::Symbol(Symbol::BraceClose),
+            Token::whitespace(),
+            Token::Kwd(Kwd::Else),
+            Token::whitespace(),
+            Token::Symbol(Symbol::BraceOpen),
+            Token::whitespace(),
+            Token::Kwd(Kwd::Return),
+            Token::whitespace(),
+            Token::Literal(Literal::IntLiteral(4)),
+            Token::whitespace(),
+            Token::Symbol(Symbol::BraceClose),
+            Token::Symbol(Symbol::Newline)
+        ]);
     }
 }
