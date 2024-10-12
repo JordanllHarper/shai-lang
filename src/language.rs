@@ -43,7 +43,31 @@ impl ValueLiteral {
             representation: representation.to_string(),
         }
     }
+
+    pub fn new_string(representation: &str) -> Self {
+        ValueLiteral::new(NativeType::String, representation)
+    }
 }
+
+
+/// Represents a list of function arguments passed into a function
+///
+/// Arguments can be single values or expressions.
+///
+/// Example:
+/// ```
+/// print "Hello" "World" 5 // Hello World 5
+///
+/// print "Hello" {
+///     if true {
+///       "World"
+///     } else {
+///       "Planet"
+///     }
+/// } // Hello World
+/// ```
+pub type FunctionArguments = Vec<Expression>;
+
 /// Shai-lang is an expression based language. The [Expression] enum represents what expressions in the
 /// language can be.
 ///
@@ -116,7 +140,8 @@ impl ValueLiteral {
 ///
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expression {
-    SingleValue(ValueLiteral),
+    SingleValue(SingleValue),
+    MultipleValues(Vec<Expression>),
     Operation {
         lhs: Box<Expression>,
         rhs: Box<Expression>,
@@ -130,6 +155,26 @@ pub enum Expression {
     Body {
         body: Vec<Expression>,
     },
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum SingleValue {
+    ValueLiteral(ValueLiteral),
+    Identifier(String),
+}
+
+impl SingleValue {
+    pub fn new_string(representation: &str) -> Self {
+        Self::ValueLiteral(ValueLiteral::new(NativeType::String, representation))
+    }
+
+    pub fn new_int(representation: &str) -> Self {
+        Self::ValueLiteral(ValueLiteral::new(NativeType::Int, representation))
+    }
+
+    pub fn new_bool(representation: &str) -> Self {
+        Self::ValueLiteral(ValueLiteral::new(NativeType::Bool, representation))
+    }
 }
 
 /// Defines the 4 basic math operations supported
@@ -166,7 +211,7 @@ pub enum MathOperation {
 pub enum Operation {
     Math(MathOperation),               // +, -, /, *
     Assignment(Option<MathOperation>), // = or +=
-    FunctionCall, // fx args...
+    FunctionCall,                      // fx args...
 }
 
 /// Various methods of evaluating 2 expressions
@@ -195,7 +240,6 @@ pub struct Evaluation {
     rhs: Box<Expression>,
     comparator: EvaluationOperator,
 }
-
 
 type Arg = ValueLiteral;
 

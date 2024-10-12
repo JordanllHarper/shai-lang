@@ -1,5 +1,6 @@
 use crate::language::*;
 use crate::lexer::*;
+use crate::parser_helpers::*;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Node {
@@ -8,35 +9,6 @@ pub enum Node {
     Operation(Expression),
     Function(Function),
     Assignment(Assignment),
-}
-
-/// Advances `tokens` till it finds a token that is not contained in `test`.
-fn advance_past_multiple<'a, I>(tokens: &mut I, test: &[Token]) -> Option<&'a Token>
-where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
-{
-    tokens.find(|t| {
-        for t_token in test {
-            if *t != t_token {
-                return true;
-            }
-        }
-        false
-    })
-}
-
-fn advance_past<'a, I>(tokens: &mut I, test: Token) -> Option<&'a Token>
-where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
-{
-    tokens.find(|t| **t != test)
-}
-
-fn advance_past_whitespace<'a, I>(tokens: &mut I) -> Option<&'a Token>
-where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
-{
-    advance_past(tokens, Token::Symbol(Symbol::Whitespace))
 }
 
 fn parse_floating_point<'a, I>(tokens: &mut I, before_decimal: i32) -> ValueLiteral
@@ -65,7 +37,7 @@ where
         ValueLiteral::new(NativeType::Int, &i.to_string())
     };
 
-    Expression::SingleValue(num)
+    Expression::SingleValue(SingleValue::ValueLiteral(num))
 }
 
 /// TODO: Handle various types of operations, not just function calls
@@ -73,11 +45,9 @@ fn on_operation<'a, I>(tokens: &mut I, ident: String, expression: Expression) ->
 where
     I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 {
-    // build operation
     Node::Operation(Expression::Operation {
-        lhs: Box::new(Expression::SingleValue(ValueLiteral::new(
-            NativeType::Function,
-            &ident,
+        lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
+            ValueLiteral::new(NativeType::Function, &ident),
         ))),
         rhs: Box::new(expression),
         operation: Operation::FunctionCall,
@@ -124,7 +94,7 @@ where
 // Function assignment [ ]
 // add (...) { ... }
 //
-// Function call [ ]
+// Function call [x]
 // print "Hello World"
 //
 // Variable assignment [x]
@@ -138,10 +108,12 @@ where
     I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 {
     // TODO: Function call e.g. print "Hello, World" [x]
-    // TODO: Function call e.g. print y
+    // TODO: Function call with multiple parameters e.g. print "Hello" "World"
+    // TODO: Function call with identifier e.g. print y
     // TODO: Expression (empty statement) e.g. x + y
     // TODO: Variable Usage e.g. y = x + 3
-    match advance_past_whitespace(tokens) {
+    let t = advance_past_whitespace(tokens);
+    match t {
         // Assignment
         Some(Token::Symbol(Symbol::Equals)) => on_assignment(tokens, ident),
 
@@ -164,31 +136,14 @@ where
         }
 
         // Operations
-        // Function if value literal (arg)
-        Some(Token::Literal(l)) => {
-            let vl = to_vl(l);
-            on_operation(tokens, ident, Expression::SingleValue(vl))
+        // Function call if value literal or string
+        Some(Token::Literal(_)) | Some(Token::Symbol(Symbol::Quote)) => {
+            let args = parse_arguments(tokens, t.expect("This isn't None at this point"))
+                .expect("If this is None, aaaaaaaaaa idk");
+            let expression = Expression::MultipleValues(args);
+            on_operation(tokens, ident, expression)
         }
-        // Function if quote
-        // E.g. case print "Hello"
-        Some(Token::Symbol(Symbol::Quote)) => {
-            let str_literal = ValueLiteral::new(
-                NativeType::String,
-                &tokens
-                    .take_while(|t: &&Token| **t != Token::Symbol(Symbol::Quote))
-                    .fold(String::new(), |acc, e| acc + &e.to_string()),
-            );
-            on_operation(tokens, ident, Expression::SingleValue(str_literal))
-        }
-
         _ => todo!(),
-    }
-}
-
-fn to_vl(l: &Literal) -> ValueLiteral {
-    match l.clone() {
-        Literal::BoolLiteral(b) => ValueLiteral::new(NativeType::Bool, &b.to_string()),
-        Literal::IntLiteral(i) => ValueLiteral::new(NativeType::Int, &i.to_string()),
     }
 }
 
@@ -213,7 +168,8 @@ pub fn parse(tokens: &[Token]) -> Option<Node> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::*;
+    use super::*;
+    use pretty_assertions::assert_eq;
 
     fn test(input: Vec<Token>, expected: Node) {
         let actual = parse(&input).unwrap();
@@ -231,14 +187,107 @@ mod tests {
                 Token::Symbol(Symbol::Quote),
             ],
             Node::Operation(Expression::Operation {
-                lhs: Box::new(Expression::SingleValue(ValueLiteral::new(
-                    NativeType::Function,
-                    "print",
+                lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
+                    ValueLiteral::new(NativeType::Function, "print"),
                 ))),
-                rhs: Box::new(Expression::SingleValue(ValueLiteral::new(
-                    NativeType::String,
-                    "Hello",
+                rhs: Box::new(Expression::MultipleValues(vec![
+                    Expression::SingleValue(
+                    SingleValue::ValueLiteral(
+                    ValueLiteral::new(NativeType::String, "Hello"),
+                ))
+
+                ])),
+                operation: Operation::FunctionCall,
+            }),
+        );
+    }
+
+    #[test]
+    fn function_call_multiple_values() {
+        // print "Hello" "World"
+        test(
+            vec![
+                Token::Ident("print".to_string()),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Quote),
+                Token::Ident("Hello".to_string()),
+                Token::Symbol(Symbol::Quote),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Quote),
+                Token::Ident("World".to_string()),
+                Token::Symbol(Symbol::Quote),
+            ],
+            Node::Operation(Expression::Operation {
+                lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
+                    ValueLiteral::new(NativeType::Function, "print"),
                 ))),
+                rhs: Box::new(Expression::MultipleValues(vec![
+                    Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new_string(
+                        "Hello",
+                    ))),
+                    Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new_string(
+                        "World",
+                    ))),
+                ])),
+                operation: Operation::FunctionCall,
+            }),
+        );
+    }
+
+    #[test]
+    fn function_call_multiple_values_with_identifier() {
+        // print "Hello" true
+        test(
+            vec![
+                Token::Ident("print".to_string()),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Quote),
+                Token::Ident("Hello".to_string()),
+                Token::Symbol(Symbol::Quote),
+                Token::whitespace(),
+                Token::Ident("x".to_string()),
+            ],
+            Node::Operation(Expression::Operation {
+                lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
+                    ValueLiteral::new(NativeType::Function, "print"),
+                ))),
+                rhs: Box::new(Expression::MultipleValues(vec![
+                    Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new_string(
+                        "Hello",
+                    ))),
+                    Expression::SingleValue(SingleValue::Identifier("x".to_string())),
+                ])),
+                operation: Operation::FunctionCall,
+            }),
+        );
+    }
+
+    #[test]
+    fn function_call_multiple_values_with_literal() {
+        // print "Hello" true
+        test(
+            vec![
+                Token::Ident("print".to_string()),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Quote),
+                Token::Ident("Hello".to_string()),
+                Token::Symbol(Symbol::Quote),
+                Token::whitespace(),
+                Token::Literal(Literal::BoolLiteral(true)),
+            ],
+            Node::Operation(Expression::Operation {
+                lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
+                    ValueLiteral::new(NativeType::Function, "print"),
+                ))),
+                rhs: Box::new(Expression::MultipleValues(vec![
+                    Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new_string(
+                        "Hello",
+                    ))),
+                    Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+                        NativeType::Bool,
+                        "true",
+                    ))),
+                ])),
                 operation: Operation::FunctionCall,
             }),
         );
@@ -246,10 +295,13 @@ mod tests {
 
     #[test]
     fn literal_assignment() {
-        // Literal input => "x=5"
+        // "x=5"
         let expected = Node::Assignment(Assignment::new(
             "x",
-            Expression::SingleValue(ValueLiteral::new(NativeType::Int, "5")),
+            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+                NativeType::Int,
+                "5",
+            ))),
         ));
         test(
             vec![
@@ -260,7 +312,7 @@ mod tests {
             expected.clone(),
         );
         // Whitespace handling
-        // Literal input => "x = 5"
+        // "x = 5"
         test(
             vec![
                 Token::Ident("x".to_string()),
@@ -271,7 +323,29 @@ mod tests {
             ],
             Node::Assignment(Assignment::new(
                 "x",
-                Expression::SingleValue(ValueLiteral::new(NativeType::Int, "5")),
+                Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+                    NativeType::Int,
+                    "5",
+                ))),
+            )),
+        );
+
+        // Uneven whitespace handling (unlike swift)
+        // "x= 5"
+
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Equals),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Literal(Literal::IntLiteral(5)),
+            ],
+            Node::Assignment(Assignment::new(
+                "x",
+                Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+                    NativeType::Int,
+                    "5",
+                ))),
             )),
         );
     }
