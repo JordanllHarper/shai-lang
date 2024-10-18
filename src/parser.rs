@@ -15,7 +15,8 @@ fn parse_floating_point<'a, I>(tokens: &mut I, before_decimal: i32) -> ValueLite
 where
     I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 {
-    let after_decimal = tokens.next();
+    // Advance past whitespace given the input is 3.   41
+    let after_decimal = advance_past_whitespace(tokens);
     match after_decimal {
         Some(Token::Literal(Literal::IntLiteral(i))) => ValueLiteral::new(
             NativeType::Float,
@@ -71,6 +72,7 @@ where
             let num = handle_integer_literal(tokens, *x);
             let expr = match advance_past_whitespace(tokens) {
                 Some(Token::Symbol(Symbol::Newline)) | None => num,
+
                 // This is not the end of the assignment woooooo...
                 // TODO: Expression operation assignment
                 Some(t) => todo!(),
@@ -107,7 +109,6 @@ fn on_identifier<'a, I>(tokens: &mut I, ident: String) -> Node
 where
     I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 {
-    // TODO: Function call e.g. print "Hello, World" [x]
     // TODO: Function call with multiple parameters e.g. print "Hello" "World"
     // TODO: Function call with identifier e.g. print y
     // TODO: Expression (empty statement) e.g. x + y
@@ -190,15 +191,33 @@ mod tests {
                 lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                     ValueLiteral::new(NativeType::Function, "print"),
                 ))),
-                rhs: Box::new(Expression::MultipleValues(vec![
-                    Expression::SingleValue(
-                    SingleValue::ValueLiteral(
-                    ValueLiteral::new(NativeType::String, "Hello"),
-                ))
-
-                ])),
+                rhs: Box::new(Expression::MultipleValues(vec![Expression::SingleValue(
+                    SingleValue::ValueLiteral(ValueLiteral::new(NativeType::String, "Hello")),
+                )])),
                 operation: Operation::FunctionCall,
             }),
+        );
+    }
+
+    #[test]
+    fn floating_point_nums_in_assignment() {
+        // x=3.5\n
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Equals),
+                Token::Literal(Literal::IntLiteral(3)),
+                Token::Symbol(Symbol::Period),
+                Token::Literal(Literal::IntLiteral(5)),
+                Token::Symbol(Symbol::Newline),
+            ],
+            Node::Assignment(Assignment::new(
+                "x",
+                Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+                    NativeType::Float,
+                    "3.5",
+                ))),
+            )),
         );
     }
 
