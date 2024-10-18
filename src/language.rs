@@ -1,3 +1,5 @@
+use crate::DataTypeKwd;
+
 /// The supported native data types in the language.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum NativeType {
@@ -15,6 +17,19 @@ pub enum NativeType {
         value: Box<NativeType>,
     },
     Function,
+}
+
+impl NativeType {
+    pub fn from_datatype_kwd(kwd : &DataTypeKwd) -> Self {
+        match kwd {
+            DataTypeKwd::Bool => Self::Bool,
+            DataTypeKwd::Char => Self::Char,
+            DataTypeKwd::Float => Self::Float,
+            DataTypeKwd::Int => Self::Int,
+            DataTypeKwd::String => Self::String,
+            DataTypeKwd::Void => Self::Void,
+        }
+    }
 }
 
 /// A single value representation.
@@ -48,7 +63,6 @@ impl ValueLiteral {
         ValueLiteral::new(NativeType::String, representation)
     }
 }
-
 
 /// Represents a list of function arguments passed into a function
 ///
@@ -250,24 +264,24 @@ type Arg = ValueLiteral;
 /// Example: (x int) -> int { ... }
 ///              |- Arg type explicitly
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct FParameter {
+pub struct Parameter {
     ident: String,
     native_type: NativeType,
 }
 
-impl FParameter {
-    pub fn new(ident: String, native_type: NativeType) -> Self {
-        Self { ident, native_type }
+impl Parameter {
+    pub fn new(ident: &str, native_type: NativeType) -> Self {
+        Self { ident: ident.to_string(), native_type }
     }
 }
 
 /// Type alias to represent a collection of parameters in a function
 /// Example: (x, y, z) -> ...
-type Params = Vec<FParameter>;
+pub type FunctionParameters = Vec<Parameter>;
 
 /// Type alias to represent a Return Type in a function
 /// Example: (...) -> int/string/char/etc
-type ReturnType = NativeType;
+pub type ReturnType = NativeType;
 
 //
 //
@@ -312,7 +326,7 @@ impl Assignment {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function {
     ident: String,
-    args: Params,
+    args: FunctionParameters,
     return_type: ReturnType,
     body: Expression,
 }

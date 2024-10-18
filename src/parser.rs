@@ -11,7 +11,7 @@ pub enum Node {
     Assignment(Assignment),
 }
 
-fn parse_floating_point<'a, I>(tokens: &mut I, before_decimal: i32) -> ValueLiteral
+fn on_floating_point<'a, I>(tokens: &mut I, before_decimal: i32) -> ValueLiteral
 where
     I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 {
@@ -28,17 +28,66 @@ where
         }
     }
 }
-fn handle_integer_literal<'a, I>(tokens: &mut I, i: i32) -> Expression
+fn on_integer_literal<'a, I>(tokens: &mut I, i: i32) -> Expression
 where
     I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 {
     let num = if let Some(Token::Symbol(Symbol::Period)) = advance_past_whitespace(tokens) {
-        parse_floating_point(tokens, i)
+        on_floating_point(tokens, i)
     } else {
         ValueLiteral::new(NativeType::Int, &i.to_string())
     };
 
     Expression::SingleValue(SingleValue::ValueLiteral(num))
+}
+
+fn on_function_declaration<'a, I>(tokens: &mut I, ident: String) -> Node
+where
+    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+{
+    // TODO: Consider implementation of functions as parameters
+    let mut args: FunctionParameters = Vec::new();
+    // Parse args
+    while let Some(t) = advance_past_whitespace(tokens) {
+        // TODO: parse the argument and it's type
+        let arg: Option<&str> = if let Token::Ident(id) = t {
+            Some(id)
+        } else {
+            // Invalid syntax
+            None
+        };
+        let native_type = if let Some(Token::Kwd(Kwd::DataType(d))) = advance_past_whitespace(tokens)
+        {
+            Some(d)
+        } else {
+            None
+        };
+
+
+        let parameter = match (arg, native_type){
+            (Some(i), Some(kwd)) => Parameter::new(i, NativeType::from_datatype_kwd(kwd)) ,
+            _ => { 
+                // Invalid syntax
+                // TODO: Handle gracefully
+                unreachable!()
+
+            }
+        };
+
+
+        args.push(parameter)
+    }
+    // Args are complete 
+    // Now we need to parse return type (if arrow exists)
+    // And then function body
+    //
+    // How do we parse return type if user omits arrow syntax
+    // e.g. f(..) _not_required_ { ... } 
+    //
+    // Perhaps we need to capture this in type system
+    // e.g. have a "typed-return-function"
+
+    todo!()
 }
 
 /// TODO: Handle various types of operations, not just function calls
@@ -69,7 +118,7 @@ where
     let current = advance_past_whitespace(tokens);
     match current {
         Some(Token::Literal(Literal::IntLiteral(x))) => {
-            let num = handle_integer_literal(tokens, *x);
+            let num = on_integer_literal(tokens, *x);
             let expr = match advance_past_whitespace(tokens) {
                 Some(Token::Symbol(Symbol::Newline)) | None => num,
 
@@ -96,12 +145,6 @@ where
 // Function assignment [ ]
 // add (...) { ... }
 //
-// Function call [x]
-// print "Hello World"
-//
-// Variable assignment [x]
-// x = 3
-//
 // Variable usage
 // y = *x* + 3
 //      |- here is usage
@@ -109,8 +152,6 @@ fn on_identifier<'a, I>(tokens: &mut I, ident: String) -> Node
 where
     I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 {
-    // TODO: Function call with multiple parameters e.g. print "Hello" "World"
-    // TODO: Function call with identifier e.g. print y
     // TODO: Expression (empty statement) e.g. x + y
     // TODO: Variable Usage e.g. y = x + 3
     let t = advance_past_whitespace(tokens);
@@ -138,12 +179,16 @@ where
 
         // Operations
         // Function call if value literal or string
+        // TODO: Clean up these expects
         Some(Token::Literal(_)) | Some(Token::Symbol(Symbol::Quote)) => {
             let args = parse_arguments(tokens, t.expect("This isn't None at this point"))
                 .expect("If this is None, aaaaaaaaaa idk");
             let expression = Expression::MultipleValues(args);
             on_operation(tokens, ident, expression)
         }
+
+        // Function assignment add (...) { ... }
+        Some(Token::Symbol(Symbol::ParenOpen)) => on_function_declaration(tokens, ident),
         _ => todo!(),
     }
 }
@@ -255,7 +300,7 @@ mod tests {
 
     #[test]
     fn function_call_multiple_values_with_identifier() {
-        // print "Hello" true
+        // print "Hello" x
         test(
             vec![
                 Token::Ident("print".to_string()),
