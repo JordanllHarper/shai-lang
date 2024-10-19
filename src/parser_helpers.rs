@@ -1,18 +1,12 @@
 use crate::language::*;
 use crate::lexer::*;
-use crate::parser::*;
 
 pub fn advance_past_multiple<'a, I>(tokens: &mut I, test: &[Token]) -> Option<&'a Token>
 where
     I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 {
     tokens.find(|t| {
-        for t_token in test {
-            if *t != t_token {
-                return true;
-            }
-        }
-        false
+        !test.contains(t)
     })
 }
 
@@ -22,6 +16,7 @@ where
 {
     tokens.find(|t| **t != test)
 }
+
 
 pub fn advance_past_whitespace<'a, I>(tokens: &mut I) -> Option<&'a Token>
 where

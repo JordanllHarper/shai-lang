@@ -1,4 +1,4 @@
-use crate::DataTypeKwd;
+use crate::{DataTypeKwd, Symbol, Token};
 
 /// The supported native data types in the language.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -20,7 +20,7 @@ pub enum NativeType {
 }
 
 impl NativeType {
-    pub fn from_datatype_kwd(kwd : &DataTypeKwd) -> Self {
+    pub fn from_datatype_kwd(kwd: &DataTypeKwd) -> Self {
         match kwd {
             DataTypeKwd::Bool => Self::Bool,
             DataTypeKwd::Char => Self::Char,
@@ -156,6 +156,10 @@ pub type FunctionArguments = Vec<Expression>;
 pub enum Expression {
     SingleValue(SingleValue),
     MultipleValues(Vec<Expression>),
+    Statement {
+        expression: Box<Expression>,
+        operation: Operation,
+    },
     Operation {
         lhs: Box<Expression>,
         rhs: Box<Expression>,
@@ -166,6 +170,7 @@ pub enum Expression {
         rhs: Box<Expression>,
         eval: Evaluation,
     },
+    FunctionDeclaration(Box<FunctionDeclaration>),
     Body {
         body: Vec<Expression>,
     },
@@ -205,6 +210,19 @@ pub enum MathOperation {
     Divide,
 }
 
+impl MathOperation {
+    pub fn from_token(t: Token) -> Option<Self> {
+        match t {
+            Token::Symbol(Symbol::FwdSlash) => Some(Self::Divide),
+            Token::Symbol(Symbol::Asterisk) => Some(Self::Multiply),
+            Token::Symbol(Symbol::Plus) => Some(Self::Add),
+            Token::Symbol(Symbol::Minus) => Some(Self::Subtract),
+
+            _ => None,
+        }
+    }
+}
+
 /// Representation of the operations supported in the language.
 ///
 /// Examples:
@@ -225,7 +243,8 @@ pub enum MathOperation {
 pub enum Operation {
     Math(MathOperation),               // +, -, /, *
     Assignment(Option<MathOperation>), // = or +=
-    FunctionCall,                      // fx args...
+    Return,
+    FunctionCall, // fx args...
 }
 
 /// Various methods of evaluating 2 expressions
@@ -255,6 +274,7 @@ pub struct Evaluation {
     comparator: EvaluationOperator,
 }
 
+/// Alias for a function argument
 type Arg = ValueLiteral;
 
 /// Represents an parameters in a function declaration.
@@ -266,12 +286,15 @@ type Arg = ValueLiteral;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Parameter {
     ident: String,
-    native_type: NativeType,
+    native_type: Option<NativeType>,
 }
 
 impl Parameter {
-    pub fn new(ident: &str, native_type: NativeType) -> Self {
-        Self { ident: ident.to_string(), native_type }
+    pub fn new(ident: &str, native_type: Option<NativeType>) -> Self {
+        Self {
+            ident: ident.to_string(),
+            native_type,
+        }
     }
 }
 
@@ -282,34 +305,6 @@ pub type FunctionParameters = Vec<Parameter>;
 /// Type alias to represent a Return Type in a function
 /// Example: (...) -> int/string/char/etc
 pub type ReturnType = NativeType;
-
-//
-//
-// ----
-//
-// Complex language constructs
-// These are built from above
-
-/// Represents the language construct of assigning some expression to some identifier.
-///
-/// Example: x = 5
-///
-/// ident = x
-/// rhs = expression of 5
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Assignment {
-    ident: String,
-    rhs: Expression,
-}
-
-impl Assignment {
-    pub fn new(ident: &str, rhs: Expression) -> Self {
-        Self {
-            ident: ident.to_string(),
-            rhs,
-        }
-    }
-}
 
 /// Represents a function in the language.
 ///
@@ -324,9 +319,25 @@ impl Assignment {
 /// int = return type
 /// { return x + y } = Expression
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Function {
+pub struct FunctionDeclaration {
     ident: String,
     args: FunctionParameters,
-    return_type: ReturnType,
+    return_type: Option<ReturnType>,
     body: Expression,
+}
+
+impl FunctionDeclaration {
+    pub fn new(
+        ident: &str,
+        args: FunctionParameters,
+        return_type: Option<ReturnType>,
+        body: Expression,
+    ) -> Self {
+        Self {
+            ident: ident.to_string(),
+            args,
+            return_type,
+            body,
+        }
+    }
 }
