@@ -30,6 +30,7 @@ impl Literal {
         match self.clone() {
             Literal::BoolLiteral(b) => SingleValue::new_bool(&b.to_string()),
             Literal::IntLiteral(i) => SingleValue::new_int(&i.to_string()),
+            Literal::StringLiteral(s) => SingleValue::new_string(&s.to_string()),
         }
     }
 }

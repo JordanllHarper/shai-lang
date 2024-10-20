@@ -279,6 +279,9 @@ where
         Some(Token::Literal(l)) => match l {
             Literal::BoolLiteral(_) => Some(Expression::SingleValue(l.to_vl())),
             Literal::IntLiteral(i) => Some(on_integer_literal(tokens, *i)),
+            Literal::StringLiteral(s) => Some(Expression::SingleValue(SingleValue::ValueLiteral(
+                ValueLiteral::new(NativeType::String, s),
+            ))),
         },
         Some(
             Token::Symbol(Symbol::Plus)
@@ -373,7 +376,7 @@ mod tests {
                 "do_nothing",
                 vec![],
                 None,
-                Expression::Body { body: vec![] }
+                Expression::Body { body: vec![] },
             ))),
         );
     }

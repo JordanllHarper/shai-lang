@@ -49,13 +49,13 @@ impl Display for Token {
                 Kwd::Else => "else",
             },
             Token::Ident(i) => i,
-            Token::Symbol(s) => match  s {
+            Token::Symbol(s) => match s {
                 Symbol::ParenOpen => "(",
                 Symbol::ParenClose => ")",
                 Symbol::ChevOpen => "<",
                 Symbol::ChevClose => ">",
                 Symbol::AngOpen => "[",
-                Symbol::AngClose =>"]",
+                Symbol::AngClose => "]",
                 Symbol::BraceOpen => "{",
                 Symbol::BraceClose => "}",
                 Symbol::Equals => "=",
@@ -91,9 +91,10 @@ impl Display for Token {
                 Symbol::EscapeQuote => "\\\"",
                 Symbol::EscapeApos => "\\\'",
             },
-            Token::Literal(l) => match l  {
+            Token::Literal(l) => match l {
                 Literal::BoolLiteral(b) => &b.to_string(),
                 Literal::IntLiteral(i) => &i.to_string(),
+                Literal::StringLiteral(s) => &s.to_string(),
             },
         };
         f.write_str(str_rep)
@@ -104,7 +105,7 @@ impl Display for Token {
 pub enum Literal {
     BoolLiteral(bool),
     IntLiteral(i32),
-    // TODO: Consider Float literal
+    StringLiteral(String), // TODO: Consider Float literal
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -214,6 +215,21 @@ impl Lexer {
     }
 }
 
+fn peek_while<M>(test: char, lexer: &mut Lexer, mapping: M) -> Token
+where
+    M: Fn(&[char]) -> Token,
+{
+    let mut c_collection = Vec::new();
+
+    while let Some(t) = lexer.advance() {
+        if t == test {
+            break;
+        }
+        c_collection.push(t);
+    }
+    mapping(&c_collection)
+}
+
 fn peek_symbol(lexer: &mut Lexer, test: char, matched: Symbol, not_matched: Symbol) -> Token {
     let next = lexer.advance();
     if let Some(c) = next {
@@ -303,7 +319,6 @@ impl Iterator for Lexer {
                 '{' => Token::Symbol(Symbol::BraceOpen),
                 '}' => Token::Symbol(Symbol::BraceClose),
                 '%' => Token::Symbol(Symbol::Modulus),
-                '\"' => Token::Symbol(Symbol::Quote),
                 '\'' => Token::Symbol(Symbol::Apstr),
                 ',' => Token::Symbol(Symbol::Comma),
                 '.' => Token::Symbol(Symbol::Period),
@@ -321,6 +336,9 @@ impl Iterator for Lexer {
                 '_' => Token::Symbol(Symbol::Underscore),
                 '\n' => Token::Symbol(Symbol::Newline),
                 ' ' => Token::Symbol(Symbol::Whitespace),
+                '"' => peek_while('"', self, |characters| {
+                    Token::Literal(Literal::StringLiteral(String::from_iter(characters.iter())))
+                }),
                 '<' => peek_symbol(self, '=', Symbol::LzEq, Symbol::ChevOpen),
                 '>' => peek_symbol(self, '=', Symbol::GzEq, Symbol::ChevClose),
                 '+' => peek_symbol(self, '=', Symbol::PlusAssign, Symbol::Plus),
@@ -426,7 +444,7 @@ mod test {
         test_char('{', Token::Symbol(Symbol::BraceOpen));
         test_char('}', Token::Symbol(Symbol::BraceClose));
         test_char('%', Token::Symbol(Symbol::Modulus));
-        test_char('\"', Token::Symbol(Symbol::Quote));
+        // test_char('\"', Token::Symbol(Symbol::Quote));
         test_char('\'', Token::Symbol(Symbol::Apstr));
         test_char(',', Token::Symbol(Symbol::Comma));
         test_char('.', Token::Symbol(Symbol::Period));
@@ -518,29 +536,21 @@ add (x, y) {
 
     #[test]
     fn hello_world_test() {
-        test("print \"Hello World\"", vec![
-            Token::Ident("print".to_string()),
-            Token::Symbol(Symbol::Whitespace),
-            Token::Symbol(Symbol::Quote),
-            Token::Ident("Hello".to_string()),
-            Token::Symbol(Symbol::Whitespace),
-            Token::Ident("World".to_string()),
-            Token::Symbol(Symbol::Quote),
-        ]);
+        test(
+            "print \"Hello World\"",
+            vec![
+                Token::Ident("print".to_string()),
+                Token::Symbol(Symbol::Whitespace),
+                Token::Literal(Literal::StringLiteral("Hello World".to_string())),
+            ],
+        );
     }
-
 
     #[test]
     fn read_escaped_characters() {
+        test("\\\"", vec![Token::Symbol(Symbol::EscapeQuote)]);
 
-        test("\\\"", vec![
-            Token::Symbol(Symbol::EscapeQuote)
-        ]);
-
-        test("\\'", vec![
-            Token::Symbol(Symbol::EscapeApos)
-        ]);
-
+        test("\\'", vec![Token::Symbol(Symbol::EscapeApos)]);
     }
 
     #[test]
