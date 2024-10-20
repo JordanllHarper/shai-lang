@@ -343,6 +343,42 @@ mod tests {
     }
 
     #[test]
+    fn function_declaration_no_args() {
+        // do_nothing () {\n
+        // \n
+        // }\n
+        test(
+            vec![
+                // Signature
+                Token::Ident("add".to_string()),
+                Token::whitespace(),
+                // Args
+                Token::Symbol(Symbol::ParenOpen),
+                Token::Symbol(Symbol::ParenClose),
+                // End of args
+                // Start of return type
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                // body (assume 4 spaces)
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Newline),
+                // end
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::Newline),
+            ],
+            Expression::FunctionDeclaration(Box::new(FunctionDeclaration::new(
+                "do_nothing",
+                vec![],
+                None,
+                Expression::Body { body: vec![] }
+            ))),
+        );
+    }
+
+    #[test]
     fn function_declaration() {
         // No specified types
         // add (numOne, numTwo) {\n
