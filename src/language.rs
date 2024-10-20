@@ -82,6 +82,17 @@ impl ValueLiteral {
 /// ```
 pub type FunctionArguments = Vec<Expression>;
 
+/// Represents a program 'body'. That is, a collection of expressions in a row.
+///
+/// Examples:
+///
+/// ```
+/// add (numOne, numTwo) {  
+///     /* start of function *body* */
+/// }
+/// ```
+pub type Body = Vec<Expression>;
+
 /// Shai-lang is an expression based language. The [Expression] enum represents what expressions in the
 /// language can be.
 ///
@@ -171,9 +182,7 @@ pub enum Expression {
         eval: Evaluation,
     },
     FunctionDeclaration(Box<FunctionDeclaration>),
-    Body {
-        body: Vec<Expression>,
-    },
+    Body(Body),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
