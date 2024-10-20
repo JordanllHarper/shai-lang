@@ -92,9 +92,9 @@ impl Display for Token {
                 Symbol::EscapeApos => "\\\'",
             },
             Token::Literal(l) => match l {
-                Literal::BoolLiteral(b) => &b.to_string(),
-                Literal::IntLiteral(i) => &i.to_string(),
-                Literal::StringLiteral(s) => &s.to_string(),
+                Literal::Bool(b) => &b.to_string(),
+                Literal::Int(i) => &i.to_string(),
+                Literal::String(s) => &s.to_string(),
             },
         };
         f.write_str(str_rep)
@@ -103,9 +103,9 @@ impl Display for Token {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Literal {
-    BoolLiteral(bool),
-    IntLiteral(i32),
-    StringLiteral(String), // TODO: Consider Float literal
+    Bool(bool),
+    Int(i32),
+    String(String), // TODO: Consider Float literal
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -287,13 +287,11 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
         "char" => Token::Kwd(Kwd::DataType(DataTypeKwd::Char)),
         "float" => Token::Kwd(Kwd::DataType(DataTypeKwd::Float)),
         "string" => Token::Kwd(Kwd::DataType(DataTypeKwd::String)),
-        "true" => Token::Literal(Literal::BoolLiteral(true)),
-        "false" => Token::Literal(Literal::BoolLiteral(false)),
+        "true" => Token::Literal(Literal::Bool(true)),
+        "false" => Token::Literal(Literal::Bool(false)),
         s => {
-            // WARNING: This does not mean this is a 3 alone
-            // This could be "3" still, we would figure that out in the next stage
             if let Ok(i) = str::parse::<i32>(s) {
-                Token::Literal(Literal::IntLiteral(i))
+                Token::Literal(Literal::Int(i))
             } else {
                 Token::Ident(s.to_string())
             }
@@ -337,7 +335,7 @@ impl Iterator for Lexer {
                 '\n' => Token::Symbol(Symbol::Newline),
                 ' ' => Token::Symbol(Symbol::Whitespace),
                 '"' => peek_while('"', self, |characters| {
-                    Token::Literal(Literal::StringLiteral(String::from_iter(characters.iter())))
+                    Token::Literal(Literal::String(String::from_iter(characters.iter())))
                 }),
                 '<' => peek_symbol(self, '=', Symbol::LzEq, Symbol::ChevOpen),
                 '>' => peek_symbol(self, '=', Symbol::GzEq, Symbol::ChevClose),
@@ -394,6 +392,49 @@ mod test {
     }
 
     #[test]
+    fn string_number_parsed() {
+        test(
+            "\"3\"",
+            vec![Token::Literal(Literal::String("3".to_string()))],
+        )
+    }
+
+    #[test]
+    fn complex_variable_assignment_with_newline() {
+        test(
+            "x = if true { return 5 } else { return 4 }\n",
+            vec![
+                Token::Ident("x".to_string()),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Equals),
+                Token::whitespace(),
+                Token::Kwd(Kwd::If),
+                Token::whitespace(),
+                Token::Literal(Literal::Bool(true)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::whitespace(),
+                Token::Kwd(Kwd::Return),
+                Token::whitespace(),
+                Token::Literal(Literal::Int(5)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceClose),
+                Token::whitespace(),
+                Token::Kwd(Kwd::Else),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::whitespace(),
+                Token::Kwd(Kwd::Return),
+                Token::whitespace(),
+                Token::Literal(Literal::Int(4)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::Newline),
+            ],
+        );
+    }
+
+    #[test]
     fn read_kwd_data_type() {
         test(
             "bool",
@@ -428,11 +469,12 @@ mod test {
         test("include", vec![Token::Kwd(Kwd::Include)]);
         test("else", vec![Token::Kwd(Kwd::Else)]);
     }
+
     #[test]
     fn read_literals() {
-        test("true", vec![Token::Literal(Literal::BoolLiteral(true))]);
-        test("false", vec![Token::Literal(Literal::BoolLiteral(false))]);
-        test("3", vec![Token::Literal(Literal::IntLiteral(3))]);
+        test("true", vec![Token::Literal(Literal::Bool(true))]);
+        test("false", vec![Token::Literal(Literal::Bool(false))]);
+        test("3", vec![Token::Literal(Literal::Int(3))]);
     }
 
     #[test]
@@ -541,7 +583,7 @@ add (x, y) {
             vec![
                 Token::Ident("print".to_string()),
                 Token::Symbol(Symbol::Whitespace),
-                Token::Literal(Literal::StringLiteral("Hello World".to_string())),
+                Token::Literal(Literal::String("Hello World".to_string())),
             ],
         );
     }
@@ -551,40 +593,5 @@ add (x, y) {
         test("\\\"", vec![Token::Symbol(Symbol::EscapeQuote)]);
 
         test("\\'", vec![Token::Symbol(Symbol::EscapeApos)]);
-    }
-
-    #[test]
-    fn complex_variable_assignment_with_newline() {
-        test(
-            "x = if true { return 5 } else { return 4 }\n",
-            vec![
-                Token::Ident("x".to_string()),
-                Token::whitespace(),
-                Token::Symbol(Symbol::Equals),
-                Token::whitespace(),
-                Token::Kwd(Kwd::If),
-                Token::whitespace(),
-                Token::Literal(Literal::BoolLiteral(true)),
-                Token::whitespace(),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::whitespace(),
-                Token::Kwd(Kwd::Return),
-                Token::whitespace(),
-                Token::Literal(Literal::IntLiteral(5)),
-                Token::whitespace(),
-                Token::Symbol(Symbol::BraceClose),
-                Token::whitespace(),
-                Token::Kwd(Kwd::Else),
-                Token::whitespace(),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::whitespace(),
-                Token::Kwd(Kwd::Return),
-                Token::whitespace(),
-                Token::Literal(Literal::IntLiteral(4)),
-                Token::whitespace(),
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::Newline),
-            ],
-        );
     }
 }
