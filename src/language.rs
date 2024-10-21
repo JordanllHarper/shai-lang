@@ -181,7 +181,7 @@ pub enum Expression {
         rhs: Box<Expression>,
         eval: Evaluation,
     },
-    FunctionDeclaration(Box<FunctionDeclaration>),
+    Function(Box<Function>),
     Body(Body),
 }
 
@@ -319,23 +319,33 @@ pub type ReturnType = NativeType;
 ///
 /// Example:
 ///
+/// ```
 /// add(x, y) -> int {
 ///     return x + y
 /// }
+///
+/// ```
+///
 /// where
 /// add = ident
 /// (x, y) = args
 /// int = return type
 /// { return x + y } = Expression
+///
+/// ```
+///
+/// add(x, y) = return x + y
+///
+/// ```
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct FunctionDeclaration {
+pub struct Function {
     ident: String,
     args: FunctionParameters,
     return_type: Option<ReturnType>,
     body: Expression,
 }
 
-impl FunctionDeclaration {
+impl Function {
     pub fn new(
         ident: &str,
         args: FunctionParameters,

@@ -9,7 +9,7 @@ where
     // Advance past whitespace given the input is 3.   41
     let after_decimal = advance_past_whitespace(tokens);
     match after_decimal {
-        Some(Token::Literal(Literal::IntLiteral(i))) => ValueLiteral::new(
+        Some(Token::Literal(Literal::Int(i))) => ValueLiteral::new(
             NativeType::Float,
             &(before_decimal.to_string() + "." + &i.to_string()),
         ),
@@ -32,7 +32,7 @@ where
     Expression::SingleValue(SingleValue::ValueLiteral(num))
 }
 
-fn on_function_declaration<'a, I>(tokens: &mut I, ident: String) -> Expression
+fn on_function<'a, I>(tokens: &mut I, ident: String) -> Expression
 where
     I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
 {
@@ -55,17 +55,20 @@ where
                 let parameter = Parameter::new(arg_ident, native_type);
                 args.push(parameter);
             }
+            // TODO: We break twice eek
+            Token::Symbol(Symbol::ParenClose) => break,
             _ => {
                 // TODO: Invalid syntax
                 todo!()
             }
         };
     }
-    let return_type: Option<ReturnType> = match advance_past_whitespace(tokens) {
+    match advance_past_whitespace(tokens) {
         Some(t) => {
             match t {
                 Token::Symbol(Symbol::Arrow) => {
-                    match advance_past_whitespace(tokens) {
+                    // Declaration with return type
+                    let ret_type = match advance_past_whitespace(tokens) {
                         Some(Token::Kwd(Kwd::DataType(d))) => {
                             Some(NativeType::from_datatype_kwd(d))
                         }
@@ -73,30 +76,41 @@ where
                             // TODO: Invalid syntax
                             todo!()
                         }
+                    };
+                    on_function_declaration(tokens, ret_type);
+                    todo!()
+                }
+                Token::Symbol(Symbol::BraceOpen) => {
+                    // Declaration without return type
+                    on_function_declaration(tokens, None)
+                }
+                Token::Symbol(Symbol::Equals) => {
+                    let expression = on_expression(tokens, None);
+                    if let Some(e) = expression {
+                        Expression::Function(Box::new(Function::new(&ident, args, None, e)))
+                    } else {
+                        // TODO: Invalid syntax
+                        todo!("{:?} Invalid syntax", expression)
                     }
                 }
-                Token::Symbol(Symbol::BraceOpen) => None,
                 _ => {
                     // TODO: Invalid syntax
                     todo!()
                 }
             }
         }
-        None => None,
-    };
-
-    let body = on_expression(tokens, None);
-    if let Some(body) = body {
-        Expression::FunctionDeclaration(Box::new(FunctionDeclaration::new(
-            &ident,
-            args,
-            return_type,
-            body,
-        )))
-    } else {
-        // TODO: Invalid syntax
-        todo!("{:?} Invalid syntax", body)
+        None => {
+            // TODO: Invalid syntax
+            todo!()
+        }
     }
+}
+
+fn on_function_declaration<'a, I>(tokens: &mut I, ret_type: Option<ReturnType>) -> Expression
+where
+    I: std::iter::Iterator<Item = &'a Token>,
+{
+    todo!();
 }
 
 /// TODO: Handle various types of operations, not just function calls
@@ -130,7 +144,7 @@ where
 {
     let t = advance_past_whitespace(tokens);
     match t {
-        Some(Token::Literal(Literal::IntLiteral(x))) => {
+        Some(Token::Literal(Literal::Int(x))) => {
             let num = on_integer_literal(tokens, *x);
             let expr = match advance_past_whitespace(tokens) {
                 Some(Token::Symbol(Symbol::Newline)) | None => num,
@@ -250,7 +264,7 @@ where
             let expression = Expression::MultipleValues(args);
             Some(on_operation(tokens, ident, expression))
         }
-        Some(Token::Symbol(Symbol::ParenOpen)) => Some(on_function_declaration(tokens, ident)),
+        Some(Token::Symbol(Symbol::ParenOpen)) => Some(on_function(tokens, ident)),
         _ => Some(Expression::SingleValue(SingleValue::Identifier(ident))),
     }
 }
@@ -277,9 +291,9 @@ where
             Some(node)
         }
         Some(Token::Literal(l)) => match l {
-            Literal::BoolLiteral(_) => Some(Expression::SingleValue(l.to_vl())),
-            Literal::IntLiteral(i) => Some(on_integer_literal(tokens, *i)),
-            Literal::StringLiteral(s) => Some(Expression::SingleValue(SingleValue::ValueLiteral(
+            Literal::Bool(_) => Some(Expression::SingleValue(l.to_vl())),
+            Literal::Int(i) => Some(on_integer_literal(tokens, *i)),
+            Literal::String(s) => Some(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::String, s),
             ))),
         },
@@ -372,21 +386,20 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::FunctionDeclaration(Box::new(FunctionDeclaration::new(
+            Expression::Function(Box::new(Function::new(
                 "do_nothing",
                 vec![],
                 None,
-                Expression::Body { body: vec![] },
+                Expression::Body(vec![]),
             ))),
         );
     }
 
+    // TODO: This is more like function expression as we haven't got a body implemented yet.
     #[test]
-    fn function_declaration() {
+    fn function_expression() {
         // No specified types
-        // add (numOne, numTwo) {\n
-        //     return numOne + numTwo\n
-        // }\n
+        // add (numOne, numTwo) = num_one + num_two\n
         test(
             vec![
                 // Signature
@@ -402,14 +415,9 @@ mod tests {
                 // End of args
                 // Start of return type
                 Token::whitespace(),
-                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Equals),
+                // End of return type
                 // body (assume 4 spaces)
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::Kwd(Kwd::Return),
-                Token::whitespace(),
                 Token::Ident("numOne".to_string()),
                 Token::whitespace(),
                 Token::Symbol(Symbol::Plus),
@@ -417,28 +425,22 @@ mod tests {
                 Token::Ident("numTwo".to_string()),
                 Token::Symbol(Symbol::Newline),
                 // end
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::Newline),
             ],
-            Expression::FunctionDeclaration(Box::new(FunctionDeclaration::new(
+            Expression::Function(Box::new(Function::new(
                 "add",
                 vec![
                     Parameter::new("numOne", None),
                     Parameter::new("numTwo", None),
                 ],
                 None,
-                Expression::Statement {
-                    expression: Box::new(Expression::Operation {
-                        lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                            "numOne".to_string(),
-                        ))),
-                        rhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                            "numTwo".to_string(),
-                        ))),
-                        operation: Operation::Math(MathOperation::Add),
-                    }),
-
-                    operation: Operation::Return,
+                Expression::Operation {
+                    lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
+                        "numOne".to_string(),
+                    ))),
+                    rhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
+                        "numTwo".to_string(),
+                    ))),
+                    operation: Operation::Math(MathOperation::Add),
                 },
             ))),
         );
@@ -473,9 +475,9 @@ mod tests {
             vec![
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Equals),
-                Token::Literal(Literal::IntLiteral(3)),
+                Token::Literal(Literal::Int(3)),
                 Token::Symbol(Symbol::Period),
-                Token::Literal(Literal::IntLiteral(5)),
+                Token::Literal(Literal::Int(5)),
                 Token::Symbol(Symbol::Newline),
             ],
             Expression::Operation {
@@ -561,7 +563,7 @@ mod tests {
                 Token::Ident("Hello".to_string()),
                 Token::Symbol(Symbol::Quote),
                 Token::whitespace(),
-                Token::Literal(Literal::BoolLiteral(true)),
+                Token::Literal(Literal::Bool(true)),
             ],
             Expression::Operation {
                 lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
@@ -597,7 +599,7 @@ mod tests {
             vec![
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Equals),
-                Token::Literal(Literal::IntLiteral(5)),
+                Token::Literal(Literal::Int(5)),
             ],
             expected.clone(),
         );
@@ -609,7 +611,7 @@ mod tests {
                 Token::Symbol(Symbol::Whitespace),
                 Token::Symbol(Symbol::Equals),
                 Token::Symbol(Symbol::Whitespace),
-                Token::Literal(Literal::IntLiteral(5)),
+                Token::Literal(Literal::Int(5)),
             ],
             expected.clone(),
         );
@@ -622,7 +624,7 @@ mod tests {
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Equals),
                 Token::Symbol(Symbol::Whitespace),
-                Token::Literal(Literal::IntLiteral(5)),
+                Token::Literal(Literal::Int(5)),
             ],
             expected,
         );
