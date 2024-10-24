@@ -1,13 +1,11 @@
-use crate::language::*;
-use crate::lexer::*;
-use crate::parser_helpers::*;
+use crate::{language::*, lexer::*};
 
 fn on_floating_point<'a, I>(tokens: &mut I, before_decimal: i32) -> ValueLiteral
 where
-    I:  std::iter::Iterator<Item = &'a Token>,
+    I: std::iter::Iterator<Item = &'a Token>,
 {
     // Advance past whitespace given the input is 3.   41
-    let after_decimal = advance_past_whitespace(tokens);
+    let after_decimal = tokens.next();
     match after_decimal {
         Some(Token::Literal(Literal::Int(i))) => ValueLiteral::new(
             NativeType::Float,
@@ -21,9 +19,9 @@ where
 }
 fn on_integer_literal<'a, I>(tokens: &mut I, i: i32) -> Expression
 where
-    I:  std::iter::Iterator<Item = &'a Token>,
+    I: std::iter::Iterator<Item = &'a Token>,
 {
-    let num = if let Some(Token::Symbol(Symbol::Period)) = advance_past_whitespace(tokens) {
+    let num = if let Some(Token::Symbol(Symbol::Period)) = tokens.next() {
         on_floating_point(tokens, i)
     } else {
         ValueLiteral::new(NativeType::Int, &i.to_string())
@@ -34,15 +32,15 @@ where
 
 fn on_function<'a, I>(tokens: &mut I, ident: String) -> Expression
 where
-    I:  std::iter::Iterator<Item = &'a Token>,
+    I: std::iter::Iterator<Item = &'a Token>,
 {
     let mut args: FunctionParameters = Vec::new();
 
     // Parse args
-    while let Some(t) = advance_past_whitespace(tokens) {
+    while let Some(t) = tokens.next() {
         match t {
             Token::Ident(arg_ident) => {
-                let native_type = match advance_past_whitespace(tokens) {
+                let native_type = match tokens.next() {
                     Some(Token::Kwd(Kwd::DataType(d))) => Some(NativeType::from_datatype_kwd(d)),
                     Some(Token::Symbol(Symbol::ParenClose)) => {
                         let parameter = Parameter::new(arg_ident, None);
@@ -63,12 +61,12 @@ where
             }
         };
     }
-    match advance_past_whitespace(tokens) {
+    match tokens.next() {
         Some(t) => {
             match t {
                 Token::Symbol(Symbol::Arrow) => {
                     // Declaration with return type
-                    let ret_type = match advance_past_whitespace(tokens) {
+                    let ret_type = match tokens.next() {
                         Some(Token::Kwd(Kwd::DataType(d))) => {
                             Some(NativeType::from_datatype_kwd(d))
                         }
@@ -116,7 +114,7 @@ where
 /// TODO: Handle various types of operations, not just function calls
 fn on_operation<'a, I>(tokens: &mut I, ident: String, expression: Expression) -> Expression
 where
-    I:  std::iter::Iterator<Item = &'a Token>,
+    I: std::iter::Iterator<Item = &'a Token>,
 {
     Expression::Operation {
         lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
@@ -133,20 +131,20 @@ fn on_evaluation<'a, I>(
     evaluation_op: EvaluationOperator,
 ) -> Expression
 where
-    I:  std::iter::Iterator<Item = &'a Token>,
+    I: std::iter::Iterator<Item = &'a Token>,
 {
     todo!();
 }
 
 fn on_assignment<'a, I>(tokens: &mut I, ident: String, previous: Option<Expression>) -> Expression
 where
-    I:  std::iter::Iterator<Item = &'a Token>,
+    I: std::iter::Iterator<Item = &'a Token>,
 {
-    let t = advance_past_whitespace(tokens);
+    let t = tokens.next();
     match t {
         Some(Token::Literal(Literal::Int(x))) => {
             let num = on_integer_literal(tokens, *x);
-            let expr = match advance_past_whitespace(tokens) {
+            let expr = match tokens.next() {
                 Some(Token::Symbol(Symbol::Newline)) | None => num,
 
                 // This is not the end of the assignment woooooo...
@@ -192,23 +190,13 @@ where
 // Variable usage
 // y = *x* + 3
 //      |- here is usage
-fn on_identifier<'a, I>(
-    tokens: &mut I,
-    ident: String,
-    previous: Option<Expression>,
-) -> Option<Expression>
+fn on_identifier<'a, I>(tokens: &mut I, ident: String, previous: Option<Expression>) -> Expression
 where
-    I:  std::iter::Iterator<Item = &'a Token>,
+    I: std::iter::Iterator<Item = &'a Token>,
 {
     // TODO: Expression (empty statement) e.g. x + y
     // TODO: Variable Usage e.g. y = x + 3
-    let t = advance_past_multiple(
-        tokens,
-        &[
-            Token::Symbol(Symbol::Newline),
-            Token::Symbol(Symbol::Whitespace),
-        ],
-    );
+    let t = tokens.next();
     println!("{:?}", t);
     match t {
         // Assignment
@@ -216,24 +204,20 @@ where
 
         // Evaluation
         Some(Token::Symbol(Symbol::Equality)) => {
-            Some(on_evaluation(tokens, ident, EvaluationOperator::Eq))
+            (on_evaluation(tokens, ident, EvaluationOperator::Eq))
         }
         Some(Token::Symbol(Symbol::NotEquality)) => {
-            Some(on_evaluation(tokens, ident, EvaluationOperator::Neq))
+            (on_evaluation(tokens, ident, EvaluationOperator::Neq))
         }
 
-        Some(Token::Symbol(Symbol::GzEq)) => {
-            Some(on_evaluation(tokens, ident, EvaluationOperator::GzEq))
-        }
-        Some(Token::Symbol(Symbol::LzEq)) => {
-            Some(on_evaluation(tokens, ident, EvaluationOperator::LzEq))
-        }
+        Some(Token::Symbol(Symbol::GzEq)) => on_evaluation(tokens, ident, EvaluationOperator::GzEq),
+        Some(Token::Symbol(Symbol::LzEq)) => on_evaluation(tokens, ident, EvaluationOperator::LzEq),
 
         Some(Token::Symbol(Symbol::ChevOpen)) => {
-            Some(on_evaluation(tokens, ident, EvaluationOperator::LzEq))
+            on_evaluation(tokens, ident, EvaluationOperator::LzEq)
         }
         Some(Token::Symbol(Symbol::ChevClose)) => {
-            Some(on_evaluation(tokens, ident, EvaluationOperator::GzEq))
+            on_evaluation(tokens, ident, EvaluationOperator::GzEq)
         }
         Some(
             Token::Symbol(Symbol::Plus)
@@ -244,7 +228,7 @@ where
             let current = Expression::SingleValue(SingleValue::Identifier(ident));
             // TODO: Clean up
             let op = MathOperation::from_token(t.unwrap().clone()).unwrap();
-            let rhs = Box::new(on_expression(tokens, Some(current.clone()))?);
+            let rhs = Box::new(on_expression(tokens, Some(current.clone())));
             println!("Rhs: {:?}", rhs);
             let expr = Expression::Operation {
                 lhs: Box::new(current),
@@ -252,47 +236,32 @@ where
                 operation: Operation::Math(op),
             };
             println!("Got here");
-            Some(expr)
+            expr
         }
 
         // Operations
         // Function call if value literal or string
         // TODO: Clean up these expects
         Some(Token::Literal(_)) | Some(Token::Symbol(Symbol::Quote)) => {
-            let args = parse_arguments(tokens, t.expect("This isn't None at this point"))
-                .expect("If this is None, aaaaaaaaaa idk");
-            let expression = Expression::MultipleValues(args);
-            Some(on_operation(tokens, ident, expression))
+            todo!()
         }
         Some(Token::Symbol(Symbol::ParenOpen)) => Some(on_function(tokens, ident)),
         _ => Some(Expression::SingleValue(SingleValue::Identifier(ident))),
     }
 }
 
-fn on_expression<'a, I>(tokens: &mut I, previous: Option<Expression>) -> Option<Expression>
+fn on_expression<'a, I>(tokens: &mut I, previous: Option<Expression>) -> Expression
 where
-    I:  std::iter::Iterator<Item = &'a Token>,
+    I: std::iter::Iterator<Item = &'a Token>,
 {
-    let t = advance_past_multiple(
-        tokens,
-        &[
-            Token::Symbol(Symbol::Newline),
-            Token::Symbol(Symbol::Whitespace),
-        ],
-    );
+    let t = tokens.next();
     println!("Token: {:?}", t);
     match t {
-        Some(Token::Ident(ident)) => {
-            let node = on_identifier(tokens, ident.to_string(), previous)?;
-            Some(node)
-        }
-        Some(Token::Kwd(k)) => {
-            let node = on_keyword(tokens, k);
-            Some(node)
-        }
+        Some(Token::Ident(ident)) => on_identifier(tokens, ident.to_string(), previous),
+        Some(Token::Kwd(k)) => on_keyword(tokens, k),
         Some(Token::Literal(l)) => match l {
-            Literal::Bool(_) => Some(Expression::SingleValue(l.to_vl())),
-            Literal::Int(i) => Some(on_integer_literal(tokens, *i)),
+            Literal::Bool(_) => (Expression::SingleValue(l.to_vl())),
+            Literal::Int(i) => (on_integer_literal(tokens, *i)),
             Literal::String(s) => Some(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::String, s),
             ))),
@@ -308,11 +277,10 @@ where
             let op = MathOperation::from_token(t.unwrap().clone()).unwrap();
             let expr = Expression::Operation {
                 lhs: Box::new(previous.expect("Unexpected syntax")),
-                rhs: Box::new(on_expression(tokens, prev)?),
+                rhs: Box::new(on_expression(tokens, prev)),
                 operation: Operation::Math(op),
             };
-            println!("Got here");
-            Some(expr)
+            (expr)
         }
         None => None,
         _ => todo!(),
@@ -324,29 +292,27 @@ where
     I: std::iter::Iterator<Item = &'a Token>,
 {
     let remaining_expression = on_expression(tokens, None);
-    if let Some(e) = remaining_expression {
-        match k {
-            Kwd::Return => Expression::Statement {
-                expression: Box::new(e),
-                operation: Operation::Return,
-            },
-            Kwd::DataType(_) => todo!(),
-            Kwd::While => todo!(),
-            Kwd::For => todo!(),
-            Kwd::If => todo!(),
-            Kwd::In => todo!(),
-            Kwd::Break => todo!(),
-            Kwd::Include => todo!(),
-            Kwd::Else => todo!(),
-        }
-    } else {
-        // TODO: Invalid syntax, incomplete function
-        todo!()
+    match k {
+        Kwd::Return => Expression::Statement {
+            expression: Box::new(remaining_expression),
+            operation: Operation::Return,
+        },
+        Kwd::DataType(_) => todo!(),
+        Kwd::While => todo!(),
+        Kwd::For => todo!(),
+        Kwd::If => todo!(),
+        Kwd::In => todo!(),
+        Kwd::Break => todo!(),
+        Kwd::Include => todo!(),
+        Kwd::Else => todo!(),
     }
 }
 
-pub fn parse(tokens: &[Token]) -> Option<Expression> {
-    on_expression(&mut tokens.iter(), None)
+pub fn parse(tokens: &[Token]) -> Expression {
+    on_expression(
+        &mut tokens.iter().filter(|t| **t == Token::whitespace()),
+        None,
+    )
 }
 
 #[cfg(test)]
@@ -355,7 +321,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn test(input: Vec<Token>, expected: Expression) {
-        let actual = parse(&input).unwrap();
+        let actual = parse(&input);
         assert_eq!(expected, actual);
     }
 
@@ -395,7 +361,6 @@ mod tests {
         );
     }
 
-    // TODO: This is more like function expression as we haven't got a body implemented yet.
     #[test]
     fn function_expression() {
         // No specified types
@@ -404,24 +369,19 @@ mod tests {
             vec![
                 // Signature
                 Token::Ident("add".to_string()),
-                Token::whitespace(),
                 // Args
                 Token::Symbol(Symbol::ParenOpen),
                 Token::Ident("numOne".to_string()),
                 Token::Symbol(Symbol::Comma),
-                Token::whitespace(),
                 Token::Ident("numTwo".to_string()),
                 Token::Symbol(Symbol::ParenClose),
                 // End of args
                 // Start of return type
-                Token::whitespace(),
                 Token::Symbol(Symbol::Equals),
                 // End of return type
                 // body (assume 4 spaces)
                 Token::Ident("numOne".to_string()),
-                Token::whitespace(),
                 Token::Symbol(Symbol::Plus),
-                Token::whitespace(),
                 Token::Ident("numTwo".to_string()),
                 Token::Symbol(Symbol::Newline),
                 // end
@@ -452,9 +412,7 @@ mod tests {
         test(
             vec![
                 Token::Ident("print".to_string()),
-                Token::Symbol(Symbol::Quote),
-                Token::Ident("Hello".to_string()),
-                Token::Symbol(Symbol::Quote),
+                Token::Literal(Literal::String("Hello".to_string())),
             ],
             Expression::Operation {
                 lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
@@ -498,14 +456,8 @@ mod tests {
         test(
             vec![
                 Token::Ident("print".to_string()),
-                Token::whitespace(),
-                Token::Symbol(Symbol::Quote),
-                Token::Ident("Hello".to_string()),
-                Token::Symbol(Symbol::Quote),
-                Token::whitespace(),
-                Token::Symbol(Symbol::Quote),
-                Token::Ident("World".to_string()),
-                Token::Symbol(Symbol::Quote),
+                Token::Literal(Literal::String("Hello".to_string())),
+                Token::Literal(Literal::String("World".to_string())),
             ],
             Expression::Operation {
                 lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
@@ -530,11 +482,7 @@ mod tests {
         test(
             vec![
                 Token::Ident("print".to_string()),
-                Token::whitespace(),
-                Token::Symbol(Symbol::Quote),
-                Token::Ident("Hello".to_string()),
-                Token::Symbol(Symbol::Quote),
-                Token::whitespace(),
+                Token::Literal(Literal::String("Hello".to_string())),
                 Token::Ident("x".to_string()),
             ],
             Expression::Operation {
@@ -558,11 +506,9 @@ mod tests {
         test(
             vec![
                 Token::Ident("print".to_string()),
-                Token::whitespace(),
                 Token::Symbol(Symbol::Quote),
                 Token::Ident("Hello".to_string()),
                 Token::Symbol(Symbol::Quote),
-                Token::whitespace(),
                 Token::Literal(Literal::Bool(true)),
             ],
             Expression::Operation {
@@ -608,9 +554,7 @@ mod tests {
         test(
             vec![
                 Token::Ident("x".to_string()),
-                Token::Symbol(Symbol::Whitespace),
                 Token::Symbol(Symbol::Equals),
-                Token::Symbol(Symbol::Whitespace),
                 Token::Literal(Literal::Int(5)),
             ],
             expected.clone(),
@@ -623,7 +567,6 @@ mod tests {
             vec![
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Equals),
-                Token::Symbol(Symbol::Whitespace),
                 Token::Literal(Literal::Int(5)),
             ],
             expected,

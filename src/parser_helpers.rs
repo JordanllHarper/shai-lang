@@ -1,30 +1,6 @@
 use crate::language::*;
 use crate::lexer::*;
 
-pub fn advance_past_multiple<'a, I>(tokens: &mut I, test: &[Token]) -> Option<&'a Token>
-where
-    I:  std::iter::Iterator<Item = &'a Token>,
-{
-    tokens.find(|t| {
-        !test.contains(t)
-    })
-}
-
-pub fn advance_past<'a, I>(tokens: &mut I, test: Token) -> Option<&'a Token>
-where
-    I:  std::iter::Iterator<Item = &'a Token>,
-{
-    tokens.find(|t| **t != test)
-}
-
-
-pub fn advance_past_whitespace<'a, I>(tokens: &mut I) -> Option<&'a Token>
-where
-    I:  std::iter::Iterator<Item = &'a Token>,
-{
-    advance_past(tokens, Token::Symbol(Symbol::Whitespace))
-}
-
 impl Literal {
     pub fn to_vl(&self) -> SingleValue {
         match self.clone() {
@@ -58,7 +34,7 @@ where
     }
 
     // Parse remaining arguments
-    while let Some(t) = advance_past_whitespace(tokens) {
+    while let Some(t) = tokens.next() {
         let arg: Option<SingleValue> = match t {
             Token::Symbol(Symbol::Quote) => Some(parse_string(tokens)),
             Token::Ident(i) => Some(SingleValue::Identifier(i.to_string())),
