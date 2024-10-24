@@ -58,6 +58,12 @@ impl ValueLiteral {
             representation: representation.to_string(),
         }
     }
+    pub fn new_expression(native_type: NativeType, representation: &str) -> Expression {
+        Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+            native_type,
+            representation,
+        )))
+    }
 
     pub fn new_string(representation: &str) -> Self {
         ValueLiteral::new(NativeType::String, representation)
@@ -192,6 +198,14 @@ pub enum SingleValue {
 }
 
 impl SingleValue {
+    pub fn new_identifier_expression(ident : &str) -> Expression {
+        Expression::SingleValue(SingleValue::Identifier(ident.to_string()))
+    }
+
+    pub fn new_value_literal_expression(value_literal : ValueLiteral) -> Expression {
+        Expression::SingleValue(SingleValue::ValueLiteral(value_literal))
+    }
+
     pub fn new_string(representation: &str) -> Self {
         Self::ValueLiteral(ValueLiteral::new(NativeType::String, representation))
     }
@@ -220,13 +234,12 @@ pub enum MathOperation {
 }
 
 impl MathOperation {
-    pub fn from_token(t: Token) -> Option<Self> {
+    pub fn from_token(t: &Token) -> Option<Self> {
         match t {
             Token::Symbol(Symbol::FwdSlash) => Some(Self::Divide),
             Token::Symbol(Symbol::Asterisk) => Some(Self::Multiply),
             Token::Symbol(Symbol::Plus) => Some(Self::Add),
             Token::Symbol(Symbol::Minus) => Some(Self::Subtract),
-
             _ => None,
         }
     }
