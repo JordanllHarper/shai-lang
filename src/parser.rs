@@ -17,7 +17,7 @@ where
             Token::Ident(i) => SingleValue::new_identifier_expression(i),
             Token::Symbol(Symbol::BraceOpen) => {
                 // TODO: Handle no expression returned (invalid syntax)
-                on_expression(tokens, None).unwrap()
+                on_expression(tokens.next().unwrap(), tokens, None).unwrap()
             }
             _ => todo!(),
         };
@@ -80,7 +80,7 @@ where
                 }
                 // Function expression
                 Token::Symbol(Symbol::Equals) => {
-                    let expression = on_expression(&mut tokens, None);
+                    let expression = on_expression(tokens.next().unwrap(), &mut tokens, None);
                     if let Some(expression) = expression {
                         let x = Function::new(&ident, args, return_type, expression);
                         Expression::Function(Box::new(x))
@@ -133,7 +133,7 @@ where
             Token::Symbol(Symbol::BraceClose) => break,
             Token::Symbol(Symbol::Newline) => continue,
             _ => {
-                let expression = on_expression(tokens, None).unwrap();
+                let expression = on_expression(t, tokens, None).unwrap();
                 body.push(expression);
             }
         }
@@ -168,7 +168,7 @@ where
         }
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             // TODO: Expression assignment
-            let expression = on_expression(tokens, None);
+            let expression = on_expression(tokens.next().unwrap(), tokens, None);
             todo!()
         }
         _ => todo!(),
@@ -254,7 +254,7 @@ where
     let prev = previous.clone();
     let op = MathOperation::from_token(operation).unwrap();
 
-    let rhs = on_expression(tokens, Some(prev))?;
+    let rhs = on_expression(tokens.next()?, tokens, Some(prev))?;
     Some(Expression::Operation {
         lhs: Box::new(previous),
         rhs: Box::new(rhs),
@@ -262,11 +262,14 @@ where
     })
 }
 
-fn on_expression<'a, I>(tokens: &mut I, previous: Option<Expression>) -> Option<Expression>
+fn on_expression<'a, I>(
+    t: &Token,
+    tokens: &mut I,
+    previous: Option<Expression>,
+) -> Option<Expression>
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
-    let t = tokens.next()?;
     println!("Token: {:?}", t);
     let expr = match t {
         Token::Ident(ident) => on_identifier(
@@ -291,7 +294,7 @@ fn on_keyword<'a, I>(tokens: &mut I, k: &Kwd) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
-    let remaining_expression = on_expression(tokens, None);
+    let remaining_expression = on_expression(tokens.next().unwrap(), tokens, None);
     match k {
         Kwd::Return => Expression::Statement {
             expression: Box::new(remaining_expression.unwrap()),
@@ -309,11 +312,8 @@ where
 }
 
 pub fn parse(tokens: &[Token]) -> Expression {
-    on_expression(
-        &mut tokens.iter().filter(|t| **t != Token::whitespace()),
-        None,
-    )
-    .unwrap()
+    let mut iter = tokens.iter();
+    on_expression(iter.next().unwrap(), &mut iter, None).unwrap()
 }
 
 #[cfg(test)]
