@@ -3,7 +3,7 @@ use crate::lexer::*;
 
 pub fn advance_past_multiple<'a, I>(tokens: &mut I, test: &[Token]) -> Option<&'a Token>
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     tokens.find(|t| {
         !test.contains(t)
@@ -12,7 +12,7 @@ where
 
 pub fn advance_past<'a, I>(tokens: &mut I, test: Token) -> Option<&'a Token>
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     tokens.find(|t| **t != test)
 }
@@ -20,7 +20,7 @@ where
 
 pub fn advance_past_whitespace<'a, I>(tokens: &mut I) -> Option<&'a Token>
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     advance_past(tokens, Token::Symbol(Symbol::Whitespace))
 }
@@ -37,7 +37,7 @@ impl Literal {
 
 pub fn parse_string<'a, I>(tokens: &mut I) -> SingleValue
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     SingleValue::new_string(
         &tokens
@@ -48,7 +48,7 @@ where
 
 pub fn parse_arguments<'a, I>(tokens: &mut I, t: &Token) -> Option<FunctionArguments>
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     let mut args: FunctionArguments = vec![];
     match t {
