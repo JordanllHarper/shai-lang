@@ -4,7 +4,7 @@ use crate::parser_helpers::*;
 
 fn on_floating_point<'a, I>(tokens: &mut I, before_decimal: i32) -> ValueLiteral
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     // Advance past whitespace given the input is 3.   41
     let after_decimal = advance_past_whitespace(tokens);
@@ -21,7 +21,7 @@ where
 }
 fn on_integer_literal<'a, I>(tokens: &mut I, i: i32) -> Expression
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     let num = if let Some(Token::Symbol(Symbol::Period)) = advance_past_whitespace(tokens) {
         on_floating_point(tokens, i)
@@ -34,7 +34,7 @@ where
 
 fn on_function<'a, I>(tokens: &mut I, ident: String) -> Expression
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     let mut args: FunctionParameters = Vec::new();
 
@@ -116,7 +116,7 @@ where
 /// TODO: Handle various types of operations, not just function calls
 fn on_operation<'a, I>(tokens: &mut I, ident: String, expression: Expression) -> Expression
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     Expression::Operation {
         lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
@@ -133,14 +133,14 @@ fn on_evaluation<'a, I>(
     evaluation_op: EvaluationOperator,
 ) -> Expression
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     todo!();
 }
 
 fn on_assignment<'a, I>(tokens: &mut I, ident: String, previous: Option<Expression>) -> Expression
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     let t = advance_past_whitespace(tokens);
     match t {
@@ -198,7 +198,7 @@ fn on_identifier<'a, I>(
     previous: Option<Expression>,
 ) -> Option<Expression>
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     // TODO: Expression (empty statement) e.g. x + y
     // TODO: Variable Usage e.g. y = x + 3
@@ -271,7 +271,7 @@ where
 
 fn on_expression<'a, I>(tokens: &mut I, previous: Option<Expression>) -> Option<Expression>
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I:  std::iter::Iterator<Item = &'a Token>,
 {
     let t = advance_past_multiple(
         tokens,
@@ -321,7 +321,7 @@ where
 
 fn on_keyword<'a, I>(tokens: &mut I, k: &Kwd) -> Expression
 where
-    I: IntoIterator<Item = &'a Token> + std::iter::Iterator<Item = &'a Token>,
+    I: std::iter::Iterator<Item = &'a Token>,
 {
     let remaining_expression = on_expression(tokens, None);
     if let Some(e) = remaining_expression {
