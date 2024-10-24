@@ -1,13 +1,13 @@
 use crate::{language::*, lexer::*};
 
-fn on_floating_point<'a, I>(tokens: &mut I, before_decimal: i32) -> ValueLiteral
+fn on_floating_point<'a, I>(tokens: &mut I, before_decimal: i32) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
     // Advance past whitespace given the input is 3.   41
     let after_decimal = tokens.next();
     match after_decimal {
-        Some(Token::Literal(Literal::Int(i))) => ValueLiteral::new(
+        Some(Token::Literal(Literal::Int(i))) => ValueLiteral::new_expression(
             NativeType::Float,
             &(before_decimal.to_string() + "." + &i.to_string()),
         ),
@@ -21,13 +21,35 @@ fn on_integer_literal<'a, I>(tokens: &mut I, i: i32) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
-    let num = if let Some(Token::Symbol(Symbol::Period)) = tokens.next() {
+    if let Some(Token::Symbol(Symbol::Period)) = tokens.next() {
         on_floating_point(tokens, i)
     } else {
-        ValueLiteral::new(NativeType::Int, &i.to_string())
-    };
+        ValueLiteral::new_expression(NativeType::Int, &i.to_string())
+    }
+}
 
-    Expression::SingleValue(SingleValue::ValueLiteral(num))
+fn on_arguments<'a, I>(tokens: &mut I, first_arg: SingleValue) -> FunctionArguments
+where
+    I: std::iter::Iterator<Item = &'a Token>,
+{
+    let mut args: FunctionArguments = vec![Expression::SingleValue(first_arg)];
+
+    while let Some(t) = tokens.next() {
+        let expr = match t {
+            Token::Literal(l) => {
+                let value_literal = l.to_vl();
+                Expression::SingleValue(value_literal)
+            }
+            Token::Symbol(Symbol::BraceOpen) => {
+                // TODO: Handle no expression returned (invalid syntax)
+                on_expression(tokens, None).unwrap()
+            }
+            _ => todo!(),
+        };
+        args.push(expr);
+    }
+
+    args
 }
 
 fn on_function<'a, I>(tokens: &mut I, ident: String) -> Expression
@@ -53,7 +75,7 @@ where
                 let parameter = Parameter::new(arg_ident, native_type);
                 args.push(parameter);
             }
-            // TODO: We break twice eek
+
             Token::Symbol(Symbol::ParenClose) => break,
             _ => {
                 // TODO: Invalid syntax
@@ -84,7 +106,13 @@ where
                 }
                 Token::Symbol(Symbol::Equals) => {
                     let expression = on_expression(tokens, None);
-                    Expression::Function(Box::new(Function::new(&ident, args, None, expression)))
+                    if let Some(expression) = expression {
+                        let x = Function::new(&ident, args, None, expression);
+                        Expression::Function(Box::new(x))
+                    } else {
+                        // TODO: Invalid syntax
+                        todo!()
+                    }
                 }
                 _ => {
                     // TODO: Invalid syntax
@@ -141,26 +169,6 @@ where
             let num = on_integer_literal(tokens, *x);
             let expr = match tokens.next() {
                 Some(Token::Symbol(Symbol::Newline)) | None => num,
-
-                // This is not the end of the assignment woooooo...
-                // TODO: Expression operation assignment
-                // math assignment
-                Some(
-                    Token::Symbol(Symbol::Plus)
-                    | Token::Symbol(Symbol::Minus)
-                    | Token::Symbol(Symbol::Asterisk)
-                    | Token::Symbol(Symbol::FwdSlash),
-                ) => {
-                    // TODO: Clean up
-                    let op = MathOperation::from_token(t.unwrap().clone()).unwrap();
-                    let expr = Expression::Operation {
-                        lhs: Box::new(previous.expect("Unexpected syntax")),
-                        rhs: Box::new(on_expression(tokens, None)),
-                        operation: Operation::Math(op),
-                    };
-                    println!("Got here");
-                    expr
-                }
                 _ => todo!(),
             };
             Expression::Operation {
@@ -219,66 +227,75 @@ where
             | Token::Symbol(Symbol::Minus)
             | Token::Symbol(Symbol::Asterisk)
             | Token::Symbol(Symbol::FwdSlash),
-        ) => {
-            let current = Expression::SingleValue(SingleValue::Identifier(ident));
-            // TODO: Clean up
-            let op = MathOperation::from_token(t.unwrap().clone()).unwrap();
-            let rhs = Box::new(on_expression(tokens, Some(current.clone())));
-            println!("Rhs: {:?}", rhs);
-            let expr = Expression::Operation {
-                lhs: Box::new(current),
-                rhs,
-                operation: Operation::Math(op),
-            };
-            println!("Got here");
-            expr
-        }
+        ) => on_math_expression(tokens, t.unwrap(), previous.unwrap()).unwrap(),
 
         // Operations
         // Function call if value literal or string
-        // TODO: Clean up these expects
-        Some(Token::Literal(_)) | Some(Token::Symbol(Symbol::Quote)) => {
+        Some(Token::Literal(l)) => on_function_call(tokens, &ident, l),
+        Some(Token::Symbol(Symbol::ParenOpen)) => on_function(tokens, ident),
+        None => {
+            // TODO: Invalid syntax
             todo!()
         }
-        Some(Token::Symbol(Symbol::ParenOpen)) => on_function(tokens, ident),
         _ => Expression::SingleValue(SingleValue::Identifier(ident)),
     }
 }
 
-fn on_expression<'a, I>(tokens: &mut I, previous: Option<Expression>) -> Expression
+fn on_function_call<'a, I>(tokens: &mut I, ident: &str, first_arg: &Literal) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
-    let t = tokens.next();
+    let args = on_arguments(tokens, first_arg.to_vl());
+
+    Expression::Operation {
+        lhs: Box::new(SingleValue::new_identifier_expression(ident)),
+        rhs: Box::new(Expression::MultipleValues(args)),
+        operation: Operation::FunctionCall,
+    }
+}
+
+fn on_math_expression<'a, I>(
+    tokens: &mut I,
+    operation: &Token,
+    previous: Expression,
+) -> Option<Expression>
+where
+    I: std::iter::Iterator<Item = &'a Token>,
+{
+    let prev = previous.clone();
+    let op = MathOperation::from_token(operation).unwrap();
+
+    let rhs = on_expression(tokens, Some(prev))?;
+    Some(Expression::Operation {
+        lhs: Box::new(previous),
+        rhs: Box::new(rhs),
+        operation: Operation::Math(op),
+    })
+}
+
+fn on_expression<'a, I>(tokens: &mut I, previous: Option<Expression>) -> Option<Expression>
+where
+    I: std::iter::Iterator<Item = &'a Token>,
+{
+    let t = tokens.next()?;
     println!("Token: {:?}", t);
-    match t {
-        Some(Token::Ident(ident)) => on_identifier(tokens, ident.to_string(), previous),
-        Some(Token::Kwd(k)) => on_keyword(tokens, k),
-        Some(Token::Literal(l)) => match l {
+    let expr = match t {
+        Token::Ident(ident) => on_identifier(tokens, ident.to_string(), previous),
+        Token::Kwd(k) => on_keyword(tokens, k),
+        Token::Literal(l) => match l {
             Literal::Bool(_) => Expression::SingleValue(l.to_vl()),
             Literal::Int(i) => on_integer_literal(tokens, *i),
-            Literal::String(s) => Expression::SingleValue(SingleValue::ValueLiteral(
-                ValueLiteral::new(NativeType::String, s),
-            )),
+            Literal::String(s) => ValueLiteral::new_expression(NativeType::String, s),
         },
-        Some(
-            Token::Symbol(Symbol::Plus)
-            | Token::Symbol(Symbol::Minus)
-            | Token::Symbol(Symbol::Asterisk)
-            | Token::Symbol(Symbol::FwdSlash),
-        ) => {
-            // TODO: Clean up
-            let prev = previous.clone();
-            let op = MathOperation::from_token(t.unwrap().clone()).unwrap();
 
-            Expression::Operation {
-                lhs: Box::new(previous.expect("Unexpected syntax")),
-                rhs: Box::new(on_expression(tokens, prev)),
-                operation: Operation::Math(op),
-            }
-        }
+        Token::Symbol(Symbol::Plus)
+        | Token::Symbol(Symbol::Minus)
+        | Token::Symbol(Symbol::Asterisk)
+        | Token::Symbol(Symbol::FwdSlash) => on_math_expression(tokens, t, previous?)?,
+
         _ => todo!(),
-    }
+    };
+    Some(expr)
 }
 
 fn on_keyword<'a, I>(tokens: &mut I, k: &Kwd) -> Expression
@@ -288,7 +305,7 @@ where
     let remaining_expression = on_expression(tokens, None);
     match k {
         Kwd::Return => Expression::Statement {
-            expression: Box::new(remaining_expression),
+            expression: Box::new(remaining_expression.unwrap()),
             operation: Operation::Return,
         },
         Kwd::DataType(_) => todo!(),
@@ -304,9 +321,10 @@ where
 
 pub fn parse(tokens: &[Token]) -> Expression {
     on_expression(
-        &mut tokens.iter().filter(|t| **t == Token::whitespace()),
+        &mut tokens.iter().filter(|t| **t != Token::whitespace()),
         None,
     )
+    .unwrap()
 }
 
 #[cfg(test)]
@@ -393,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn function_call() {
+    fn function_call_no_values() {
         // print "Hello"
         test(
             vec![
@@ -401,8 +419,8 @@ mod tests {
                 Token::Literal(Literal::String("Hello".to_string())),
             ],
             Expression::Operation {
-                lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
-                    ValueLiteral::new(NativeType::Function, "print"),
+                lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
+                    "print".to_string(),
                 ))),
                 rhs: Box::new(Expression::MultipleValues(vec![Expression::SingleValue(
                     SingleValue::ValueLiteral(ValueLiteral::new(NativeType::String, "Hello")),
@@ -446,9 +464,7 @@ mod tests {
                 Token::Literal(Literal::String("World".to_string())),
             ],
             Expression::Operation {
-                lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
-                    ValueLiteral::new(NativeType::Function, "print"),
-                ))),
+                lhs: Box::new(Expression::SingleValue(SingleValue::Identifier("print".to_string()))),
                 rhs: Box::new(Expression::MultipleValues(vec![
                     Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new_string(
                         "Hello",
@@ -492,14 +508,12 @@ mod tests {
         test(
             vec![
                 Token::Ident("print".to_string()),
-                Token::Symbol(Symbol::Quote),
-                Token::Ident("Hello".to_string()),
-                Token::Symbol(Symbol::Quote),
+                Token::Literal(Literal::String("Hello".to_string())),
                 Token::Literal(Literal::Bool(true)),
             ],
             Expression::Operation {
-                lhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
-                    ValueLiteral::new(NativeType::Function, "print"),
+                lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
+                    "print".to_string(),
                 ))),
                 rhs: Box::new(Expression::MultipleValues(vec![
                     Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new_string(
