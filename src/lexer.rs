@@ -14,7 +14,7 @@
 
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Kwd(Kwd),
     Ident(String),
@@ -95,17 +95,19 @@ impl Display for Token {
                 Literal::Bool(b) => &b.to_string(),
                 Literal::Int(i) => &i.to_string(),
                 Literal::String(s) => &s.to_string(),
+                Literal::Float(f) => &f.to_string(),
             },
         };
         f.write_str(str_rep)
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     Bool(bool),
     Int(i32),
-    String(String), // TODO: Consider Float literal
+    Float(f32),
+    String(String),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -256,6 +258,15 @@ fn maybe_peek(lexer: &mut Lexer, test: char, matched: Symbol) -> Option<Token> {
         None
     }
 }
+fn parse_literal_or_identifier(s: &str) -> Token {
+    if let Ok(r) = str::parse::<i32>(s) {
+        Token::Literal(Literal::Int(r))
+    } else if let Ok(r) = str::parse::<f32>(s) {
+        Token::Literal(Literal::Float(r))
+    } else {
+        Token::Ident(s.to_string())
+    }
+}
 
 /// Advances a lexer until a non-alphanumeric delimeter and converts into an optional [Token].
 /// Returns Some if a text symbol can be found and None otherwise.
@@ -266,7 +277,8 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
 
     // cover it being the end of the stream as well as delimiter
     while let Some(ch) = lexer.advance() {
-        if !ch.is_alphanumeric() {
+        // allow floats through
+        if !ch.is_alphanumeric() && ch != '.' {
             break;
         }
         buf.push(ch);
@@ -289,13 +301,7 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
         "string" => Token::Kwd(Kwd::DataType(DataTypeKwd::String)),
         "true" => Token::Literal(Literal::Bool(true)),
         "false" => Token::Literal(Literal::Bool(false)),
-        s => {
-            if let Ok(i) = str::parse::<i32>(s) {
-                Token::Literal(Literal::Int(i))
-            } else {
-                Token::Ident(s.to_string())
-            }
-        }
+        s => parse_literal_or_identifier(s),
     };
     lexer.step_back();
     Some(token)
@@ -475,6 +481,7 @@ mod test {
         test("true", vec![Token::Literal(Literal::Bool(true))]);
         test("false", vec![Token::Literal(Literal::Bool(false))]);
         test("3", vec![Token::Literal(Literal::Int(3))]);
+        test("3.13", vec![Token::Literal(Literal::Float(3.13))]);
     }
 
     #[test]

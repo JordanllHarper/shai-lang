@@ -217,6 +217,10 @@ impl SingleValue {
     pub fn new_bool(representation: &str) -> Self {
         Self::ValueLiteral(ValueLiteral::new(NativeType::Bool, representation))
     }
+
+    pub fn new_float(representation: &str) -> Self {
+        Self::ValueLiteral(ValueLiteral::new(NativeType::Float, representation))
+    }
 }
 
 /// Defines the 4 basic math operations supported
