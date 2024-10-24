@@ -84,12 +84,7 @@ where
                 }
                 Token::Symbol(Symbol::Equals) => {
                     let expression = on_expression(tokens, None);
-                    if let Some(e) = expression {
-                        Expression::Function(Box::new(Function::new(&ident, args, None, e)))
-                    } else {
-                        // TODO: Invalid syntax
-                        todo!("{:?} Invalid syntax", expression)
-                    }
+                    Expression::Function(Box::new(Function::new(&ident, args, None, expression)))
                 }
                 _ => {
                     // TODO: Invalid syntax
@@ -160,7 +155,7 @@ where
                     let op = MathOperation::from_token(t.unwrap().clone()).unwrap();
                     let expr = Expression::Operation {
                         lhs: Box::new(previous.expect("Unexpected syntax")),
-                        rhs: Box::new(on_expression(tokens, None).unwrap()),
+                        rhs: Box::new(on_expression(tokens, None)),
                         operation: Operation::Math(op),
                     };
                     println!("Got here");
@@ -200,14 +195,14 @@ where
     println!("{:?}", t);
     match t {
         // Assignment
-        Some(Token::Symbol(Symbol::Equals)) => Some(on_assignment(tokens, ident, previous)),
+        Some(Token::Symbol(Symbol::Equals)) => on_assignment(tokens, ident, previous),
 
         // Evaluation
         Some(Token::Symbol(Symbol::Equality)) => {
-            (on_evaluation(tokens, ident, EvaluationOperator::Eq))
+            on_evaluation(tokens, ident, EvaluationOperator::Eq)
         }
         Some(Token::Symbol(Symbol::NotEquality)) => {
-            (on_evaluation(tokens, ident, EvaluationOperator::Neq))
+            on_evaluation(tokens, ident, EvaluationOperator::Neq)
         }
 
         Some(Token::Symbol(Symbol::GzEq)) => on_evaluation(tokens, ident, EvaluationOperator::GzEq),
@@ -245,8 +240,8 @@ where
         Some(Token::Literal(_)) | Some(Token::Symbol(Symbol::Quote)) => {
             todo!()
         }
-        Some(Token::Symbol(Symbol::ParenOpen)) => Some(on_function(tokens, ident)),
-        _ => Some(Expression::SingleValue(SingleValue::Identifier(ident))),
+        Some(Token::Symbol(Symbol::ParenOpen)) => on_function(tokens, ident),
+        _ => Expression::SingleValue(SingleValue::Identifier(ident)),
     }
 }
 
@@ -260,11 +255,11 @@ where
         Some(Token::Ident(ident)) => on_identifier(tokens, ident.to_string(), previous),
         Some(Token::Kwd(k)) => on_keyword(tokens, k),
         Some(Token::Literal(l)) => match l {
-            Literal::Bool(_) => (Expression::SingleValue(l.to_vl())),
-            Literal::Int(i) => (on_integer_literal(tokens, *i)),
-            Literal::String(s) => Some(Expression::SingleValue(SingleValue::ValueLiteral(
+            Literal::Bool(_) => Expression::SingleValue(l.to_vl()),
+            Literal::Int(i) => on_integer_literal(tokens, *i),
+            Literal::String(s) => Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::String, s),
-            ))),
+            )),
         },
         Some(
             Token::Symbol(Symbol::Plus)
@@ -275,14 +270,13 @@ where
             // TODO: Clean up
             let prev = previous.clone();
             let op = MathOperation::from_token(t.unwrap().clone()).unwrap();
-            let expr = Expression::Operation {
+
+            Expression::Operation {
                 lhs: Box::new(previous.expect("Unexpected syntax")),
                 rhs: Box::new(on_expression(tokens, prev)),
                 operation: Operation::Math(op),
-            };
-            (expr)
+            }
         }
-        None => None,
         _ => todo!(),
     }
 }
@@ -334,19 +328,11 @@ mod tests {
             vec![
                 // Signature
                 Token::Ident("add".to_string()),
-                Token::whitespace(),
                 // Args
                 Token::Symbol(Symbol::ParenOpen),
                 Token::Symbol(Symbol::ParenClose),
                 // End of args
-                // Start of return type
-                Token::whitespace(),
                 Token::Symbol(Symbol::BraceOpen),
-                // body (assume 4 spaces)
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
                 Token::Symbol(Symbol::Newline),
                 // end
                 Token::Symbol(Symbol::BraceClose),
