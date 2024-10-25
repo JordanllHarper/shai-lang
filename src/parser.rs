@@ -58,7 +58,7 @@ where
     (parameters, tokens)
 }
 
-fn on_function<'a, I>(tokens: &mut I, ident: String) -> Expression
+fn on_function<'a, I>(tokens: &mut I, ident: &str) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
@@ -73,14 +73,14 @@ where
                 Token::Symbol(Symbol::BraceOpen) => {
                     // Body
                     let body = on_function_body(&mut tokens);
-                    let f = Function::new(&ident, args, return_type, body);
+                    let f = Function::new(ident, args, return_type, body);
                     Expression::Function(Box::new(f))
                 }
                 // Function expression
                 Token::Symbol(Symbol::Equals) => {
                     let expression = on_expression(tokens.next().unwrap(), &mut tokens, None);
                     if let Some(expression) = expression {
-                        let x = Function::new(&ident, args, return_type, expression);
+                        let x = Function::new(ident, args, return_type, expression);
                         Expression::Function(Box::new(x))
                     } else {
                         // TODO: Invalid syntax
@@ -146,7 +146,7 @@ where
 
 fn on_evaluation<'a, I>(
     tokens: &mut I,
-    ident: String,
+    ident: &str,
     evaluation_op: EvaluationOperator,
 ) -> Expression
 where
@@ -155,7 +155,7 @@ where
     todo!();
 }
 
-fn on_assignment<'a, I>(tokens: &mut I, ident: String, previous: Option<Expression>) -> Expression
+fn on_assignment<'a, I>(tokens: &mut I, ident: &str, previous: Option<Expression>) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
@@ -164,7 +164,9 @@ where
         Some(Token::Literal(l)) => {
             let sv = l.to_single_value();
             Expression::Operation {
-                lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(ident))),
+                lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
+                    ident.to_string(),
+                ))),
                 rhs: Box::new(Expression::SingleValue(sv)),
                 operation: Operation::Assignment(None),
             }
@@ -173,6 +175,15 @@ where
             // TODO: Expression assignment
             let expression = on_expression(tokens.next().unwrap(), tokens, None);
             todo!()
+        }
+        Some(Token::Ident(i)) => {
+            let lhs = SingleValue::new_identifier_expression(ident);
+            let rhs = on_identifier(tokens, i, Some(SingleValue::new_identifier_expression(i)));
+            Expression::Operation {
+                lhs: Box::new(lhs),
+                rhs: Box::new(rhs),
+                operation: Operation::Assignment(None),
+            }
         }
         _ => todo!(),
     }
@@ -183,7 +194,7 @@ where
 // Variable usage
 // y = *x* + 3
 //      |- here is usage
-fn on_identifier<'a, I>(tokens: &mut I, ident: String, previous: Option<Expression>) -> Expression
+fn on_identifier<'a, I>(tokens: &mut I, ident: &str, previous: Option<Expression>) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
@@ -221,13 +232,9 @@ where
 
         // Operations
         // Function call if value literal or string
-        Some(Token::Literal(l)) => on_function_call(tokens, &ident, l),
+        Some(Token::Literal(l)) => on_function_call(tokens, ident, l),
         Some(Token::Symbol(Symbol::ParenOpen)) => on_function(tokens, ident),
-        None => {
-            // TODO: Invalid syntax
-            todo!()
-        }
-        _ => Expression::SingleValue(SingleValue::Identifier(ident)),
+        _ => Expression::SingleValue(SingleValue::Identifier(ident.to_string())),
     }
 }
 
@@ -275,7 +282,7 @@ where
     let expr = match t {
         Token::Ident(ident) => on_identifier(
             tokens,
-            ident.to_string(),
+            ident,
             Some(SingleValue::new_identifier_expression(ident)),
         ),
         Token::Kwd(k) => on_keyword(tokens, k),
@@ -329,6 +336,48 @@ mod tests {
     fn test(input: Vec<Token>, expected: Expression) {
         let actual = parse(&input);
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn variable_assignment_with_another_variable() {
+        // y = x + 3
+        test(
+            vec![
+                Token::Ident("y".to_string()),
+                Token::Symbol(Symbol::Equals),
+                Token::Ident("x".to_string()),
+            ],
+            Expression::Operation {
+                lhs: Box::new(SingleValue::new_identifier_expression("y")),
+                rhs: Box::new(SingleValue::new_identifier_expression("x")),
+                operation: Operation::Assignment(None),
+            },
+        )
+    }
+
+    #[test]
+    fn variable_usage_in_expressions() {
+        // y = x + 3
+        test(
+            vec![
+                Token::Ident("y".to_string()),
+                Token::Symbol(Symbol::Equals),
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Plus),
+                Token::Literal(Literal::Int(3)),
+            ],
+            Expression::Operation {
+                lhs: Box::new(SingleValue::new_identifier_expression("y")),
+                rhs: Box::new(Expression::Operation {
+                    lhs: Box::new(SingleValue::new_identifier_expression("x")),
+                    rhs: Box::new(SingleValue::new_value_literal_expression(
+                        ValueLiteral::new(NativeType::Int, "3"),
+                    )),
+                    operation: Operation::Math(MathOperation::Add),
+                }),
+                operation: Operation::Assignment(None),
+            },
+        )
     }
 
     #[test]
