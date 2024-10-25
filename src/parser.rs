@@ -1,5 +1,3 @@
-use std::iter::Peekable;
-
 use crate::{language::*, lexer::*};
 
 fn on_arguments<'a, I>(tokens: &mut I, first_arg: SingleValue) -> FunctionArguments
@@ -49,7 +47,7 @@ where
                 let parameter = Parameter::new(arg_ident, native_type);
                 args.push(parameter);
             }
-
+            Token::Symbol(Symbol::Comma) => continue,
             Token::Symbol(Symbol::ParenClose) => break,
             _ => {
                 // TODO: Invalid syntax
@@ -65,8 +63,7 @@ where
 {
     let (args, tokens) = on_parameters(tokens);
     let mut peekable = tokens.peekable();
-    let (return_type, peekable) = on_return_type(&mut peekable);
-    let mut tokens = peekable.collect::<Vec<&Token>>().into_iter();
+    let (return_type, mut tokens) = on_return_type(&mut peekable);
 
     match tokens.next() {
         Some(t) => {
@@ -103,10 +100,13 @@ where
     }
 }
 
-fn on_return_type<'a, I>(tokens: &mut Peekable<I>) -> (Option<ReturnType>, &mut Peekable<I>)
+fn on_return_type<'a, I>(
+    tokens: I,
+) -> (Option<ReturnType>, Box<dyn Iterator<Item = &'a Token> + 'a>)
 where
-    I: std::iter::Iterator<Item = &'a Token>,
+    I: std::iter::IntoIterator<Item = &'a Token>,
 {
+    let mut tokens = tokens.into_iter().peekable();
     if let Some(Token::Symbol(Symbol::Arrow)) = tokens.peek() {
         tokens.next();
         // Declaration with return type
@@ -117,9 +117,11 @@ where
                 todo!()
             }
         };
-        return (ret_type, tokens);
+        let iter = tokens.collect::<Vec<&Token>>().into_iter();
+        return (ret_type, Box::new(iter));
     }
-    (None, tokens)
+    let tokens = tokens.collect::<Vec<&Token>>().into_iter();
+    (None, Box::new(tokens))
 }
 
 fn on_function_body<'a, I>(tokens: &mut I) -> Expression
@@ -311,13 +313,18 @@ where
     }
 }
 
-pub fn parse(tokens: &[Token]) -> Expression {
-    let mut iter = tokens.iter();
+pub fn parse<'a, I>(tokens: I) -> Expression
+where
+    I: std::iter::IntoIterator<Item = &'a Token>,
+{
+    let mut iter = tokens.into_iter();
     on_expression(iter.next().unwrap(), &mut iter, None).unwrap()
 }
 
 #[cfg(test)]
 mod tests {
+    
+
     use super::*;
     use pretty_assertions::assert_eq;
 
@@ -327,7 +334,7 @@ mod tests {
     }
 
     #[test]
-    fn function_declaration_no_args() {
+    fn function_declaration_no_params_no_return() {
         // do_nothing () {\n
         // \n
         // }\n
@@ -355,7 +362,213 @@ mod tests {
     }
 
     #[test]
-    fn function_expression() {
+    fn function_declaration_no_params_return() {
+        // do_nothing () -> int {\n
+        // \n
+        // }\n
+        test(
+            vec![
+                // Signature
+                Token::Ident("do_nothing".to_string()),
+                // Args
+                Token::Symbol(Symbol::ParenOpen),
+                Token::Symbol(Symbol::ParenClose),
+                // End of Args
+                //Return type
+                Token::Symbol(Symbol::Arrow),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                //End of Return Type
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                // end
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::Newline),
+            ],
+            Expression::Function(Box::new(Function::new(
+                "do_nothing",
+                vec![],
+                Some(NativeType::Int),
+                Expression::Body(vec![]),
+            ))),
+        );
+        // with body
+        test(
+            vec![
+                // Signature
+                Token::Ident("add".to_string()),
+                // Args
+                Token::Symbol(Symbol::ParenOpen),
+                Token::Symbol(Symbol::ParenClose),
+                // End of Args
+                //Return type
+                Token::Symbol(Symbol::Arrow),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                //End of Return Type
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                // body return numOne + numTwo
+                Token::Kwd(Kwd::Return),
+                Token::Ident("numOne".to_string()),
+                Token::Symbol(Symbol::Plus),
+                Token::Ident("numTwo".to_string()),
+                // end
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::Newline),
+            ],
+            Expression::Function(Box::new(Function::new(
+                "add",
+                vec![],
+                Some(NativeType::Int),
+                Expression::Body(vec![Expression::Statement {
+                    expression: Box::new(Expression::Operation {
+                        lhs: Box::new(SingleValue::new_identifier_expression("numOne")),
+                        rhs: Box::new(SingleValue::new_identifier_expression("numTwo")),
+                        operation: Operation::Math(MathOperation::Add),
+                    }),
+                    operation: Operation::Return,
+                }]),
+            ))),
+        )
+    }
+
+    #[test]
+    fn function_declaration_params_no_return() {
+        // do_nothing (numOne, numTwo) {\n
+        // \n
+        // }\n
+        test(
+            vec![
+                // Signature
+                Token::Ident("do_nothing".to_string()),
+                // Args
+                Token::Symbol(Symbol::ParenOpen),
+                Token::Ident("numOne".to_string()),
+                Token::Symbol(Symbol::Comma),
+                Token::Ident("numTwo".to_string()),
+                Token::Symbol(Symbol::ParenClose),
+                // End of args
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                // end
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::Newline),
+            ],
+            Expression::Function(Box::new(Function::new(
+                "do_nothing",
+                vec![
+                    Parameter::new("numOne", None),
+                    Parameter::new("numTwo", None),
+                ],
+                None,
+                Expression::Body(vec![]),
+            ))),
+        );
+        // typed arguments
+        test(
+            vec![
+                // Signature
+                Token::Ident("do_nothing".to_string()),
+                // Args
+                Token::Symbol(Symbol::ParenOpen),
+                Token::Ident("numOne".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                Token::Symbol(Symbol::Comma),
+                Token::Ident("numTwo".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                Token::Symbol(Symbol::ParenClose),
+                // End of args
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                // end
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::Newline),
+            ],
+            Expression::Function(Box::new(Function::new(
+                "do_nothing",
+                vec![
+                    Parameter::new("numOne", Some(NativeType::Int)),
+                    Parameter::new("numTwo", Some(NativeType::Int)),
+                ],
+                None,
+                Expression::Body(vec![]),
+            ))),
+        )
+    }
+
+    #[test]
+    fn function_declaration_params_return() {
+        // do_nothing (numOne, numTwo) -> int {\n
+        // \n
+        // }\n
+        test(
+            vec![
+                // Signature
+                Token::Ident("do_nothing".to_string()),
+                // Args
+                Token::Symbol(Symbol::ParenOpen),
+                Token::Ident("numOne".to_string()),
+                Token::Symbol(Symbol::Comma),
+                Token::Ident("numTwo".to_string()),
+                Token::Symbol(Symbol::ParenClose),
+                // End of Args
+                //Return type
+                Token::Symbol(Symbol::Arrow),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                //End of Return Type
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                // end
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::Newline),
+            ],
+            Expression::Function(Box::new(Function::new(
+                "do_nothing",
+                vec![
+                    Parameter::new("numOne", None),
+                    Parameter::new("numTwo", None),
+                ],
+                Some(NativeType::Int),
+                Expression::Body(vec![]),
+            ))),
+        );
+        // Typed Parameters
+        test(
+            vec![
+                // Signature
+                Token::Ident("do_nothing".to_string()),
+                // Args
+                Token::Symbol(Symbol::ParenOpen),
+                Token::Ident("numOne".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                Token::Symbol(Symbol::Comma),
+                Token::Ident("numTwo".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                Token::Symbol(Symbol::ParenClose),
+                // End of Params
+                //Return type
+                Token::Symbol(Symbol::Arrow),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                //End of Return Type
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                // end
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::Newline),
+            ],
+            Expression::Function(Box::new(Function::new(
+                "do_nothing",
+                vec![
+                    Parameter::new("numOne", Some(NativeType::Int)),
+                    Parameter::new("numTwo", Some(NativeType::Int)),
+                ],
+                Some(NativeType::Int),
+                Expression::Body(vec![]),
+            ))),
+        )
+    }
+
+    #[test]
+    fn function_expression_params_no_return() {
         // No specified types
         // add (numOne, numTwo) = num_one + num_two\n
         test(
