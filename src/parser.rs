@@ -29,23 +29,23 @@ fn on_parameters<'a, I>(tokens: &mut I) -> (FunctionParameters, &mut I)
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
-    let mut args: FunctionParameters = Vec::new();
+    let mut parameters: FunctionParameters = Vec::new();
 
     while let Some(t) = tokens.next() {
         match t {
-            Token::Ident(arg_ident) => {
+            Token::Ident(param_ident) => {
                 let native_type = match tokens.next() {
                     Some(Token::Kwd(Kwd::DataType(d))) => Some(NativeType::from_datatype_kwd(d)),
                     Some(Token::Symbol(Symbol::ParenClose)) => {
-                        let parameter = Parameter::new(arg_ident, None);
-                        args.push(parameter);
+                        let parameter = Parameter::new(param_ident, None);
+                        parameters.push(parameter);
                         break;
                     }
                     _ => None,
                 };
 
-                let parameter = Parameter::new(arg_ident, native_type);
-                args.push(parameter);
+                let parameter = Parameter::new(param_ident, native_type);
+                parameters.push(parameter);
             }
             Token::Symbol(Symbol::Comma) => continue,
             Token::Symbol(Symbol::ParenClose) => break,
@@ -55,8 +55,9 @@ where
             }
         };
     }
-    (args, tokens)
+    (parameters, tokens)
 }
+
 fn on_function<'a, I>(tokens: &mut I, ident: String) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
@@ -175,8 +176,6 @@ where
         }
         _ => todo!(),
     }
-    // TODO: Function assignment
-    // E.g. fname (...) = ...
 }
 
 // Identifier options
@@ -323,7 +322,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    
 
     use super::*;
     use pretty_assertions::assert_eq;
