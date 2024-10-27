@@ -27,76 +27,103 @@ impl Token {
         Token::Symbol(Symbol::Whitespace)
     }
 }
+
+impl Display for DataTypeKwd {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let representation = match self {
+            DataTypeKwd::Bool => "bool",
+            DataTypeKwd::Char => "char",
+            DataTypeKwd::Float => "float",
+            DataTypeKwd::Int => "int",
+            DataTypeKwd::String => "string",
+            DataTypeKwd::Void => "void",
+        };
+        f.write_str(representation)
+    }
+}
+impl Display for Kwd {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Kwd::DataType(d) => &d.to_string(),
+            Kwd::While => "while",
+            Kwd::For => "for",
+            Kwd::If => "if",
+            Kwd::Return => "return",
+            Kwd::In => "in",
+            Kwd::Break => "break",
+            Kwd::Include => "include",
+            Kwd::Else => "else",
+        };
+        f.write_str(str)
+    }
+}
+impl Display for Symbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Symbol::ParenOpen => "(",
+            Symbol::ParenClose => ")",
+            Symbol::ChevOpen => "<",
+            Symbol::ChevClose => ">",
+            Symbol::AngOpen => "[",
+            Symbol::AngClose => "]",
+            Symbol::BraceOpen => "{",
+            Symbol::BraceClose => "}",
+            Symbol::Equals => "=",
+            Symbol::Modulus => "%",
+            Symbol::Quote => "\"",
+            Symbol::Apstr => "\'",
+            Symbol::Comma => ",",
+            Symbol::Minus => "-",
+            Symbol::Period => ".",
+            Symbol::Plus => "+",
+            Symbol::Asterisk => "*",
+            Symbol::FwdSlash => "/",
+            Symbol::BckSlash => "\\",
+            Symbol::Dollar => "$",
+            Symbol::Colon => ":",
+            Symbol::Underscore => "_",
+            Symbol::Ampsnd => "&",
+            Symbol::Pipe => "|",
+            Symbol::Whitespace => " ",
+            Symbol::Bang => "!",
+            Symbol::Newline => "\n",
+            Symbol::Equality => "==",
+            Symbol::NotEquality => "!=",
+            Symbol::PlusAssign => "+=",
+            Symbol::MinusAssign => "-=",
+            Symbol::MultiplyAssign => "*=",
+            Symbol::DivideAssign => "/=",
+            Symbol::Arrow => "->",
+            Symbol::And => "&&",
+            Symbol::Or => "||",
+            Symbol::LzEq => "<=",
+            Symbol::GzEq => ">=",
+            Symbol::EscapeQuote => "\\\"",
+            Symbol::EscapeApos => "\\\'",
+        };
+        f.write_str(str)
+    }
+}
+
 impl Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str_rep = match self {
-            Token::Kwd(k) => match k {
-                Kwd::DataType(dt) => match dt {
-                    DataTypeKwd::Bool => "bool",
-                    DataTypeKwd::Char => "char",
-                    DataTypeKwd::Float => "float",
-                    DataTypeKwd::Int => "int",
-                    DataTypeKwd::String => "string",
-                    DataTypeKwd::Void => "void",
-                },
-                Kwd::While => "while",
-                Kwd::For => "for",
-                Kwd::If => "if",
-                Kwd::Return => "return",
-                Kwd::In => "in",
-                Kwd::Break => "break",
-                Kwd::Include => "include",
-                Kwd::Else => "else",
-            },
+            Token::Kwd(k) => &k.to_string(),
             Token::Ident(i) => i,
-            Token::Symbol(s) => match s {
-                Symbol::ParenOpen => "(",
-                Symbol::ParenClose => ")",
-                Symbol::ChevOpen => "<",
-                Symbol::ChevClose => ">",
-                Symbol::AngOpen => "[",
-                Symbol::AngClose => "]",
-                Symbol::BraceOpen => "{",
-                Symbol::BraceClose => "}",
-                Symbol::Equals => "=",
-                Symbol::Modulus => "%",
-                Symbol::Quote => "\"",
-                Symbol::Apstr => "\'",
-                Symbol::Comma => ",",
-                Symbol::Minus => "-",
-                Symbol::Period => ".",
-                Symbol::Plus => "+",
-                Symbol::Asterisk => "*",
-                Symbol::FwdSlash => "/",
-                Symbol::BckSlash => "\\",
-                Symbol::Dollar => "$",
-                Symbol::Colon => ":",
-                Symbol::Underscore => "_",
-                Symbol::Ampsnd => "&",
-                Symbol::Pipe => "|",
-                Symbol::Whitespace => " ",
-                Symbol::Bang => "!",
-                Symbol::Newline => "\n",
-                Symbol::Equality => "==",
-                Symbol::NotEquality => "!=",
-                Symbol::PlusAssign => "+=",
-                Symbol::MinusAssign => "-=",
-                Symbol::MultiplyAssign => "*=",
-                Symbol::DivideAssign => "/=",
-                Symbol::Arrow => "->",
-                Symbol::And => "&&",
-                Symbol::Or => "||",
-                Symbol::LzEq => "<=",
-                Symbol::GzEq => ">=",
-                Symbol::EscapeQuote => "\\\"",
-                Symbol::EscapeApos => "\\\'",
-            },
-            Token::Literal(l) => match l {
-                Literal::Bool(b) => &b.to_string(),
-                Literal::Int(i) => &i.to_string(),
-                Literal::String(s) => &s.to_string(),
-                Literal::Float(f) => &f.to_string(),
-            },
+            Token::Symbol(s) => &s.to_string(),
+            Token::Literal(l) => &l.to_string(),
+        };
+        f.write_str(str_rep)
+    }
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str_rep = match self {
+            Literal::Bool(b) => &b.to_string(),
+            Literal::Int(i) => &i.to_string(),
+            Literal::String(s) => &s.to_string(),
+            Literal::Float(f) => &f.to_string(),
         };
         f.write_str(str_rep)
     }
