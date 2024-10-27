@@ -12,7 +12,7 @@
 //
 // DATA STRUCTS
 
-const WHITESPACE : char = ' ';
+const WHITESPACE: char = ' ';
 
 use std::{
     collections::HashSet,
@@ -107,6 +107,8 @@ impl Display for Symbol {
             Symbol::GzEq => ">=",
             Symbol::EscapeQuote => "\\\"",
             Symbol::EscapeApos => "\\\'",
+            Symbol::Comment(c) => c,
+            Symbol::MultilineComment(c) => c,
         };
         f.write_str(str)
     }
@@ -185,6 +187,8 @@ pub enum Symbol {
     Or,
     LzEq,
     GzEq,
+    MultilineComment(String),
+    Comment(String),
     // Escape chars
     EscapeQuote,
     EscapeApos,
@@ -252,7 +256,64 @@ impl Lexer {
     }
 }
 
-fn peek_while<M>(test: char, lexer: &mut Lexer, mapping: M) -> Token
+fn peek_if<M>(lexer: &mut Lexer, test: char, until: char, mapping: M) -> Option<Token>
+where
+    M: Fn(&[char]) -> Token,
+{
+    let next = lexer.advance()?;
+    if next == test {
+        let mut c_collection = Vec::new();
+
+        while let Some(c) = lexer.advance() {
+            if c == until {
+                break;
+            }
+            c_collection.push(c);
+        }
+        Some(mapping(&c_collection))
+    } else {
+        lexer.step_back();
+        None
+    }
+}
+
+fn take_until<M>(lexer: &mut Lexer, test: char, until: &str, mapping: M) -> Option<Token>
+where
+    M: Fn(&[char]) -> Token,
+{
+    let next = lexer.advance()?;
+
+    let until_count = until.len();
+    let until = until.chars().collect::<Vec<char>>();
+
+    if next == test {
+        let mut c_collection = Vec::new();
+        let mut until_collection = Vec::new();
+
+        while let Some(c) = lexer.advance() {
+            until_collection.push(c);
+
+            if until == until_collection {
+                c_collection.pop();
+                // match
+                break;
+            } else {
+                c_collection.push(c);
+            }
+
+            if until_collection.len() >= until_count {
+                until_collection.remove(0);
+            }
+        }
+
+        Some(mapping(&c_collection))
+    } else {
+        lexer.step_back();
+        None
+    }
+}
+
+fn peek_while<M>(lexer: &mut Lexer, test: char, mapping: M) -> Token
 where
     M: Fn(&[char]) -> Token,
 {
@@ -408,7 +469,7 @@ impl Iterator for Lexer {
                 '_' => Token::Symbol(Symbol::Underscore),
                 '\n' => Token::Symbol(Symbol::Newline),
                 ' ' => Token::Symbol(Symbol::Whitespace),
-                '"' => peek_while('"', self, |characters| {
+                '"' => peek_while(self, '"', |characters| {
                     Token::Literal(Literal::String(String::from_iter(characters.iter())))
                 }),
                 '<' => peek_symbol(self, '=', Symbol::LzEq, Symbol::ChevOpen),
@@ -425,7 +486,31 @@ impl Iterator for Lexer {
                 }
 
                 '*' => peek_symbol(self, '=', Symbol::MultiplyAssign, Symbol::Asterisk),
-                '/' => peek_symbol(self, '=', Symbol::DivideAssign, Symbol::FwdSlash),
+                '/' => {
+                    if let Some(c) = peek_if(self, '/', '\n', |characters| {
+                        Token::Symbol(Symbol::Comment(String::from_iter(characters.iter())))
+                    }) {
+                        c
+                    } else if let Some(t) = take_until(self, '*', "*/", |characters| {
+                        Token::Symbol(Symbol::MultilineComment(String::from_iter(
+                            characters.iter(),
+                        )))
+                    }) {
+                        t
+                    } else {
+                        peek_symbol(self, '=', Symbol::DivideAssign, Symbol::FwdSlash)
+                    }
+
+                    // if let Some(c) = peek_while('/', self, |c| {
+                    //     Token::Symbol(Symbol::Comment(String::from_iter(c.iter())))
+                    // }) {
+                    //     c
+                    // } else if let Some(c) = maybe_peek(self, '*', Symbol::MultilineComment) {
+                    //     c
+                    // } else {
+                    //     peek_symbol(self, '=', Symbol::DivideAssign, Symbol::FwdSlash)
+                    // }
+                }
                 '=' => peek_symbol(self, '=', Symbol::Equality, Symbol::Equals),
                 '!' => peek_symbol(self, '=', Symbol::NotEquality, Symbol::Bang),
                 '&' => peek_symbol(self, '&', Symbol::And, Symbol::Ampsnd),
@@ -470,6 +555,30 @@ mod test {
         test(
             "\"3\"",
             vec![Token::Literal(Literal::String("3".to_string()))],
+        )
+    }
+
+    #[test]
+    fn single_line_comment() {
+        test(
+            "// hello",
+            vec![Token::Symbol(Symbol::Comment(" hello".to_string()))],
+        )
+    }
+
+    #[test]
+    fn multi_line_comment() {
+        test(
+            r"/*
+hello
+*/",
+            vec![
+                Token::Symbol(Symbol::MultilineComment(
+                    r"
+hello
+".to_string(),
+                )),
+            ],
         )
     }
 
