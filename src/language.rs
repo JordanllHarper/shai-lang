@@ -104,7 +104,7 @@ pub type Body = Vec<Expression>;
 ///
 /// An expression is defined as something which returns a value.
 ///
-/// There are 3 types of expressions in Shai-lang:
+/// There are several types of expressions in Shai-lang:
 ///
 /// NOTE: For below, we use '{ }' to denote both real syntax and the ideas of expressions.
 ///
