@@ -1,37 +1,23 @@
-# Shai-lang Syntax + Grammar
+# The Shai-Lang Language
 
-## General overview
+## Introduction
 
-### What constitutes true?
-- true
-- conditions that evaluate to true - e.g. 5 == 5
+Shai is an expression based scripting language designed for writing utilities in a terminal environment. It aims to be familiar to reduce context switching when coming from a large project to writing helper scripts.
 
-### Type design:
-Language is dynamically typed, but types can be specified.
-If these don't conform, this would result in a runtime error.
+It takes inspiration from the following languages:
 
-### Syntax goals:
-Simple structure that resembles other popular languages.
-Cut out unncessary syntax.
+- Bash + Nushell for acting as a Shell scripting language.
+- Go for it's development speed.
+- Python + Lua for dynamic typing and preference for mechanisms over contracts. TODO: Reference TJ Devries here on why Lua in Neovim (this is his idea).
+- Rust + Kotlin for it's expresssion based systems.
 
-### Features:
-Type extensions
-Higher order functions + anonymous functions
-
-### Inspirations:
-Bash    - function calls and signature general syntax
-Nushell - idea of scripts being more structured
-C       - syntax of arrays, constants
-Go      - type specification in function signatures + variables, no semicolons
-Python  - dynamic types
-Rust    - return type syntax
-... and common language syntax, data types
+Below is an overview of the language.
 
 ## Comments
 
 Declaration:
 
-// C 
+`// C`
 
 where 
 
@@ -54,7 +40,7 @@ Examples:
 */
 ```
 
-## "Primitive" Data Types
+## Data Types
 
 - `char`
 - `string`
@@ -70,7 +56,7 @@ Examples:
 
 Declaration: 
 
-x : T = y
+`x : T = y`
 
 where
 
@@ -106,7 +92,9 @@ Examples:
 
 ## Variable Constants
 
-x : const T = y
+Declaration:
+
+`x : const T = y`
 
 where
 
@@ -120,6 +108,7 @@ x : const int = 5 // immutable
 ## Functions
 
 Declaration: 
+
 fx (y T1, z T2, ... T...) -> RT 
 { ... }
 
@@ -130,9 +119,6 @@ y, z and ... = arguments
 T1, T2 and T... = argument types
 RT = return type
 { ... } = function body
-
-> [!NOTE]
-> Whitespace between function name and argument list
 
 OR
 
@@ -192,7 +178,7 @@ concatStringAndInt (s1, i1) {
 
 Declaration: 
 
-T[] a = \[v1, v2, v3]\
+`T[] a = [v1, v2, v3]`
 
 where 
 
@@ -202,35 +188,35 @@ a = array name
 
 Examples: 
 ```
-string[] values = ["one", "two", "three"]
+values : string[] = ["one", "two", "three"]
 ```
 ## Function calls
 
 Declaration: 
 
-x(args) 
+`x ...`
 
 where 
 
 x = function name
-args = arguments specified
+... = arguments specified
 
 Examples:
 > Without variable
-`calculateArea 9, 10`
+`calculateArea 9 10`
     OR
 > With inferred type
-`area = calculateArea 9, 10`
+`area = calculateArea 9 10`
     OR  
 > With explicit type 
-`area : int = calculateArea 9, 10`
+`area : int = calculateArea 9 10`
 
 
 ## Property/Method Access
 
 Declaration:
 
-e.p
+`e.p`
 
 where
 
@@ -248,7 +234,7 @@ Examples:
 
 ## Imports
 
-include x
+`include x`
 
 where
 
@@ -272,10 +258,11 @@ include foo
 include bar as baz
 ```
 
-## If condtions
+## If else expressions
+
 Declaration: 
 
-if x { ... }
+`if x { ... }`
 
 where 
 
@@ -293,13 +280,25 @@ if i > 3 {
     print i
 }
 ```
+
+```
+i = 5
+if i > 3 { 
+    print i
+} else {
+    print i + 1
+}
+```
 ## For Loops
 
 Declaration:
 
+```
 for x in y {
     ...
 }
+
+```
 
 where 
 
@@ -308,7 +307,7 @@ y = range
 
 Examples: 
 ```
-for i in range(0, 10){
+for i in 0..10{
     print i
 }
 ```
@@ -320,17 +319,22 @@ for name in names{
 ```
 
 ## While loop 
+
 Declaration:
 
+```
 while x { 
     
 }
+```
 
 where 
 
-x is loop continuation condition
+x is loop continuation condition that evaluates to true or false. 
+
 > [!NOTE]
 > If x is ommitted, loop will continue until a break statement is hit
+
 ```
 while { 
     print "hello"
