@@ -28,6 +28,9 @@ impl NativeType {
             DataTypeKwd::Int => Self::Int,
             DataTypeKwd::String => Self::String,
             DataTypeKwd::Void => Self::Void,
+            DataTypeKwd::Array(a) => {
+                Self::Array(Box::new(Self::from_datatype_kwd(a)))
+            },
         }
     }
 }
@@ -198,11 +201,11 @@ pub enum SingleValue {
 }
 
 impl SingleValue {
-    pub fn new_identifier_expression(ident : &str) -> Expression {
+    pub fn new_identifier_expression(ident: &str) -> Expression {
         Expression::SingleValue(SingleValue::Identifier(ident.to_string()))
     }
 
-    pub fn new_value_literal_expression(value_literal : ValueLiteral) -> Expression {
+    pub fn new_value_literal_expression(value_literal: ValueLiteral) -> Expression {
         Expression::SingleValue(SingleValue::ValueLiteral(value_literal))
     }
 
@@ -220,6 +223,12 @@ impl SingleValue {
 
     pub fn new_float(representation: &str) -> Self {
         Self::ValueLiteral(ValueLiteral::new(NativeType::Float, representation))
+    }
+    pub fn new_array(representation: &str, native_type: NativeType) -> Self {
+        Self::ValueLiteral(ValueLiteral::new(
+            NativeType::Array(Box::new(native_type)),
+            representation,
+        ))
     }
 }
 
