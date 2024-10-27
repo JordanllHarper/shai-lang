@@ -12,7 +12,12 @@
 //
 // DATA STRUCTS
 
-use std::fmt::{Display, Formatter};
+const WHITESPACE : char = ' ';
+
+use std::{
+    collections::HashSet,
+    fmt::{Display, Formatter},
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
@@ -27,76 +32,105 @@ impl Token {
         Token::Symbol(Symbol::Whitespace)
     }
 }
+
+impl Display for DataTypeKwd {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let representation = match self {
+            DataTypeKwd::Bool => "bool",
+            DataTypeKwd::Char => "char",
+            DataTypeKwd::Float => "float",
+            DataTypeKwd::Int => "int",
+            DataTypeKwd::String => "string",
+            DataTypeKwd::Void => "void",
+            DataTypeKwd::Array(a) => &format!("{}[]", &a),
+        };
+        f.write_str(representation)
+    }
+}
+
+impl Display for Kwd {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Kwd::DataType(d) => &d.to_string(),
+            Kwd::While => "while",
+            Kwd::For => "for",
+            Kwd::If => "if",
+            Kwd::Return => "return",
+            Kwd::In => "in",
+            Kwd::Break => "break",
+            Kwd::Include => "include",
+            Kwd::Else => "else",
+        };
+        f.write_str(str)
+    }
+}
+impl Display for Symbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            Symbol::ParenOpen => "(",
+            Symbol::ParenClose => ")",
+            Symbol::ChevOpen => "<",
+            Symbol::ChevClose => ">",
+            Symbol::AngOpen => "[",
+            Symbol::AngClose => "]",
+            Symbol::BraceOpen => "{",
+            Symbol::BraceClose => "}",
+            Symbol::Equals => "=",
+            Symbol::Modulus => "%",
+            Symbol::Quote => "\"",
+            Symbol::Apstr => "\'",
+            Symbol::Comma => ",",
+            Symbol::Minus => "-",
+            Symbol::Period => ".",
+            Symbol::Plus => "+",
+            Symbol::Asterisk => "*",
+            Symbol::FwdSlash => "/",
+            Symbol::BckSlash => "\\",
+            Symbol::Dollar => "$",
+            Symbol::Colon => ":",
+            Symbol::Underscore => "_",
+            Symbol::Ampsnd => "&",
+            Symbol::Pipe => "|",
+            Symbol::Whitespace => " ",
+            Symbol::Bang => "!",
+            Symbol::Newline => "\n",
+            Symbol::Equality => "==",
+            Symbol::NotEquality => "!=",
+            Symbol::PlusAssign => "+=",
+            Symbol::MinusAssign => "-=",
+            Symbol::MultiplyAssign => "*=",
+            Symbol::DivideAssign => "/=",
+            Symbol::Arrow => "->",
+            Symbol::And => "&&",
+            Symbol::Or => "||",
+            Symbol::LzEq => "<=",
+            Symbol::GzEq => ">=",
+            Symbol::EscapeQuote => "\\\"",
+            Symbol::EscapeApos => "\\\'",
+        };
+        f.write_str(str)
+    }
+}
+
 impl Display for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str_rep = match self {
-            Token::Kwd(k) => match k {
-                Kwd::DataType(dt) => match dt {
-                    DataTypeKwd::Bool => "bool",
-                    DataTypeKwd::Char => "char",
-                    DataTypeKwd::Float => "float",
-                    DataTypeKwd::Int => "int",
-                    DataTypeKwd::String => "string",
-                    DataTypeKwd::Void => "void",
-                },
-                Kwd::While => "while",
-                Kwd::For => "for",
-                Kwd::If => "if",
-                Kwd::Return => "return",
-                Kwd::In => "in",
-                Kwd::Break => "break",
-                Kwd::Include => "include",
-                Kwd::Else => "else",
-            },
+            Token::Kwd(k) => &k.to_string(),
             Token::Ident(i) => i,
-            Token::Symbol(s) => match s {
-                Symbol::ParenOpen => "(",
-                Symbol::ParenClose => ")",
-                Symbol::ChevOpen => "<",
-                Symbol::ChevClose => ">",
-                Symbol::AngOpen => "[",
-                Symbol::AngClose => "]",
-                Symbol::BraceOpen => "{",
-                Symbol::BraceClose => "}",
-                Symbol::Equals => "=",
-                Symbol::Modulus => "%",
-                Symbol::Quote => "\"",
-                Symbol::Apstr => "\'",
-                Symbol::Comma => ",",
-                Symbol::Minus => "-",
-                Symbol::Period => ".",
-                Symbol::Plus => "+",
-                Symbol::Asterisk => "*",
-                Symbol::FwdSlash => "/",
-                Symbol::BckSlash => "\\",
-                Symbol::Dollar => "$",
-                Symbol::Colon => ":",
-                Symbol::Underscore => "_",
-                Symbol::Ampsnd => "&",
-                Symbol::Pipe => "|",
-                Symbol::Whitespace => " ",
-                Symbol::Bang => "!",
-                Symbol::Newline => "\n",
-                Symbol::Equality => "==",
-                Symbol::NotEquality => "!=",
-                Symbol::PlusAssign => "+=",
-                Symbol::MinusAssign => "-=",
-                Symbol::MultiplyAssign => "*=",
-                Symbol::DivideAssign => "/=",
-                Symbol::Arrow => "->",
-                Symbol::And => "&&",
-                Symbol::Or => "||",
-                Symbol::LzEq => "<=",
-                Symbol::GzEq => ">=",
-                Symbol::EscapeQuote => "\\\"",
-                Symbol::EscapeApos => "\\\'",
-            },
-            Token::Literal(l) => match l {
-                Literal::Bool(b) => &b.to_string(),
-                Literal::Int(i) => &i.to_string(),
-                Literal::String(s) => &s.to_string(),
-                Literal::Float(f) => &f.to_string(),
-            },
+            Token::Symbol(s) => &s.to_string(),
+            Token::Literal(l) => &l.to_string(),
+        };
+        f.write_str(str_rep)
+    }
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str_rep = match self {
+            Literal::Bool(b) => &b.to_string(),
+            Literal::Int(i) => &i.to_string(),
+            Literal::String(s) => &s.to_string(),
+            Literal::Float(f) => &f.to_string(),
         };
         f.write_str(str_rep)
     }
@@ -164,6 +198,7 @@ pub enum DataTypeKwd {
     Int,
     String,
     Void,
+    Array(Box<DataTypeKwd>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -268,6 +303,11 @@ fn parse_literal_or_identifier(s: &str) -> Token {
     }
 }
 
+fn is_symbol_applicable(symbol: &char) -> bool {
+    let allowed_symbols = HashSet::from(['[', ']', '.']);
+    allowed_symbols.contains(symbol)
+}
+
 /// Advances a lexer until a non-alphanumeric delimeter and converts into an optional [Token].
 /// Returns Some if a text symbol can be found and None otherwise.
 /// e.g. whitespace, which should never happen unless there is a "  " double space.
@@ -277,11 +317,12 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
 
     // cover it being the end of the stream as well as delimiter
     while let Some(ch) = lexer.advance() {
-        // allow floats through
-        if !ch.is_alphanumeric() && ch != '.' {
+        // allow designated symbols through
+        if ch.is_alphanumeric() || is_symbol_applicable(&ch) {
+            buf.push(ch);
+        } else {
             break;
         }
-        buf.push(ch);
     }
 
     let token = match buf.as_str() {
@@ -293,18 +334,45 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
         "in" => Token::Kwd(Kwd::In),
         "break" => Token::Kwd(Kwd::Break),
         "include" => Token::Kwd(Kwd::Include),
-        "bool" => Token::Kwd(Kwd::DataType(DataTypeKwd::Bool)),
-        "void" => Token::Kwd(Kwd::DataType(DataTypeKwd::Void)),
-        "int" => Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
-        "char" => Token::Kwd(Kwd::DataType(DataTypeKwd::Char)),
-        "float" => Token::Kwd(Kwd::DataType(DataTypeKwd::Float)),
-        "string" => Token::Kwd(Kwd::DataType(DataTypeKwd::String)),
         "true" => Token::Literal(Literal::Bool(true)),
         "false" => Token::Literal(Literal::Bool(false)),
-        s => parse_literal_or_identifier(s),
+        "void" => Token::Kwd(Kwd::DataType(DataTypeKwd::Void)),
+        s => {
+            if let Some(s) = get_datatype(s) {
+                s
+            } else {
+                parse_literal_or_identifier(s)
+            }
+        }
     };
     lexer.step_back();
     Some(token)
+}
+
+fn map_datatype_kwd(s: &str) -> Option<DataTypeKwd> {
+    match s {
+        "bool" => Some(DataTypeKwd::Bool),
+        "int" => Some(DataTypeKwd::Int),
+        "char" => Some(DataTypeKwd::Char),
+        "float" => Some(DataTypeKwd::Float),
+        "string" => Some(DataTypeKwd::String),
+        _ => None,
+    }
+}
+
+fn get_datatype(s: &str) -> Option<Token> {
+    let s = s.trim();
+    let s_components = s.split("[]").collect::<Vec<&str>>();
+    let datatype = s_components.first()?.trim();
+    let dt_kwd = map_datatype_kwd(datatype)?;
+
+    if s_components.len() == 1 {
+        Some(Token::Kwd(Kwd::DataType(dt_kwd)))
+    } else {
+        Some(Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
+            dt_kwd,
+        )))))
+    }
 }
 
 impl Iterator for Lexer {
@@ -442,25 +510,50 @@ mod test {
 
     #[test]
     fn read_kwd_data_type() {
-        test(
-            "bool",
-            vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Bool))],
-        );
-        test(
-            "char",
-            vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Char))],
-        );
-        test(
-            "float",
-            vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Float))],
-        );
-        test(
-            "int",
-            vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::Int))],
-        );
+        test("bool", vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Bool))]);
+        test("char", vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Char))]);
+        test("float", vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Float))]);
+        test("int", vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Int))]);
         test(
             "string",
-            vec![Token::Kwd(super::Kwd::DataType(DataTypeKwd::String))],
+            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::String))],
+        );
+    }
+    #[test]
+    fn read_kwd_data_type_arrays() {
+        test(
+            "bool[]",
+            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
+                DataTypeKwd::Bool,
+            ))))],
+        );
+
+        test(
+            "string[]",
+            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
+                DataTypeKwd::String,
+            ))))],
+        );
+
+        test(
+            "int[]",
+            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
+                DataTypeKwd::Int,
+            ))))],
+        );
+
+        test(
+            "float[]",
+            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
+                DataTypeKwd::Float,
+            ))))],
+        );
+
+        test(
+            "char[]",
+            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
+                DataTypeKwd::Char,
+            ))))],
         );
     }
 
