@@ -316,6 +316,7 @@ where
         Kwd::Break => todo!(),
         Kwd::Include => todo!(),
         Kwd::Else => todo!(),
+        Kwd::Const => todo!(),
     }
 }
 

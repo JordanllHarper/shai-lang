@@ -60,6 +60,7 @@ impl Display for Kwd {
             Kwd::Break => "break",
             Kwd::Include => "include",
             Kwd::Else => "else",
+            Kwd::Const => "const",
         };
         f.write_str(str)
     }
@@ -216,6 +217,7 @@ pub enum Kwd {
     Break,
     Include,
     Else,
+    Const,
 }
 /// Lexer component for transforming raw string slice into a [Token] stream.
 /// Implements [Iterator], and will provide a token on each `.next()`.
@@ -395,6 +397,7 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
         "in" => Token::Kwd(Kwd::In),
         "break" => Token::Kwd(Kwd::Break),
         "include" => Token::Kwd(Kwd::Include),
+        "const" => Token::Kwd(Kwd::Const),
         "true" => Token::Literal(Literal::Bool(true)),
         "false" => Token::Literal(Literal::Bool(false)),
         "void" => Token::Kwd(Kwd::DataType(DataTypeKwd::Void)),
@@ -676,6 +679,7 @@ hello
         test("break", vec![Token::Kwd(Kwd::Break)]);
         test("include", vec![Token::Kwd(Kwd::Include)]);
         test("else", vec![Token::Kwd(Kwd::Else)]);
+        test("const", vec![Token::Kwd(Kwd::Const)]);
     }
 
     #[test]
