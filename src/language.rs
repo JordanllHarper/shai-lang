@@ -28,9 +28,6 @@ impl NativeType {
             DataTypeKwd::Int => Self::Int,
             DataTypeKwd::String => Self::String,
             DataTypeKwd::Void => Self::Void,
-            DataTypeKwd::Array(a) => {
-                Self::Array(Box::new(Self::from_datatype_kwd(a)))
-            },
         }
     }
 }

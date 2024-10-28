@@ -12,8 +12,6 @@
 //
 // DATA STRUCTS
 
-const WHITESPACE: char = ' ';
-
 use std::{
     collections::HashSet,
     fmt::{Display, Formatter},
@@ -42,7 +40,6 @@ impl Display for DataTypeKwd {
             DataTypeKwd::Int => "int",
             DataTypeKwd::String => "string",
             DataTypeKwd::Void => "void",
-            DataTypeKwd::Array(a) => &format!("{}[]", &a),
         };
         f.write_str(representation)
     }
@@ -110,6 +107,7 @@ impl Display for Symbol {
             Symbol::EscapeApos => "\\\'",
             Symbol::Comment(c) => c,
             Symbol::MultilineComment(c) => c,
+            Symbol::Array => "[]",
         };
         f.write_str(str)
     }
@@ -178,6 +176,7 @@ pub enum Symbol {
     Newline,
     // 2 char symbols
     Equality,
+    Array,
     NotEquality,
     PlusAssign,
     MinusAssign,
@@ -203,7 +202,6 @@ pub enum DataTypeKwd {
     Int,
     String,
     Void,
-    Array(Box<DataTypeKwd>),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -402,8 +400,8 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
         "false" => Token::Literal(Literal::Bool(false)),
         "void" => Token::Kwd(Kwd::DataType(DataTypeKwd::Void)),
         s => {
-            if let Some(s) = get_datatype(s) {
-                s
+            if let Some(s) = map_datatype_kwd(s) {
+                Token::Kwd(Kwd::DataType(s))
             } else {
                 parse_literal_or_identifier(s)
             }
@@ -424,21 +422,6 @@ fn map_datatype_kwd(s: &str) -> Option<DataTypeKwd> {
     }
 }
 
-fn get_datatype(s: &str) -> Option<Token> {
-    let s = s.trim();
-    let s_components = s.split("[]").collect::<Vec<&str>>();
-    let datatype = s_components.first()?.trim();
-    let dt_kwd = map_datatype_kwd(datatype)?;
-
-    if s_components.len() == 1 {
-        Some(Token::Kwd(Kwd::DataType(dt_kwd)))
-    } else {
-        Some(Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
-            dt_kwd,
-        )))))
-    }
-}
-
 impl Iterator for Lexer {
     type Item = Token;
 
@@ -450,7 +433,6 @@ impl Iterator for Lexer {
             let token = match c {
                 '(' => Token::Symbol(Symbol::ParenOpen),
                 ')' => Token::Symbol(Symbol::ParenClose),
-                '[' => Token::Symbol(Symbol::AngOpen),
                 ']' => Token::Symbol(Symbol::AngClose),
                 '{' => Token::Symbol(Symbol::BraceOpen),
                 '}' => Token::Symbol(Symbol::BraceClose),
@@ -475,6 +457,7 @@ impl Iterator for Lexer {
                 '"' => peek_while(self, '"', |characters| {
                     Token::Literal(Literal::String(String::from_iter(characters.iter())))
                 }),
+                '[' => peek_symbol(self, ']', Symbol::Array, Symbol::AngOpen),
                 '<' => peek_symbol(self, '=', Symbol::LzEq, Symbol::ChevOpen),
                 '>' => peek_symbol(self, '=', Symbol::GzEq, Symbol::ChevClose),
                 '+' => peek_symbol(self, '=', Symbol::PlusAssign, Symbol::Plus),
@@ -503,16 +486,6 @@ impl Iterator for Lexer {
                     } else {
                         peek_symbol(self, '=', Symbol::DivideAssign, Symbol::FwdSlash)
                     }
-
-                    // if let Some(c) = peek_while('/', self, |c| {
-                    //     Token::Symbol(Symbol::Comment(String::from_iter(c.iter())))
-                    // }) {
-                    //     c
-                    // } else if let Some(c) = maybe_peek(self, '*', Symbol::MultilineComment) {
-                    //     c
-                    // } else {
-                    //     peek_symbol(self, '=', Symbol::DivideAssign, Symbol::FwdSlash)
-                    // }
                 }
                 '=' => peek_symbol(self, '=', Symbol::Equality, Symbol::Equals),
                 '!' => peek_symbol(self, '=', Symbol::NotEquality, Symbol::Bang),
@@ -575,13 +548,12 @@ mod test {
             r"/*
 hello
 */",
-            vec![
-                Token::Symbol(Symbol::MultilineComment(
-                    r"
+            vec![Token::Symbol(Symbol::MultilineComment(
+                r"
 hello
-".to_string(),
-                )),
-            ],
+"
+                .to_string(),
+            ))],
         )
     }
 
@@ -629,43 +601,6 @@ hello
         test(
             "string",
             vec![Token::Kwd(Kwd::DataType(DataTypeKwd::String))],
-        );
-    }
-    #[test]
-    fn read_kwd_data_type_arrays() {
-        test(
-            "bool[]",
-            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
-                DataTypeKwd::Bool,
-            ))))],
-        );
-
-        test(
-            "string[]",
-            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
-                DataTypeKwd::String,
-            ))))],
-        );
-
-        test(
-            "int[]",
-            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
-                DataTypeKwd::Int,
-            ))))],
-        );
-
-        test(
-            "float[]",
-            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
-                DataTypeKwd::Float,
-            ))))],
-        );
-
-        test(
-            "char[]",
-            vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Array(Box::new(
-                DataTypeKwd::Char,
-            ))))],
         );
     }
 
