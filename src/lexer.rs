@@ -722,6 +722,7 @@ add (x, y) {
         test("||", vec![Token::Symbol(Symbol::Or)]);
         test(">=", vec![Token::Symbol(Symbol::GzEq)]);
         test("<=", vec![Token::Symbol(Symbol::LzEq)]);
+        test("[]", vec![Token::Symbol(Symbol::Array)]);
     }
 
     #[test]
