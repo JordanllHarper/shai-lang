@@ -78,11 +78,7 @@ impl Display for Symbol {
             Symbol::Quote => "\"",
             Symbol::Apstr => "\'",
             Symbol::Comma => ",",
-            Symbol::Minus => "-",
             Symbol::Period => ".",
-            Symbol::Plus => "+",
-            Symbol::Asterisk => "*",
-            Symbol::FwdSlash => "/",
             Symbol::BckSlash => "\\",
             Symbol::Dollar => "$",
             Symbol::Colon => ":",
@@ -108,7 +104,21 @@ impl Display for Symbol {
             Symbol::Comment(c) => c,
             Symbol::MultilineComment(c) => c,
             Symbol::Array => "[]",
+            Symbol::MathSymbol(s) => &s.to_string(),
         };
+        f.write_str(str)
+    }
+}
+
+impl Display for MathSymbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            MathSymbol::Minus => "-",
+            MathSymbol::Plus => "+",
+            MathSymbol::Asterisk => "*",
+            MathSymbol::FwdSlash => "/",
+        };
+
         f.write_str(str)
     }
 }
@@ -146,6 +156,14 @@ pub enum Literal {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub enum MathSymbol {
+    Minus,
+    Plus,
+    Asterisk,
+    FwdSlash,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Symbol {
     ParenOpen,
     ParenClose,
@@ -160,11 +178,10 @@ pub enum Symbol {
     Quote,
     Apstr,
     Comma,
-    Minus,
     Period,
-    Plus,
-    Asterisk,
-    FwdSlash,
+    // math symbols
+    MathSymbol(MathSymbol),
+    //
     BckSlash,
     Dollar,
     Colon,
@@ -460,18 +477,38 @@ impl Iterator for Lexer {
                 '[' => peek_symbol(self, ']', Symbol::Array, Symbol::AngOpen),
                 '<' => peek_symbol(self, '=', Symbol::LzEq, Symbol::ChevOpen),
                 '>' => peek_symbol(self, '=', Symbol::GzEq, Symbol::ChevClose),
-                '+' => peek_symbol(self, '=', Symbol::PlusAssign, Symbol::Plus),
+                '+' => peek_symbol(
+                    self,
+                    '=',
+                    Symbol::PlusAssign,
+                    Symbol::MathSymbol(MathSymbol::Plus),
+                ),
                 '-' => {
-                    let final_symbol = peek_symbol(self, '=', Symbol::MinusAssign, Symbol::Minus);
+                    let final_symbol = peek_symbol(
+                        self,
+                        '=',
+                        Symbol::MinusAssign,
+                        Symbol::MathSymbol(MathSymbol::Minus),
+                    );
                     if final_symbol != Token::Symbol(Symbol::MinusAssign) {
                         self.step_back();
-                        peek_symbol(self, '>', Symbol::Arrow, Symbol::Minus)
+                        peek_symbol(
+                            self,
+                            '>',
+                            Symbol::Arrow,
+                            Symbol::MathSymbol(MathSymbol::Minus),
+                        )
                     } else {
                         final_symbol
                     }
                 }
 
-                '*' => peek_symbol(self, '=', Symbol::MultiplyAssign, Symbol::Asterisk),
+                '*' => peek_symbol(
+                    self,
+                    '=',
+                    Symbol::MultiplyAssign,
+                    Symbol::MathSymbol(MathSymbol::Asterisk),
+                ),
                 '/' => {
                     if let Some(c) = peek_if(self, '/', '\n', |characters| {
                         Token::Symbol(Symbol::Comment(String::from_iter(characters.iter())))
@@ -484,7 +521,12 @@ impl Iterator for Lexer {
                     }) {
                         t
                     } else {
-                        peek_symbol(self, '=', Symbol::DivideAssign, Symbol::FwdSlash)
+                        peek_symbol(
+                            self,
+                            '=',
+                            Symbol::DivideAssign,
+                            Symbol::MathSymbol(MathSymbol::FwdSlash),
+                        )
                     }
                 }
                 '=' => peek_symbol(self, '=', Symbol::Equality, Symbol::Equals),
@@ -646,10 +688,10 @@ hello
         test_char(' ', Token::Symbol(Symbol::Whitespace));
         test_char('<', Token::Symbol(Symbol::ChevOpen));
         test_char('>', Token::Symbol(Symbol::ChevClose));
-        test_char('+', Token::Symbol(Symbol::Plus));
-        test_char('-', Token::Symbol(Symbol::Minus));
-        test_char('*', Token::Symbol(Symbol::Asterisk));
-        test_char('/', Token::Symbol(Symbol::FwdSlash));
+        test_char('+', Token::Symbol(Symbol::MathSymbol(MathSymbol::Plus)));
+        test_char('-', Token::Symbol(Symbol::MathSymbol(MathSymbol::Minus)));
+        test_char('*', Token::Symbol(Symbol::MathSymbol(MathSymbol::Asterisk)));
+        test_char('/', Token::Symbol(Symbol::MathSymbol(MathSymbol::FwdSlash)));
         test_char('=', Token::Symbol(Symbol::Equals));
         test_char('!', Token::Symbol(Symbol::Bang));
         test_char('&', Token::Symbol(Symbol::Ampsnd));
@@ -700,7 +742,7 @@ add (x, y) {
                 Token::Symbol(Symbol::Whitespace),
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Whitespace),
-                Token::Symbol(Symbol::Plus),
+                Token::Symbol(Symbol::MathSymbol(MathSymbol::Plus)),
                 Token::Symbol(Symbol::Whitespace),
                 Token::Ident("y".to_string()),
                 Token::Symbol(Symbol::Newline),

@@ -15,7 +15,8 @@ where
             Token::Ident(i) => SingleValue::new_identifier_expression(i),
             Token::Symbol(Symbol::BraceOpen) => {
                 // TODO: Handle no expression returned (invalid syntax)
-                on_expression(tokens.next().unwrap(), tokens, None).unwrap()
+                let t = tokens.next().expect("There should be a function body");
+                on_expression(t, tokens, None)
             }
             _ => todo!(),
         };
@@ -78,14 +79,10 @@ where
                 }
                 // Function expression
                 Token::Symbol(Symbol::Equals) => {
-                    let expression = on_expression(tokens.next().unwrap(), &mut tokens, None);
-                    if let Some(expression) = expression {
-                        let x = Function::new(ident, args, return_type, expression);
-                        Expression::Function(Box::new(x))
-                    } else {
-                        // TODO: Invalid syntax
-                        todo!()
-                    }
+                    let t = tokens.next().expect("Syntax error");
+                    let expression = on_expression(t, &mut tokens, None);
+                    let x = Function::new(ident, args, return_type, expression);
+                    Expression::Function(Box::new(x))
                 }
                 t => {
                     println!("{:?}", t);
@@ -136,7 +133,7 @@ where
             Token::Symbol(Symbol::BraceClose) => break,
             Token::Symbol(Symbol::Newline) => continue,
             _ => {
-                let expression = on_expression(t, tokens, None).unwrap();
+                let expression = on_expression(t, tokens, None);
                 body.push(expression);
             }
         }
@@ -173,7 +170,7 @@ where
         }
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             // TODO: Expression assignment
-            let expression = on_expression(tokens.next().unwrap(), tokens, None);
+            // let expression = on_expression(tokens.next().unwrap(), tokens, None);
             todo!()
         }
         Some(Token::Ident(i)) => {
@@ -223,12 +220,14 @@ where
         Some(Token::Symbol(Symbol::ChevClose)) => {
             on_evaluation(tokens, ident, EvaluationOperator::GzEq)
         }
-        Some(
-            Token::Symbol(Symbol::Plus)
-            | Token::Symbol(Symbol::Minus)
-            | Token::Symbol(Symbol::Asterisk)
-            | Token::Symbol(Symbol::FwdSlash),
-        ) => on_math_expression(tokens, t.unwrap(), previous.unwrap()).unwrap(),
+        Some(Token::Symbol(Symbol::MathSymbol(t))) => {
+            let operation = MathOperation::from_token(t);
+            on_math_expression(
+                tokens,
+                operation,
+                previous.expect("There should be a previous expresssion this is applying to."),
+            )
+        }
 
         // Operations
         // Function call if value literal or string
@@ -253,28 +252,24 @@ where
 
 fn on_math_expression<'a, I>(
     tokens: &mut I,
-    operation: &Token,
+    operation: MathOperation,
     previous: Expression,
-) -> Option<Expression>
+) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
     let prev = previous.clone();
-    let op = MathOperation::from_token(operation).unwrap();
 
-    let rhs = on_expression(tokens.next()?, tokens, Some(prev))?;
-    Some(Expression::Operation {
+    let t = tokens.next().expect("There should be more tokens");
+    let rhs = on_expression(t, tokens, Some(prev));
+    Expression::Operation {
         lhs: Box::new(previous),
         rhs: Box::new(rhs),
-        operation: Operation::Math(op),
-    })
+        operation: Operation::Math(operation),
+    }
 }
 
-fn on_expression<'a, I>(
-    t: &Token,
-    tokens: &mut I,
-    previous: Option<Expression>,
-) -> Option<Expression>
+fn on_expression<'a, I>(t: &Token, tokens: &mut I, previous: Option<Expression>) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
@@ -288,14 +283,15 @@ where
         Token::Kwd(k) => on_keyword(tokens, k),
         Token::Literal(l) => Expression::SingleValue(l.to_single_value()),
 
-        Token::Symbol(Symbol::Plus)
-        | Token::Symbol(Symbol::Minus)
-        | Token::Symbol(Symbol::Asterisk)
-        | Token::Symbol(Symbol::FwdSlash) => on_math_expression(tokens, t, previous?)?,
+        Token::Symbol(Symbol::MathSymbol(t)) => on_math_expression(
+            tokens,
+            MathOperation::from_token(t),
+            previous.expect("Given a math expression, there should be a lhs."),
+        ),
 
         _ => todo!(),
     };
-    Some(expr)
+    expr
 }
 
 fn on_keyword<'a, I>(tokens: &mut I, k: &Kwd) -> Expression
@@ -305,7 +301,7 @@ where
     let remaining_expression = on_expression(tokens.next().unwrap(), tokens, None);
     match k {
         Kwd::Return => Expression::Statement {
-            expression: Box::new(remaining_expression.unwrap()),
+            expression: Box::new(remaining_expression),
             operation: Operation::Return,
         },
         Kwd::DataType(_) => todo!(),
@@ -325,7 +321,7 @@ where
     I: std::iter::IntoIterator<Item = &'a Token>,
 {
     let mut iter = tokens.into_iter();
-    on_expression(iter.next().unwrap(), &mut iter, None).unwrap()
+    on_expression(iter.next().unwrap(), &mut iter, None)
 }
 
 #[cfg(test)]
@@ -364,7 +360,7 @@ mod tests {
                 Token::Ident("y".to_string()),
                 Token::Symbol(Symbol::Equals),
                 Token::Ident("x".to_string()),
-                Token::Symbol(Symbol::Plus),
+                Token::Symbol(Symbol::MathSymbol(MathSymbol::Plus)),
                 Token::Literal(Literal::Int(3)),
             ],
             Expression::Operation {
@@ -457,7 +453,7 @@ mod tests {
                 // body return numOne + numTwo
                 Token::Kwd(Kwd::Return),
                 Token::Ident("numOne".to_string()),
-                Token::Symbol(Symbol::Plus),
+                Token::Symbol(Symbol::MathSymbol(MathSymbol::Plus)),
                 Token::Ident("numTwo".to_string()),
                 // end
                 Token::Symbol(Symbol::BraceClose),
@@ -634,7 +630,7 @@ mod tests {
                 // End of return type
                 // body (assume 4 spaces)
                 Token::Ident("numOne".to_string()),
-                Token::Symbol(Symbol::Plus),
+                Token::Symbol(Symbol::MathSymbol(MathSymbol::Plus)),
                 Token::Ident("numTwo".to_string()),
                 Token::Symbol(Symbol::Newline),
                 // end

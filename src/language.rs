@@ -1,4 +1,4 @@
-use crate::{DataTypeKwd, Symbol, Token};
+use crate::*;
 
 /// The supported native data types in the language.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -244,13 +244,12 @@ pub enum MathOperation {
 }
 
 impl MathOperation {
-    pub fn from_token(t: &Token) -> Option<Self> {
+    pub fn from_token(t: &MathSymbol) -> Self {
         match t {
-            Token::Symbol(Symbol::FwdSlash) => Some(Self::Divide),
-            Token::Symbol(Symbol::Asterisk) => Some(Self::Multiply),
-            Token::Symbol(Symbol::Plus) => Some(Self::Add),
-            Token::Symbol(Symbol::Minus) => Some(Self::Subtract),
-            _ => None,
+            MathSymbol::FwdSlash => Self::Divide,
+            MathSymbol::Asterisk => Self::Multiply,
+            MathSymbol::Plus => Self::Add,
+            MathSymbol::Minus => Self::Subtract,
         }
     }
 }
