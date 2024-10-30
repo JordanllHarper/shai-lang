@@ -564,7 +564,7 @@ mod test {
         T: ToString,
     {
         let mut lexer = Lexer::new(&input.to_string());
-        let actual = lexer.next().unwrap();
+        let actual = lexer.next().expect("There should be a character.");
         assert_eq!(expected, actual);
     }
 

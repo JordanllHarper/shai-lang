@@ -152,7 +152,7 @@ where
     todo!();
 }
 
-fn on_assignment<'a, I>(tokens: &mut I, ident: &str, previous: Option<Expression>) -> Expression
+fn on_assignment<'a, I>(tokens: &mut I, ident: &str) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
@@ -170,7 +170,6 @@ where
         }
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             // TODO: Expression assignment
-            // let expression = on_expression(tokens.next().unwrap(), tokens, None);
             todo!()
         }
         Some(Token::Ident(i)) => {
@@ -201,7 +200,7 @@ where
     println!("{:?}", t);
     match t {
         // Assignment
-        Some(Token::Symbol(Symbol::Equals)) => on_assignment(tokens, ident, previous),
+        Some(Token::Symbol(Symbol::Equals)) => on_assignment(tokens, ident),
 
         // Evaluation
         Some(Token::Symbol(Symbol::Equality)) => {
@@ -274,7 +273,8 @@ where
     I: std::iter::Iterator<Item = &'a Token>,
 {
     println!("Token: {:?}", t);
-    let expr = match t {
+    
+    match t {
         Token::Ident(ident) => on_identifier(
             tokens,
             ident,
@@ -290,15 +290,14 @@ where
         ),
 
         _ => todo!(),
-    };
-    expr
+    }
 }
 
 fn on_keyword<'a, I>(tokens: &mut I, k: &Kwd) -> Expression
 where
     I: std::iter::Iterator<Item = &'a Token>,
 {
-    let remaining_expression = on_expression(tokens.next().unwrap(), tokens, None);
+    let remaining_expression = on_expression(tokens.next().expect("There should be an expression after a keyword."), tokens, None);
     match k {
         Kwd::Return => Expression::Statement {
             expression: Box::new(remaining_expression),
@@ -321,7 +320,7 @@ where
     I: std::iter::IntoIterator<Item = &'a Token>,
 {
     let mut iter = tokens.into_iter();
-    on_expression(iter.next().unwrap(), &mut iter, None)
+    on_expression(iter.next().expect("There should be a token that exists in the program."), &mut iter, None)
 }
 
 #[cfg(test)]
