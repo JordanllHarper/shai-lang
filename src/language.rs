@@ -188,6 +188,7 @@ pub enum Expression {
         eval: Evaluation,
     },
     Function(Box<Function>),
+    If(Box<If>),
     Body(Body),
 }
 
@@ -195,6 +196,12 @@ pub enum Expression {
 pub enum SingleValue {
     ValueLiteral(ValueLiteral),
     Identifier(String),
+}
+
+impl Expression {
+    pub fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
 }
 
 impl SingleValue {
@@ -289,24 +296,50 @@ pub enum EvaluationOperator {
     Neq,
 }
 
+impl EvaluationOperator {
+    pub fn from_evaluation_symbol(evaluation_symbol: &EvaluationSymbol) -> Self {
+        match evaluation_symbol {
+            EvaluationSymbol::Equality => Self::Eq,
+            EvaluationSymbol::NotEquality => Self::Neq,
+            EvaluationSymbol::LzEq => Self::LzEq,
+            EvaluationSymbol::GzEq => Self::GzEq,
+            EvaluationSymbol::Lz => Self::Lz,
+            EvaluationSymbol::Gz => Self::Gz,
+        }
+    }
+}
+
 /// Defines a method of comparison between 2 expressions.
 ///
-/// For clarity, given boolean expressions:
-/// if true { ... }
-/// if false { ... }
+/// if 1 == 1 { ... }
 ///
-/// lhs = expression that has the value assigned (true or false)
-/// rhs = expression that returns true constantly
-/// comparator = [EvaluationOperator::Eq]
+/// Given the rhs is `None`, this is equatable to the following:
+///
+/// if true { ... }
+///
+/// where the rhs is implicitly true
+///
+/// if true == true { ... }
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Evaluation {
     lhs: Box<Expression>,
-    rhs: Box<Expression>,
-    comparator: EvaluationOperator,
+    rhs: Option<Box<Expression>>,
+    evaluation_op: Option<EvaluationOperator>,
 }
 
-/// Alias for a function argument
-type Arg = ValueLiteral;
+impl Evaluation {
+    pub fn new(
+        lhs: Expression,
+        rhs: Option<Expression>,
+        evaluation_op: Option<EvaluationOperator>,
+    ) -> Self {
+        Self {
+            lhs: Box::new(lhs),
+            rhs: rhs.map(Box::new),
+            evaluation_op,
+        }
+    }
+}
 
 /// Represents an parameters in a function declaration.
 /// Example: (x) -> int { ... }
@@ -362,7 +395,7 @@ pub type ReturnType = NativeType;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function {
     ident: String,
-    args: FunctionParameters,
+    params: FunctionParameters,
     return_type: Option<ReturnType>,
     body: Expression,
 }
@@ -376,9 +409,53 @@ impl Function {
     ) -> Self {
         Self {
             ident: ident.to_string(),
-            args,
+            params: args,
             return_type,
             body,
+        }
+    }
+}
+
+/// Represents the if expression, which allows conditional branching.
+///
+/// Given on_false_evaluation is *not* None, this represents an else branch:
+///
+/// if true {
+///     ...
+/// } else {
+///     ...      
+/// }
+///
+/// ...otherwise it's a single if branch.
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct If {
+    evaluation: Evaluation,
+    on_true_evaluation: Expression,
+    on_false_evaluation: Option<Expression>,
+}
+
+impl If {
+    pub fn new_boxed(
+        evaluation: Evaluation,
+        on_true_evaluation: Expression,
+        on_false_evaluation: Option<Expression>,
+    ) -> Box<Self> {
+        Box::new(Self::new(
+            evaluation,
+            on_true_evaluation,
+            on_false_evaluation,
+        ))
+    }
+    pub fn new(
+        evaluation: Evaluation,
+        on_true_evaluation: Expression,
+        on_false_evaluation: Option<Expression>,
+    ) -> Self {
+        Self {
+            evaluation,
+            on_true_evaluation,
+            on_false_evaluation,
         }
     }
 }
