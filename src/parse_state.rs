@@ -17,6 +17,12 @@ impl ParseState {
     pub fn has_next(self) -> bool {
         self.tokens.get(self.position).cloned().is_some()
     }
+    pub fn peek(&self) -> Option<&Token> {
+        self.tokens.get(self.position)
+    }
+    pub fn advance(self) -> Self {
+        ParseState::new(self.tokens, self.position + 1)
+    }
 
     pub fn next(self) -> (Option<Token>, Self) {
         let next = self.tokens.get(self.position).cloned();
