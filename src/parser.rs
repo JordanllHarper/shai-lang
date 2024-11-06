@@ -1,68 +1,80 @@
+use std::vec;
+
 use crate::{language::*, lexer::*, parse_state::ParseState};
 
 type ExpressionState = (Expression, ParseState);
 
-fn on_arguments(state: ParseState, first_arg: SingleValue) -> (FunctionArguments, ParseState) {
-    let mut args: FunctionArguments = vec![Expression::SingleValue(first_arg)];
-    let mut arg_state = state;
+type ParseResult<T> = Result<T, ParseError>;
 
-    while let (Some(t), state) = arg_state.next() {
-        if t == Token::Symbol(Symbol::Newline) {
-            return (args, state);
-        }
-        if t ==  Token::Symbol(Symbol::BraceClose){
-            let state = state.step_back();
-            return (args, state.1);
-        }
-        println!("On arguments: {:?}", t);
-        let (expr, state) = match t {
-            Token::Literal(l) => (Expression::SingleValue(l.to_single_value()), state),
-            Token::Ident(i) => (SingleValue::new_identifier_expression(&i), state),
-            Token::Symbol(Symbol::BraceOpen) => on_body(state),
-            _ => todo!(),
-        };
-        args.push(expr);
-        arg_state = state;
-    }
-    unreachable!("Invalid syntax!")
+pub enum ParseError {
+    InvalidSyntax { expected: Token, actual: Token },
+    NoMoreTokens,
 }
 
-fn on_parameters(state: ParseState) -> (FunctionParameters, ParseState) {
-    let mut parameters: FunctionParameters = Vec::new();
-    let mut param_state = state;
+type ArgumentsState = (FunctionArguments, ParseState);
+fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ArgumentsState {
+    let peek = state.peek();
 
-    while let (Some(t), state) = param_state.next() {
-        if t == Token::Symbol(Symbol::ParenClose) {
-            return (parameters, state);
-        }
-        let new_state = match t {
-            Token::Ident(param_ident) => {
-                let (t, state) = state.next();
-
-                let (native_type, state) = match t {
-                    Some(Token::Kwd(Kwd::DataType(d))) => {
-                        (Some(NativeType::from_datatype_kwd(&d)), state)
-                    }
-                    _ => (None, state.step_back().1),
-                };
-
-                let parameter = Parameter::new(&param_ident, native_type);
-                parameters.push(parameter);
-                state
-            }
-            Token::Symbol(Symbol::Comma) => {
-                // do nothing
-                //
-                state
-            }
-            t => {
-                // TODO: Invalid syntax
-                todo!("{:?}", t)
-            }
-        };
-        param_state = new_state;
+    match peek {
+        Some(Token::Symbol(Symbol::Newline)) => return (args.to_vec(), state.advance()),
+        Some(Token::Symbol(Symbol::BraceClose)) => return (args.to_vec(), state),
+        _ => (),
     }
-    unreachable!("Invalid syntax!");
+
+    let (next, state) = state.next();
+
+    let state = if let Some(Token::Symbol(Symbol::BraceOpen)) = next {
+        let (body, state) = on_body(state);
+        args.push(body);
+        state
+    } else {
+        state
+    };
+
+    match next {
+        Some(Token::Literal(l)) => args.push(Expression::SingleValue(l.to_single_value())),
+        Some(Token::Ident(i)) => args.push(SingleValue::new_identifier_expression(&i)),
+        _ => unreachable!("Invalid syntax"),
+    };
+    parse_arguments(state, args)
+}
+
+fn on_arguments(state: ParseState, first_arg: SingleValue) -> ArgumentsState {
+    parse_arguments(state, &mut vec![Expression::SingleValue(first_arg)])
+}
+
+fn on_parameter_identifier(state: ParseState, ident: &str) -> (Parameter, ParseState) {
+    let next = state.peek();
+    let (native_type, state) = match next {
+        Some(Token::Kwd(Kwd::DataType(d))) => {
+            (Some(NativeType::from_datatype_kwd(d)), state.advance())
+        }
+        _ => (None, state),
+    };
+    (Parameter::new(ident, native_type), state)
+}
+
+fn parse_parameters(state: ParseState, parameters: &mut Vec<Parameter>) -> ParametersState {
+    let (t, state) = state.next();
+    match t {
+        Some(Token::Symbol(Symbol::ParenClose)) => return (parameters.to_vec(), state),
+        Some(Token::Symbol(Symbol::Comma)) => return parse_parameters(state, parameters),
+        _ => (),
+    }
+
+    let (parameter, state) = match t {
+        Some(Token::Ident(ident)) => on_parameter_identifier(state, &ident),
+        _ => unreachable!(),
+    };
+    parameters.push(parameter);
+
+    parse_parameters(state, parameters)
+}
+
+type ParametersState = (FunctionParameters, ParseState);
+
+fn on_parameters(state: ParseState) -> ParametersState {
+    parse_parameters(state, &mut vec![])
 }
 
 fn on_function(state: ParseState, ident: &str) -> ExpressionState {
@@ -71,77 +83,58 @@ fn on_function(state: ParseState, ident: &str) -> ExpressionState {
 
     let (next, state) = state.next();
     match next {
-        Some(t) => {
-            match t {
-                // function declaration
-                Token::Symbol(Symbol::BraceOpen) => {
-                    // Body
-                    let (body, state) = on_body(state);
-                    let f = Function::new(ident, params, return_type, body);
-                    (Expression::Function(Box::new(f)), state)
-                }
-                // Function expression
-                Token::Symbol(Symbol::Equals) => {
-                    let (expression, state) = on_expression(state, None);
-                    let x = Function::new(ident, params, return_type, expression);
-                    (Expression::Function(Box::new(x)), state)
-                }
-                t => {
-                    // TODO: Invalid syntax
-                    todo!("{:?}\n{:?}", t, state)
-                }
-            }
+        Some(Token::Symbol(Symbol::BraceOpen)) => {
+            // Body
+            let (body, state) = on_body(state);
+            let f = Function::new(ident, params, return_type, body);
+            (Expression::Function(Box::new(f)), state)
         }
-        None => {
-            // TODO: Invalid syntax
-            todo!()
+        Some(Token::Symbol(Symbol::Equals)) => {
+            let (expression, state) = on_expression(state);
+            let function = Function::new(ident, params, return_type, expression);
+            (Expression::Function(Box::new(function)), state)
         }
+        _ => unreachable!("Invalid syntax"),
     }
 }
 
-fn on_return_type(state: ParseState) -> (Option<NativeType>, ParseState) {
-    let (next, state) = state.next();
-    if let Some(Token::Symbol(Symbol::Arrow)) = next {
-        let (next, state) = state.next();
-        let ret_type = match next {
-            Some(Token::Kwd(Kwd::DataType(d))) => Some(NativeType::from_datatype_kwd(&d)),
-            _ => {
-                // TODO: Invalid syntax
-                todo!()
-            }
-        };
-        (ret_type, state)
-    } else {
-        (None, state.step_back().1)
+type ReturnState = (Option<NativeType>, ParseState);
+fn on_return_type(state: ParseState) -> ReturnState {
+    let peek = state.peek();
+    match peek {
+        Some(Token::Symbol(Symbol::Arrow)) => {
+            let state = state.advance();
+            let (next, state) = state.next();
+            let ret_type = match next {
+                Some(Token::Kwd(Kwd::DataType(d))) => Some(NativeType::from_datatype_kwd(&d)),
+                _ => unreachable!("Invalid syntax"),
+            };
+            (ret_type, state)
+        }
+        _ => (None, state),
     }
+}
+
+type BodyState = (Body, ParseState);
+fn parse_body(state: ParseState, body: &mut Body) -> BodyState {
+    let peek = state.peek();
+
+    match peek {
+        Some(Token::Symbol(Symbol::BraceClose)) => return (body.to_vec(), state.advance()),
+        Some(Token::Symbol(Symbol::Newline)) => return parse_body(state.advance(), body),
+        _ => (),
+    }
+
+    let (expression, state) = on_expression(state);
+
+    body.push(expression);
+
+    parse_body(state, body)
 }
 
 fn on_body(state: ParseState) -> ExpressionState {
-    let mut body: Body = Vec::new();
-    let mut body_state = state.clone();
-    while let (Some(t), state) = body_state.clone().next() {
-        println!("Iterating tokens: {:?}", t);
-        if t == Token::Symbol(Symbol::BraceClose) {
-            println!("Found closing brace");
-            return (Expression::Body(body), state);
-        }
-
-        println!("On body: {:?}", t);
-        let state = match t {
-            Token::Symbol(Symbol::Newline) => state,
-            _ => {
-                let (_, state) = state.step_back();
-                let (expression, state) = on_expression(state, None);
-                body.push(expression);
-                state
-            }
-        };
-
-        body_state = state;
-    }
-    println!("We exited loop {:?}", body_state);
-    // No closing brace = invalid!!
-    unreachable!("Invalid syntax");
+    let (body, state) = parse_body(state, &mut vec![]);
+    (Expression::Body(body), state)
 }
 
 fn on_assignment(state: ParseState, ident: &str) -> ExpressionState {
@@ -165,8 +158,7 @@ fn on_assignment(state: ParseState, ident: &str) -> ExpressionState {
         }
         Some(Token::Ident(i)) => {
             let lhs = SingleValue::new_identifier_expression(ident);
-            let (rhs, state) =
-                on_identifier(state, &i, Some(SingleValue::new_identifier_expression(&i)));
+            let (rhs, state) = on_identifier(state, &i);
             (
                 Expression::Operation {
                     lhs: lhs.boxed(),
@@ -185,7 +177,7 @@ fn on_assignment(state: ParseState, ident: &str) -> ExpressionState {
 // Variable usage
 // y = *x* + 3
 //      |- here is usage
-fn on_identifier(state: ParseState, ident: &str, previous: Option<Expression>) -> ExpressionState {
+fn on_identifier(state: ParseState, ident: &str) -> ExpressionState {
     // TODO: Expression (empty statement) e.g. x + y
     // TODO: Variable Usage e.g. y = x + 3
     let (t, state) = state.next();
@@ -199,7 +191,7 @@ fn on_identifier(state: ParseState, ident: &str, previous: Option<Expression>) -
             on_math_expression(
                 state,
                 operation,
-                previous.expect("There should be a previous expresssion this is applying to."),
+                SingleValue::new_identifier_expression(ident),
             )
         }
 
@@ -216,8 +208,6 @@ fn on_identifier(state: ParseState, ident: &str, previous: Option<Expression>) -
 
 fn on_function_call(state: ParseState, ident: &str, first_arg: &Literal) -> ExpressionState {
     let (args, state) = on_arguments(state, first_arg.to_single_value());
-    println!("On function call args {:?}", args);
-
     (
         Expression::Operation {
             lhs: SingleValue::new_identifier_expression(ident).boxed(),
@@ -231,14 +221,12 @@ fn on_function_call(state: ParseState, ident: &str, first_arg: &Literal) -> Expr
 fn on_math_expression(
     state: ParseState,
     operation: MathOperation,
-    previous: Expression,
+    lhs: Expression,
 ) -> ExpressionState {
-    let prev = previous.clone();
-
-    let (rhs, state) = on_expression(state, Some(prev));
+    let (rhs, state) = on_expression(state);
     (
         Expression::Operation {
-            lhs: previous.boxed(),
+            lhs: lhs.boxed(),
             rhs: rhs.boxed(),
             operation: Operation::Math(operation),
         },
@@ -246,41 +234,24 @@ fn on_math_expression(
     )
 }
 
-fn on_expression(state: ParseState, previous: Option<Expression>) -> ExpressionState {
+fn on_expression(state: ParseState) -> ExpressionState {
     let (next, state) = state.next();
-    let next = next.expect("There should be more tokens given this function is called");
-    println!("On expression {:?}", next);
-    match next {
-        Token::Ident(ident) => on_identifier(
-            state,
-            &ident,
-            Some(SingleValue::new_identifier_expression(&ident)),
-        ),
+    match next.expect("There should be more tokens given this function is called") {
+        Token::Ident(ident) => on_identifier(state, &ident),
         Token::Kwd(k) => on_keyword(state, &k),
         Token::Literal(l) => (Expression::SingleValue(l.to_single_value()), state),
-        Token::Symbol(Symbol::Math(t)) => on_math_expression(
-            state,
-            MathOperation::from_token(&t),
-            previous.expect("Given a math expression, there should be a lhs."),
-        ),
         Token::Symbol(Symbol::BraceOpen) => on_body(state),
+        Token::Symbol(Symbol::Newline) => on_expression(state),
 
-        _ => todo!(),
+        t => {
+            panic!("Invalid token. Got {:?}", t)
+        }
     }
 }
 
 fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
     match k {
-        Kwd::Return => {
-            let (remaining_expression, state) = on_expression(state, None);
-            (
-                Expression::Statement {
-                    expression: remaining_expression.boxed(),
-                    operation: Operation::Return,
-                },
-                state,
-            )
-        }
+        Kwd::Return => on_return(state),
         Kwd::DataType(_) => todo!(),
         Kwd::While => todo!(),
         Kwd::For => todo!(),
@@ -294,31 +265,27 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
 }
 
 fn on_else(state: ParseState) -> ExpressionState {
-    println!("In On else");
-    on_expression(state, None)
+    on_expression(state)
 }
 
-pub fn on_if(state: ParseState) -> ExpressionState {
-    let (lhs, state) = on_expression(state, None);
+// TODO: This might be able to be improved through refactoring.
+fn on_if(state: ParseState) -> ExpressionState {
+    let (lhs, state) = on_expression(state);
     let (next, state) = state.next();
-    match next.expect("There should be an evaluation operation after the lhs in an if statement.") {
-        Token::Symbol(Symbol::Evaluation(e)) => {
+    match next {
+        Some(Token::Symbol(Symbol::Evaluation(e))) => {
             let evaluation_op = EvaluationOperator::from_evaluation_symbol(&e);
 
             // we need to have a rhs given some equality operator
-            let (rhs, state) = on_expression(state, None);
-
-            let (on_true_evaluation, state) = on_expression(state, None);
-            println!("True evaluation result: {:?}", on_true_evaluation);
-
+            let (rhs, state) = on_expression(state);
+            let (on_true_evaluation, state) = on_expression(state);
             let (next, state) = state.next();
             let (on_false_evaluation, state) = if let Some(Token::Kwd(Kwd::Else)) = next {
-                let (expr, state) = on_expression(state, None);
+                let (expr, state) = on_expression(state);
                 (Some(expr), state)
             } else {
                 (None, state)
             };
-            println!("false evaluation result: {:?}", on_false_evaluation);
             (
                 Expression::If(If::new_boxed(
                     Evaluation::new(lhs, Some(rhs), Some(evaluation_op)),
@@ -328,17 +295,16 @@ pub fn on_if(state: ParseState) -> ExpressionState {
                 state,
             )
         }
-        Token::Symbol(Symbol::BraceOpen) => {
+        Some(Token::Symbol(Symbol::BraceOpen)) => {
             let (on_true_evaluation, state) = on_body(state);
             // NOTE: this will handle else if
             let (next, state) = state.next();
-            let (on_false_evaluation, state) = if next.is_some() {
-                let (expr, state) = on_expression(state, None);
+            let (on_false_evaluation, state) = if let Some(Token::Kwd(Kwd::Else)) = next {
+                let (expr, state) = on_expression(state);
                 (Some(expr), state)
             } else {
                 (None, state)
             };
-            println!("{:?}", on_false_evaluation);
             (
                 Expression::If(If::new_boxed(
                     Evaluation::new(lhs, None, None),
@@ -349,11 +315,22 @@ pub fn on_if(state: ParseState) -> ExpressionState {
             )
         }
         t => {
-            println!("{:?}", t);
+            println!("Expected a token in on_if, found: {:?} ", t);
             // TODO: Invalid syntax
             todo!()
         }
     }
+}
+
+fn on_return(state: ParseState) -> ExpressionState {
+    let (e, state) = on_expression(state);
+    (
+        Expression::Statement {
+            expression: e.boxed(),
+            operation: Operation::Return,
+        },
+        state,
+    )
 }
 
 pub fn parse<I>(tokens: I) -> Expression
@@ -361,7 +338,7 @@ where
     I: std::iter::IntoIterator<Item = Token>,
 {
     let parse_state = ParseState::new(tokens.into_iter().collect::<Vec<Token>>(), 0);
-    on_expression(parse_state, None).0
+    on_expression(parse_state).0
 }
 
 #[cfg(test)]

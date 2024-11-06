@@ -7,16 +7,6 @@ pub struct ParseState {
 }
 
 impl ParseState {
-    pub fn step_back(self) -> (Option<Token>, Self) {
-        let new_position = self.position - 1;
-        let previous = self.tokens.get(new_position).cloned();
-        let new_state = ParseState::new(self.tokens, new_position);
-        (previous, new_state)
-    }
-
-    pub fn has_next(self) -> bool {
-        self.tokens.get(self.position).cloned().is_some()
-    }
     pub fn peek(&self) -> Option<&Token> {
         self.tokens.get(self.position)
     }
