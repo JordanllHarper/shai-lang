@@ -182,13 +182,13 @@ pub enum Expression {
         rhs: Box<Expression>,
         operation: Operation,
     },
-    Evaluation {
-        lhs: Box<Expression>,
-        rhs: Box<Expression>,
-        eval: Evaluation,
-    },
+    Evaluation(Evaluation),
     Function(Box<Function>),
     If(Box<If>),
+    While {
+        condition: Option<Box<Expression>>,
+        body: Box<Expression>,
+    },
     Body(Body),
 }
 
@@ -294,6 +294,7 @@ pub enum EvaluationOperator {
     GzEq,
     Eq,
     Neq,
+    BooleanTruthy, // if true { ... }
 }
 
 impl EvaluationOperator {
@@ -324,14 +325,14 @@ impl EvaluationOperator {
 pub struct Evaluation {
     lhs: Box<Expression>,
     rhs: Option<Box<Expression>>,
-    evaluation_op: Option<EvaluationOperator>,
+    evaluation_op: EvaluationOperator,
 }
 
 impl Evaluation {
     pub fn new(
         lhs: Expression,
         rhs: Option<Expression>,
-        evaluation_op: Option<EvaluationOperator>,
+        evaluation_op: EvaluationOperator,
     ) -> Self {
         Self {
             lhs: Box::new(lhs),
@@ -430,14 +431,14 @@ impl Function {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct If {
-    evaluation: Evaluation,
+    evaluation: Expression,
     on_true_evaluation: Expression,
     on_false_evaluation: Option<Expression>,
 }
 
 impl If {
     pub fn new_boxed(
-        evaluation: Evaluation,
+        evaluation: Expression,
         on_true_evaluation: Expression,
         on_false_evaluation: Option<Expression>,
     ) -> Box<Self> {
@@ -448,7 +449,7 @@ impl If {
         ))
     }
     pub fn new(
-        evaluation: Evaluation,
+        evaluation: Expression,
         on_true_evaluation: Expression,
         on_false_evaluation: Option<Expression>,
     ) -> Self {

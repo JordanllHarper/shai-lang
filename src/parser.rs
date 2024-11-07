@@ -1,4 +1,4 @@
-use std::vec;
+use pretty_assertions::assert_eq;
 
 use crate::{language::*, lexer::*, parse_state::ParseState};
 
@@ -118,12 +118,14 @@ fn on_return_type(state: ParseState) -> ReturnState {
 type BodyState = (Body, ParseState);
 fn parse_body(state: ParseState, body: &mut Body) -> BodyState {
     let peek = state.peek();
+    println!("Parse body:{:?}", peek);
 
     match peek {
         Some(Token::Symbol(Symbol::BraceClose)) => return (body.to_vec(), state.advance()),
         Some(Token::Symbol(Symbol::Newline)) => return parse_body(state.advance(), body),
         _ => (),
     }
+    println!("Parse body: Got past peek");
 
     let (expression, state) = on_expression(state);
 
@@ -234,12 +236,66 @@ fn on_math_expression(
     )
 }
 
+fn on_evaluation(
+    state: ParseState,
+    lhs: Expression,
+    evaluation: EvaluationOperator,
+) -> ExpressionState {
+    let peek = state.peek();
+    if peek.is_none() {
+        unreachable!("Invalid syntax! Expect a token in on evaluation")
+    }
+
+    if let EvaluationOperator::BooleanTruthy = evaluation {
+        return (
+            Expression::Evaluation(Evaluation::new(lhs, None, evaluation)),
+            state,
+        );
+    }
+    let (rhs, state) = on_expression(state);
+    (
+        Expression::Evaluation(Evaluation::new(lhs, Some(rhs), evaluation)),
+        state,
+    )
+}
+
+fn on_boolean_literal(state: ParseState, boolean: Expression) -> ExpressionState {
+    let peek = state.peek();
+    match peek {
+        Some(Token::Symbol(Symbol::Evaluation(e))) => {
+            let evaluation_operator = EvaluationOperator::from_evaluation_symbol(e);
+            let state = state.advance();
+            on_evaluation(state, boolean, evaluation_operator)
+        }
+        Some(Token::Symbol(Symbol::BraceOpen)) => {
+            on_evaluation(state, boolean, EvaluationOperator::BooleanTruthy)
+        }
+        _ => (boolean, state),
+    }
+}
+
+fn on_literal(state: ParseState, l: Literal) -> ExpressionState {
+    let lhs = Expression::SingleValue(l.to_single_value());
+    if let Literal::Bool(_) = l {
+        on_boolean_literal(state, lhs)
+    } else {
+        let peek = state.peek();
+        match peek {
+            Some(Token::Symbol(Symbol::Evaluation(e))) => {
+                let evaluation_operator = EvaluationOperator::from_evaluation_symbol(e);
+                let state = state.advance();
+                on_evaluation(state, lhs, evaluation_operator)
+            }
+            _ => (lhs, state),
+        }
+    }
+}
 fn on_expression(state: ParseState) -> ExpressionState {
     let (next, state) = state.next();
     match next.expect("There should be more tokens given this function is called") {
         Token::Ident(ident) => on_identifier(state, &ident),
         Token::Kwd(k) => on_keyword(state, &k),
-        Token::Literal(l) => (Expression::SingleValue(l.to_single_value()), state),
+        Token::Literal(l) => on_literal(state, l),
         Token::Symbol(Symbol::BraceOpen) => on_body(state),
         Token::Symbol(Symbol::Newline) => on_expression(state),
 
@@ -253,7 +309,7 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
     match k {
         Kwd::Return => on_return(state),
         Kwd::DataType(_) => todo!(),
-        Kwd::While => todo!(),
+        Kwd::While => on_while(state),
         Kwd::For => todo!(),
         Kwd::If => on_if(state),
         Kwd::In => todo!(),
@@ -264,62 +320,56 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
     }
 }
 
+fn on_while(state: ParseState) -> ExpressionState {
+    let peek = state.peek();
+    let (condition, state) = match peek {
+        Some(Token::Symbol(Symbol::BraceOpen)) => (None, state),
+        Some(_) => {
+            let (expr, state) = on_expression(state);
+            (Some(expr), state)
+        }
+        None => unreachable!("Invalid syntax!"),
+    };
+
+    let (next, state) = state.next();
+
+    assert_eq!(Some(Token::Symbol(Symbol::BraceOpen)), next);
+
+    let (body, state) = on_body(state);
+    let while_expr = Expression::While {
+        condition: condition.map(Box::new),
+        body: body.boxed(),
+    };
+    (while_expr, state)
+}
+
 fn on_else(state: ParseState) -> ExpressionState {
     on_expression(state)
 }
 
-// TODO: This might be able to be improved through refactoring.
 fn on_if(state: ParseState) -> ExpressionState {
-    let (lhs, state) = on_expression(state);
+    let (evaluation, state) = on_expression(state);
     let (next, state) = state.next();
-    match next {
-        Some(Token::Symbol(Symbol::Evaluation(e))) => {
-            let evaluation_op = EvaluationOperator::from_evaluation_symbol(&e);
 
-            // we need to have a rhs given some equality operator
-            let (rhs, state) = on_expression(state);
-            let (on_true_evaluation, state) = on_expression(state);
-            let (next, state) = state.next();
-            let (on_false_evaluation, state) = if let Some(Token::Kwd(Kwd::Else)) = next {
-                let (expr, state) = on_expression(state);
-                (Some(expr), state)
-            } else {
-                (None, state)
-            };
-            (
-                Expression::If(If::new_boxed(
-                    Evaluation::new(lhs, Some(rhs), Some(evaluation_op)),
-                    on_true_evaluation,
-                    on_false_evaluation,
-                )),
-                state,
-            )
-        }
-        Some(Token::Symbol(Symbol::BraceOpen)) => {
-            let (on_true_evaluation, state) = on_body(state);
-            // NOTE: this will handle else if
-            let (next, state) = state.next();
-            let (on_false_evaluation, state) = if let Some(Token::Kwd(Kwd::Else)) = next {
-                let (expr, state) = on_expression(state);
-                (Some(expr), state)
-            } else {
-                (None, state)
-            };
-            (
-                Expression::If(If::new_boxed(
-                    Evaluation::new(lhs, None, None),
-                    on_true_evaluation,
-                    on_false_evaluation,
-                )),
-                state,
-            )
-        }
-        t => {
-            println!("Expected a token in on_if, found: {:?} ", t);
-            // TODO: Invalid syntax
-            todo!()
-        }
-    }
+    assert_eq!(Some(Token::Symbol(Symbol::BraceOpen)), next);
+
+    let (on_true_evaluation, state) = on_body(state);
+    // NOTE: this will handle else if
+    let (next, state) = state.next();
+    let (on_false_evaluation, state) = if let Some(Token::Kwd(Kwd::Else)) = next {
+        let (expr, state) = on_expression(state);
+        (Some(expr), state)
+    } else {
+        (None, state)
+    };
+    (
+        Expression::If(If::new_boxed(
+            evaluation,
+            on_true_evaluation,
+            on_false_evaluation,
+        )),
+        state,
+    )
 }
 
 fn on_return(state: ParseState) -> ExpressionState {
@@ -356,6 +406,7 @@ mod tests {
     #[test]
     fn if_expression() {
         // if true { }
+        println!("Test 1");
         test(
             vec![
                 Token::Kwd(Kwd::If),
@@ -363,21 +414,22 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(Box::new(If::new(
-                Evaluation::new(
+            Expression::If(If::new_boxed(
+                Expression::Evaluation(Evaluation::new(
                     SingleValue::new_value_literal_expression(ValueLiteral::new(
                         NativeType::Bool,
                         "true",
                     )),
                     None,
-                    None,
-                ),
+                    EvaluationOperator::BooleanTruthy,
+                )),
                 Expression::Body(vec![
                     // empty body
                 ]),
                 None,
-            ))),
+            )),
         );
+        println!("Test 2");
         test(
             // if 3 == 3 {
             //     print "Hello"
@@ -393,7 +445,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
             ],
             Expression::If(If::new_boxed(
-                Evaluation::new(
+                Expression::Evaluation(Evaluation::new(
                     SingleValue::new_value_literal_expression(ValueLiteral::new(
                         NativeType::Int,
                         "3",
@@ -401,8 +453,8 @@ mod tests {
                     Some(SingleValue::new_value_literal_expression(
                         ValueLiteral::new(NativeType::Int, "3"),
                     )),
-                    Some(EvaluationOperator::Eq),
-                ),
+                    EvaluationOperator::Eq,
+                )),
                 Expression::Body(vec![Expression::Operation {
                     lhs: SingleValue::new_identifier_expression("print").boxed(),
                     rhs: Expression::MultipleValues(vec![
@@ -436,14 +488,14 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
             ],
             Expression::If(If::new_boxed(
-                Evaluation::new(
+                Expression::Evaluation(Evaluation::new(
                     SingleValue::new_value_literal_expression(ValueLiteral::new(
                         NativeType::Bool,
                         "true",
                     )),
                     None,
-                    None,
-                ),
+                    EvaluationOperator::BooleanTruthy,
+                )),
                 Expression::Body(vec![
                     // empty body
                 ]),
@@ -475,7 +527,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
             ],
             Expression::If(If::new_boxed(
-                Evaluation::new(
+                Expression::Evaluation(Evaluation::new(
                     SingleValue::new_value_literal_expression(ValueLiteral::new(
                         NativeType::Int,
                         "3",
@@ -483,8 +535,8 @@ mod tests {
                     Some(SingleValue::new_value_literal_expression(
                         ValueLiteral::new(NativeType::Int, "3"),
                     )),
-                    Some(EvaluationOperator::Eq),
-                ),
+                    EvaluationOperator::Eq,
+                )),
                 Expression::Body(vec![Expression::Operation {
                     lhs: SingleValue::new_identifier_expression("print").boxed(),
                     rhs: Expression::MultipleValues(vec![
@@ -506,6 +558,97 @@ mod tests {
                     operation: Operation::FunctionCall,
                 }])),
             )),
+        );
+    }
+
+    #[test]
+    fn while_loops() {
+        // while {
+        //
+        // }
+        test(
+            vec![
+                Token::Kwd(Kwd::While),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                Token::Symbol(Symbol::Newline),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::While {
+                condition: None,
+                body: Expression::Body(Body::new()).boxed(),
+            },
+        );
+        // With function call:
+        // while {
+        //    print "Hello"
+        // }
+        test(
+            vec![
+                Token::Kwd(Kwd::While),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                Token::Ident("print".to_string()),
+                Token::Literal(Literal::String("Hello".to_string())),
+                Token::Symbol(Symbol::Newline),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::While {
+                condition: None,
+                body: Expression::Body(vec![Expression::Operation {
+                    lhs: SingleValue::new_identifier_expression("print").boxed(),
+                    rhs: Expression::MultipleValues(vec![
+                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
+                            "Hello",
+                        )),
+                    ])
+                    .boxed(),
+                    operation: Operation::FunctionCall,
+                }])
+                .boxed(),
+            },
+        );
+
+        // With condition
+        test(
+            vec![
+                Token::Kwd(Kwd::While),
+                Token::Literal(Literal::Int(3)),
+                Token::Symbol(Symbol::Evaluation(EvaluationSymbol::Equality)),
+                Token::Literal(Literal::Int(3)),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                Token::Ident("print".to_string()),
+                Token::Literal(Literal::String("Hello".to_string())),
+                Token::Symbol(Symbol::Newline),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::While {
+                condition: Some(
+                    Expression::Evaluation(Evaluation::new(
+                        SingleValue::new_value_literal_expression(ValueLiteral::new(
+                            NativeType::Int,
+                            "3",
+                        )),
+                        Some(SingleValue::new_value_literal_expression(
+                            ValueLiteral::new(NativeType::Int, "3"),
+                        )),
+                        EvaluationOperator::Eq,
+                    ))
+                    .boxed(),
+                ),
+                body: Expression::Body(vec![Expression::Operation {
+                    lhs: SingleValue::new_identifier_expression("print").boxed(),
+                    rhs: Expression::MultipleValues(vec![
+                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
+                            "Hello",
+                        )),
+                    ])
+                    .boxed(),
+                    operation: Operation::FunctionCall,
+                }])
+                .boxed(),
+            },
         );
     }
 
