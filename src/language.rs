@@ -189,7 +189,13 @@ pub enum Expression {
         condition: Option<Box<Expression>>,
         body: Box<Expression>,
     },
+    For {
+        scoped_variable: Box<Expression>,
+        iterable: Box<Expression>,
+        body: Box<Expression>,
+    },
     Body(Body),
+    Range(Range), 
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -460,3 +466,18 @@ impl If {
         }
     }
 }
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Range {
+    from: Box<Expression>,
+    to: Box<Expression>,
+    inclusive: bool,
+}
+
+impl Range {
+    pub fn new(from: Box<Expression>, to: Box<Expression>, inclusive: bool) -> Self {
+        Self { from, to, inclusive }
+    }
+}
+
+

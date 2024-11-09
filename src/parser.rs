@@ -11,6 +11,10 @@ pub enum ParseError {
     NoMoreTokens,
 }
 
+fn is_new_body(t: Option<&Token>) -> bool {
+    t == Some(&Token::Symbol(Symbol::BraceOpen))
+}
+
 type ArgumentsState = (FunctionArguments, ParseState);
 fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ArgumentsState {
     let peek = state.peek();
@@ -23,7 +27,7 @@ fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> Arguments
 
     let (next, state) = state.next();
 
-    let state = if let Some(Token::Symbol(Symbol::BraceOpen)) = next {
+    let state = if is_new_body(next.as_ref()) {
         let (body, state) = on_body(state);
         args.push(body);
         state
@@ -184,35 +188,30 @@ fn on_identifier(state: ParseState, ident: &str) -> ExpressionState {
     // TODO: Variable Usage e.g. y = x + 3
     let t = state.peek();
 
-    if let Some(Token::Symbol(Symbol::BraceOpen)) = t {
-        return on_evaluation(
+    if let Some(Token::Kwd(Kwd::In)) = t {
+        return (
+            Expression::SingleValue(SingleValue::Identifier(ident.to_string())),
             state,
-            SingleValue::new_identifier_expression(ident),
-            EvaluationOperator::BooleanTruthy,
         );
     }
     let (t, state) = state.next();
+    let lhs = SingleValue::new_identifier_expression(ident);
     match t {
         // Assignment
         Some(Token::Symbol(Symbol::Equals)) => on_assignment(state, ident),
 
         Some(Token::Symbol(Symbol::Math(t))) => {
             let operation = MathOperation::from_token(&t);
-            on_math_expression(
-                state,
-                operation,
-                SingleValue::new_identifier_expression(ident),
-            )
+            on_math_expression(state, operation, lhs)
         }
 
         // Operations
         // Function call if value literal or string
         Some(Token::Literal(l)) => on_function_call(state, ident, &l),
+        Some(Token::Symbol(Symbol::Range)) => on_range(state, lhs, false),
+        Some(Token::Symbol(Symbol::RangeEq)) => on_range(state, lhs, true),
         Some(Token::Symbol(Symbol::ParenOpen)) => on_function(state, ident),
-        _ => (
-            Expression::SingleValue(SingleValue::Identifier(ident.to_string())),
-            state,
-        ),
+        _ => (lhs, state),
     }
 }
 
@@ -244,66 +243,60 @@ fn on_math_expression(
     )
 }
 
-fn on_evaluation(
-    state: ParseState,
-    lhs: Expression,
-    evaluation: EvaluationOperator,
-) -> ExpressionState {
-    let peek = state.peek();
-    if peek.is_none() {
-        unreachable!("Invalid syntax! Expect a token in on evaluation")
-    }
+fn on_single_value(state: ParseState) -> ExpressionState {
+    let (next, state) = state.next();
+    let single_value = match next {
+        Some(Token::Literal(l)) => Expression::SingleValue(l.to_single_value()),
+        Some(Token::Ident(i)) => SingleValue::new_identifier_expression(&i),
+        _ => unreachable!("Invalid syntax"),
+    };
+    (single_value, state)
+}
 
-    if let EvaluationOperator::BooleanTruthy = evaluation {
+fn on_evaluation(state: ParseState) -> ExpressionState {
+    let (lhs, state) = on_single_value(state);
+
+    let peek = state.peek();
+    // truthy value e.g. if x { ... }
+    if is_new_body(peek) {
         return (
-            Expression::Evaluation(Evaluation::new(lhs, None, evaluation)),
+            Expression::Evaluation(Evaluation::new(
+                lhs,
+                None,
+                EvaluationOperator::BooleanTruthy,
+            )),
             state,
         );
     }
-    let (rhs, state) = on_expression(state);
+    let (next, state) = state.next();
+
+    let evaluation_operator = if let Some(Token::Symbol(Symbol::Evaluation(e))) = next {
+        EvaluationOperator::from_evaluation_symbol(&e)
+    } else {
+        unreachable!("Invalid syntax")
+    };
+
+    let (rhs, state) = on_single_value(state);
     (
-        Expression::Evaluation(Evaluation::new(lhs, Some(rhs), evaluation)),
+        Expression::Evaluation(Evaluation::new(lhs, Some(rhs), evaluation_operator)),
         state,
     )
 }
 
-fn on_boolean_literal(state: ParseState, boolean: Expression) -> ExpressionState {
-    let peek = state.peek();
-    match peek {
-        Some(Token::Symbol(Symbol::Evaluation(e))) => {
-            let evaluation_operator = EvaluationOperator::from_evaluation_symbol(e);
-            let state = state.advance();
-            on_evaluation(state, boolean, evaluation_operator)
-        }
-        Some(Token::Symbol(Symbol::BraceOpen)) => {
-            on_evaluation(state, boolean, EvaluationOperator::BooleanTruthy)
-        }
-        _ => (boolean, state),
-    }
+fn on_range(state: ParseState, lhs: Expression, inclusive: bool) -> ExpressionState {
+    let (rhs, state) = on_single_value(state);
+    (
+        Expression::Range(Range::new(lhs.boxed(), rhs.boxed(), inclusive)),
+        state,
+    )
 }
 
-fn on_literal(state: ParseState, l: Literal) -> ExpressionState {
-    let lhs = Expression::SingleValue(l.to_single_value());
-    if let Literal::Bool(_) = l {
-        on_boolean_literal(state, lhs)
-    } else {
-        let peek = state.peek();
-        match peek {
-            Some(Token::Symbol(Symbol::Evaluation(e))) => {
-                let evaluation_operator = EvaluationOperator::from_evaluation_symbol(e);
-                let state = state.advance();
-                on_evaluation(state, lhs, evaluation_operator)
-            }
-            _ => (lhs, state),
-        }
-    }
-}
 fn on_expression(state: ParseState) -> ExpressionState {
     let (next, state) = state.next();
     match next.expect("There should be more tokens given this function is called") {
         Token::Ident(ident) => on_identifier(state, &ident),
         Token::Kwd(k) => on_keyword(state, &k),
-        Token::Literal(l) => on_literal(state, l),
+        Token::Literal(l) => (Expression::SingleValue(l.to_single_value()), state),
         Token::Symbol(Symbol::BraceOpen) => on_body(state),
         Token::Symbol(Symbol::Newline) => on_expression(state),
 
@@ -318,7 +311,7 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
         Kwd::Return => on_return(state),
         Kwd::DataType(_) => todo!(),
         Kwd::While => on_while(state),
-        Kwd::For => todo!(),
+        Kwd::For => on_for(state),
         Kwd::If => on_if(state),
         Kwd::In => todo!(),
         Kwd::Break => todo!(),
@@ -329,15 +322,23 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
 }
 
 fn on_while(state: ParseState) -> ExpressionState {
-    let peek = state.peek();
-    let (condition, state) = match peek {
-        Some(Token::Symbol(Symbol::BraceOpen)) => (None, state),
-        Some(_) => {
-            let (expr, state) = on_expression(state);
-            (Some(expr), state)
-        }
-        None => unreachable!("Invalid syntax!"),
-    };
+    let peeked = state.peek();
+
+    if is_new_body(peeked) {
+        // handle infinite loops
+        let state = state.advance();
+
+        let (body, state) = on_body(state);
+        return (
+            Expression::While {
+                condition: None,
+                body: body.boxed(),
+            },
+            state,
+        );
+    }
+
+    let (evaluation, state) = on_evaluation(state);
 
     let (next, state) = state.next();
 
@@ -345,27 +346,65 @@ fn on_while(state: ParseState) -> ExpressionState {
 
     let (body, state) = on_body(state);
     let while_expr = Expression::While {
-        condition: condition.map(Box::new),
+        condition: Some(evaluation.boxed()),
         body: body.boxed(),
     };
     (while_expr, state)
 }
 
+fn on_iterable(state: ParseState) -> ExpressionState {
+    let (lhs, state) = on_single_value(state);
+    let peek = state.peek();
+    if is_new_body(peek) {
+        return (lhs, state);
+    };
+
+    let (next, state) = state.next();
+    match next {
+        Some(Token::Symbol(Symbol::Range)) => on_range(state, lhs, false),
+        Some(Token::Symbol(Symbol::RangeEq)) => on_range(state, lhs, true),
+        t => unreachable!("Invalid syntax: {:?}", t),
+    }
+}
+
+fn on_for(state: ParseState) -> ExpressionState {
+    let (scoped_variable, state) = on_single_value(state);
+    let (next, state) = state.next();
+    assert_eq!(Some(Token::Kwd(Kwd::In)), next);
+    let (iterable, state) = on_iterable(state);
+    let (next, state) = state.next();
+    assert_eq!(Some(Token::Symbol(Symbol::BraceOpen)), next);
+    let (body, state) = on_body(state);
+
+    (
+        Expression::For {
+            scoped_variable: Box::new(scoped_variable),
+            iterable: Box::new(iterable),
+            body: Box::new(body),
+        },
+        state,
+    )
+}
+
 fn on_else(state: ParseState) -> ExpressionState {
-    on_expression(state)
+    let (next, state) = state.next();
+    match next {
+        Some(Token::Symbol(Symbol::BraceOpen)) => on_body(state),
+        Some(Token::Kwd(Kwd::If)) => on_if(state),
+        _ => unreachable!("Invalid syntax")
+    }
 }
 
 fn on_if(state: ParseState) -> ExpressionState {
-    let (evaluation, state) = on_expression(state);
+    let (evaluation, state) = on_evaluation(state);
     let (next, state) = state.next();
 
     assert_eq!(Some(Token::Symbol(Symbol::BraceOpen)), next);
 
     let (on_true_evaluation, state) = on_body(state);
-    // NOTE: this will handle else if
     let (next, state) = state.next();
     let (on_false_evaluation, state) = if let Some(Token::Kwd(Kwd::Else)) = next {
-        let (expr, state) = on_expression(state);
+        let (expr, state) = on_else(state);
         (Some(expr), state)
     } else {
         (None, state)
@@ -766,6 +805,68 @@ mod tests {
                     operation: Operation::FunctionCall,
                 }])
                 .boxed(),
+            },
+        );
+    }
+
+    #[test]
+    fn for_loops() {
+        // for x in 0..5 {
+        //
+        // }
+        test(
+            vec![
+                Token::Kwd(Kwd::For),
+                Token::Ident("x".to_string()),
+                Token::Kwd(Kwd::In),
+                Token::Literal(Literal::Int(0)),
+                Token::Symbol(Symbol::Range),
+                Token::Literal(Literal::Int(5)),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::For {
+                scoped_variable: SingleValue::new_identifier_expression("x").boxed(),
+                iterable: Expression::Range(Range::new(
+                    SingleValue::new_value_literal_expression(ValueLiteral::new(
+                        NativeType::Int,
+                        "0",
+                    ))
+                    .boxed(),
+                    SingleValue::new_value_literal_expression(ValueLiteral::new(
+                        NativeType::Int,
+                        "5",
+                    ))
+                    .boxed(),
+                    false,
+                ))
+                .boxed(),
+                body: Expression::Body(Body::new()).boxed(),
+            },
+        );
+        // for x in y..z {
+        //
+        // }
+        test(
+            vec![
+                Token::Kwd(Kwd::For),
+                Token::Ident("x".to_string()),
+                Token::Kwd(Kwd::In),
+                Token::Ident("y".to_string()),
+                Token::Symbol(Symbol::Range),
+                Token::Ident("z".to_string()),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::For {
+                scoped_variable: SingleValue::new_identifier_expression("x").boxed(),
+                iterable: Expression::Range(Range::new(
+                    SingleValue::new_identifier_expression("y").boxed(),
+                    SingleValue::new_identifier_expression("z").boxed(),
+                    false,
+                ))
+                .boxed(),
+                body: Expression::Body(Body::new()).boxed(),
             },
         );
     }
