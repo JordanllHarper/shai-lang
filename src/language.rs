@@ -286,7 +286,7 @@ impl MathOperation {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Operation {
     Math(MathOperation),               // +, -, /, *
-    Assignment(Option<MathOperation>), // = or +=
+    Assignment { math_operation: Option<MathOperation>, type_assertion : Option<NativeType> }, // = or +=
     Return,
     FunctionCall, // fx args...
 }

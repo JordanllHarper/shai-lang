@@ -122,14 +122,12 @@ fn on_return_type(state: ParseState) -> ReturnState {
 type BodyState = (Body, ParseState);
 fn parse_body(state: ParseState, body: &mut Body) -> BodyState {
     let peek = state.peek();
-    println!("Parse body:{:?}", peek);
 
     match peek {
         Some(Token::Symbol(Symbol::BraceClose)) => return (body.to_vec(), state.advance()),
         Some(Token::Symbol(Symbol::Newline)) => return parse_body(state.advance(), body),
         _ => (),
     }
-    println!("Parse body: Got past peek");
 
     let (expression, state) = on_expression(state);
 
@@ -143,7 +141,11 @@ fn on_body(state: ParseState) -> ExpressionState {
     (Expression::Body(body), state)
 }
 
-fn on_assignment(state: ParseState, ident: &str) -> ExpressionState {
+fn on_assignment(
+    state: ParseState,
+    ident: &str,
+    type_assertion: Option<NativeType>,
+) -> ExpressionState {
     let (t, state) = state.next();
     match t {
         Some(Token::Literal(l)) => {
@@ -153,7 +155,10 @@ fn on_assignment(state: ParseState, ident: &str) -> ExpressionState {
                     lhs: Expression::SingleValue(SingleValue::Identifier(ident.to_string()))
                         .boxed(),
                     rhs: Box::new(Expression::SingleValue(sv)),
-                    operation: Operation::Assignment(None),
+                    operation: Operation::Assignment {
+                        math_operation: None,
+                        type_assertion,
+                    },
                 },
                 state,
             )
@@ -169,7 +174,10 @@ fn on_assignment(state: ParseState, ident: &str) -> ExpressionState {
                 Expression::Operation {
                     lhs: lhs.boxed(),
                     rhs: rhs.boxed(),
-                    operation: Operation::Assignment(None),
+                    operation: Operation::Assignment {
+                        math_operation: None,
+                        type_assertion,
+                    },
                 },
                 state,
             )
@@ -195,23 +203,43 @@ fn on_identifier(state: ParseState, ident: &str) -> ExpressionState {
         );
     }
     let (t, state) = state.next();
-    let lhs = SingleValue::new_identifier_expression(ident);
     match t {
         // Assignment
-        Some(Token::Symbol(Symbol::Equals)) => on_assignment(state, ident),
+        Some(Token::Symbol(Symbol::Equals)) => on_assignment(state, ident, None),
 
         Some(Token::Symbol(Symbol::Math(t))) => {
             let operation = MathOperation::from_token(&t);
-            on_math_expression(state, operation, lhs)
+            on_math_expression(
+                state,
+                operation,
+                SingleValue::new_identifier_expression(ident),
+            )
         }
 
         // Operations
         // Function call if value literal or string
         Some(Token::Literal(l)) => on_function_call(state, ident, &l),
-        Some(Token::Symbol(Symbol::Range)) => on_range(state, lhs, false),
-        Some(Token::Symbol(Symbol::RangeEq)) => on_range(state, lhs, true),
+        Some(Token::Symbol(Symbol::Range)) => {
+            on_range(state, SingleValue::new_identifier_expression(ident), false)
+        }
+        Some(Token::Symbol(Symbol::RangeEq)) => {
+            on_range(state, SingleValue::new_identifier_expression(ident), true)
+        }
         Some(Token::Symbol(Symbol::ParenOpen)) => on_function(state, ident),
-        _ => (lhs, state),
+        Some(Token::Symbol(Symbol::Colon)) => on_variable_type_assertion(state, ident),
+        _ => (SingleValue::new_identifier_expression(ident), state),
+    }
+}
+
+fn on_variable_type_assertion(state: ParseState, ident: &str) -> ExpressionState {
+    let (var_type, state) = state.next();
+    if let Some(Token::Kwd(Kwd::DataType(d))) = var_type {
+        let kwd = NativeType::from_datatype_kwd(&d);
+        let (next, state) = state.next();
+        assert_eq!(Some(Token::Symbol(Symbol::Equals)), next);
+        on_assignment(state, ident, Some(kwd))
+    } else {
+        unreachable!("Invalid syntax!")
     }
 }
 
@@ -391,7 +419,7 @@ fn on_else(state: ParseState) -> ExpressionState {
     match next {
         Some(Token::Symbol(Symbol::BraceOpen)) => on_body(state),
         Some(Token::Kwd(Kwd::If)) => on_if(state),
-        _ => unreachable!("Invalid syntax")
+        _ => unreachable!("Invalid syntax"),
     }
 }
 
@@ -883,7 +911,10 @@ mod tests {
             Expression::Operation {
                 lhs: Box::new(SingleValue::new_identifier_expression("y")),
                 rhs: Box::new(SingleValue::new_identifier_expression("x")),
-                operation: Operation::Assignment(None),
+                operation: Operation::Assignment {
+                    math_operation: None,
+                    type_assertion: None,
+                },
             },
         )
     }
@@ -908,7 +939,10 @@ mod tests {
                     )),
                     operation: Operation::Math(MathOperation::Add),
                 }),
-                operation: Operation::Assignment(None),
+                operation: Operation::Assignment {
+                    math_operation: None,
+                    type_assertion: None,
+                },
             },
         )
     }
@@ -1191,7 +1225,10 @@ mod tests {
                 rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                     ValueLiteral::new(NativeType::Float, "3.5"),
                 ))),
-                operation: Operation::Assignment(None),
+                operation: Operation::Assignment {
+                    math_operation: None,
+                    type_assertion: None,
+                },
             },
         );
     }
@@ -1286,7 +1323,10 @@ mod tests {
             rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::Int, "5"),
             ))),
-            operation: Operation::Assignment(None),
+            operation: Operation::Assignment {
+                math_operation: None,
+                type_assertion: None,
+            },
         };
         test(
             vec![
@@ -1318,5 +1358,28 @@ mod tests {
             ],
             expected,
         );
+
+        let expected = Expression::Operation {
+            lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
+                "x".to_string(),
+            ))),
+            rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
+                ValueLiteral::new(NativeType::Int, "5"),
+            ))),
+            operation: Operation::Assignment {
+                math_operation: None,
+                type_assertion: Some(NativeType::Int),
+            },
+        };
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Colon),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                Token::Symbol(Symbol::Equals),
+                Token::Literal(Literal::Int(5)),
+            ],
+            expected,
+        )
     }
 }
