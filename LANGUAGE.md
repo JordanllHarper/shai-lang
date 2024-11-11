@@ -17,7 +17,7 @@ Below is an overview of the language.
 
 Declaration:
 
-`// C`
+`// C `
 
 where 
 
@@ -94,7 +94,9 @@ Examples:
 
 Declaration:
 
-`x : const T = y`
+`const x = y`
+OR
+`const x : T = y`
 
 where
 
@@ -103,7 +105,7 @@ T = type
 y = value
 
 Examples: 
-x : const int = 5 // immutable
+const x : int = 5 // immutable
 
 ## Functions
 
@@ -178,7 +180,7 @@ concatStringAndInt (s1, i1) {
 
 Declaration: 
 
-`T[] a = [v1, v2, v3]`
+`a : T[] = [v1, v2, v3]`
 
 where 
 
@@ -313,7 +315,7 @@ for i in 0..10{
 ```
 ```
 names = ["Jordan", "Jules", "Sarah"]
-for name in names{
+for name in names {
     print name
 }
 ```
