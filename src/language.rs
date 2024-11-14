@@ -195,7 +195,7 @@ pub enum Expression {
         body: Box<Expression>,
     },
     Body(Body),
-    Range(Range), 
+    Range(Range),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -285,8 +285,12 @@ impl MathOperation {
 ///
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Operation {
-    Math(MathOperation),               // +, -, /, *
-    Assignment { math_operation: Option<MathOperation>, type_assertion : Option<NativeType> }, // = or +=
+    Math(MathOperation), // +, -, /, *
+    Assignment {
+        math_operation: Option<MathOperation>,
+        type_assertion: Option<NativeType>,
+        is_constant: bool,
+    }, 
     Return,
     FunctionCall, // fx args...
 }
@@ -476,8 +480,10 @@ pub struct Range {
 
 impl Range {
     pub fn new(from: Box<Expression>, to: Box<Expression>, inclusive: bool) -> Self {
-        Self { from, to, inclusive }
+        Self {
+            from,
+            to,
+            inclusive,
+        }
     }
 }
-
-

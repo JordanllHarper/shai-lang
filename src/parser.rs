@@ -158,6 +158,7 @@ fn on_assignment(
                     operation: Operation::Assignment {
                         math_operation: None,
                         type_assertion,
+                        is_constant: false,
                     },
                 },
                 state,
@@ -177,6 +178,7 @@ fn on_assignment(
                     operation: Operation::Assignment {
                         math_operation: None,
                         type_assertion,
+                        is_constant: false,
                     },
                 },
                 state,
@@ -341,12 +343,53 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
         Kwd::While => on_while(state),
         Kwd::For => on_for(state),
         Kwd::If => on_if(state),
-        Kwd::In => todo!(),
         Kwd::Break => todo!(),
         Kwd::Include => todo!(),
         Kwd::Else => on_else(state),
-        Kwd::Const => todo!(),
+        Kwd::Const => on_const(state),
+        _ => unreachable!("Invalid syntax"),
     }
+}
+
+fn on_constant_type_assertion(state: ParseState) -> (NativeType, ParseState) {
+    let (var_type, state) = state.next();
+    if let Some(Token::Kwd(Kwd::DataType(d))) = var_type {
+        (NativeType::from_datatype_kwd(&d), state)
+    } else {
+        unreachable!("Invalid syntax!")
+    }
+}
+
+fn on_const(state: ParseState) -> ExpressionState {
+    let (next, state) = state.next();
+    let identifier = if let Some(Token::Ident(ident)) = next {
+        SingleValue::new_identifier_expression(&ident)
+    } else {
+        unreachable!("Invalid syntax")
+    };
+    let peek = state.peek();
+    let (type_assertion, state) = if let Some(Token::Symbol(Symbol::Colon)) = peek {
+        let state = state.advance();
+        let (expr, state) = on_constant_type_assertion(state);
+        (Some(expr), state)
+    } else {
+        (None, state)
+    };
+    let (next, state) = state.next();
+    assert_eq!(Some(Token::Symbol(Symbol::Equals)), next);
+    let (expr, state) = on_expression(state);
+    (
+        Expression::Operation {
+            lhs: identifier.boxed(),
+            rhs: expr.boxed(),
+            operation: Operation::Assignment {
+                math_operation: None,
+                type_assertion,
+                is_constant: true,
+            },
+        },
+        state,
+    )
 }
 
 fn on_while(state: ParseState) -> ExpressionState {
@@ -914,6 +957,7 @@ mod tests {
                 operation: Operation::Assignment {
                     math_operation: None,
                     type_assertion: None,
+                    is_constant: false,
                 },
             },
         )
@@ -942,6 +986,7 @@ mod tests {
                 operation: Operation::Assignment {
                     math_operation: None,
                     type_assertion: None,
+                    is_constant: false,
                 },
             },
         )
@@ -1228,6 +1273,7 @@ mod tests {
                 operation: Operation::Assignment {
                     math_operation: None,
                     type_assertion: None,
+                    is_constant: false,
                 },
             },
         );
@@ -1326,6 +1372,7 @@ mod tests {
             operation: Operation::Assignment {
                 math_operation: None,
                 type_assertion: None,
+                is_constant: false,
             },
         };
         test(
@@ -1336,6 +1383,19 @@ mod tests {
             ],
             expected.clone(),
         );
+
+        // Whitespace handling
+        // "x = 5"
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Equals),
+                Token::Literal(Literal::Int(5)),
+            ],
+            expected.clone(),
+        );
+
+
         // Whitespace handling
         // "x = 5"
         test(
@@ -1369,6 +1429,7 @@ mod tests {
             operation: Operation::Assignment {
                 math_operation: None,
                 type_assertion: Some(NativeType::Int),
+                is_constant: false,
             },
         };
         test(
@@ -1380,6 +1441,55 @@ mod tests {
                 Token::Literal(Literal::Int(5)),
             ],
             expected,
-        )
+        );
+        // const x = 5
+        let expected = Expression::Operation {
+            lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
+                "x".to_string(),
+            ))),
+            rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
+                ValueLiteral::new(NativeType::Int, "5"),
+            ))),
+            operation: Operation::Assignment {
+                math_operation: None,
+                type_assertion: None,
+                is_constant: true,
+            },
+        };
+        test(
+            vec![
+                Token::Kwd(Kwd::Const),
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Equals),
+                Token::Literal(Literal::Int(5)),
+            ],
+            expected,
+        );
+
+        // const x : Int = 5
+        let expected = Expression::Operation {
+            lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
+                "x".to_string(),
+            ))),
+            rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
+                ValueLiteral::new(NativeType::Int, "5"),
+            ))),
+            operation: Operation::Assignment {
+                math_operation: None,
+                type_assertion: Some(NativeType::Int),
+                is_constant: true,
+            },
+        };
+        test(
+            vec![
+                Token::Kwd(Kwd::Const),
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Colon),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                Token::Symbol(Symbol::Equals),
+                Token::Literal(Literal::Int(5)),
+            ],
+            expected,
+        );
     }
 }
