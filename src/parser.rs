@@ -336,6 +336,23 @@ fn on_expression(state: ParseState) -> ExpressionState {
     }
 }
 
+fn on_include(state: ParseState) -> ExpressionState {
+    let (package, state) = state.next();
+    if let Some(Token::Literal(Literal::String(s))) = package {
+        (
+            Expression::Statement {
+                expression: Some(
+                    SingleValue::new_value_literal_expression(ValueLiteral::new_string(&s)).boxed(),
+                ),
+                operation: Operation::Include,
+            },
+            state,
+        )
+    } else {
+        unreachable!("Invalid syntax: expected a string for the package name")
+    }
+}
+
 fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
     match k {
         Kwd::Return => on_return(state),
@@ -350,7 +367,7 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
             },
             state,
         ),
-        Kwd::Include => todo!(),
+        Kwd::Include => on_include(state),
         Kwd::Else => on_else(state),
         Kwd::Const => on_const(state),
         _ => unreachable!("Invalid syntax"),
@@ -609,8 +626,11 @@ mod tests {
                     Some(Expression::Body(vec![Expression::Operation {
                         lhs: SingleValue::new_identifier_expression("print").boxed(),
                         rhs: Expression::MultipleValues(vec![
-                            SingleValue::new_value_literal_expression(ValueLiteral::new_string("hi"))
-                        ]).boxed(),
+                            SingleValue::new_value_literal_expression(ValueLiteral::new_string(
+                                "hi",
+                            )),
+                        ])
+                        .boxed(),
                         operation: Operation::FunctionCall,
                     }])),
                 )))])
@@ -1588,5 +1608,23 @@ mod tests {
             ],
             expected,
         );
+    }
+    #[test]
+    fn include_kwd() {
+        test(
+            vec![
+                Token::Kwd(Kwd::Include),
+                Token::Literal(Literal::String("my_package".to_string())),
+            ],
+            Expression::Statement {
+                expression: Some(
+                    SingleValue::new_value_literal_expression(ValueLiteral::new_string(
+                        "my_package",
+                    ))
+                    .boxed(),
+                ),
+                operation: Operation::Include,
+            },
+        )
     }
 }

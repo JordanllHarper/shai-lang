@@ -294,6 +294,7 @@ pub enum Operation {
     Return,
     FunctionCall, // fx args...
     Break,
+    Include,
 }
 
 /// Various methods of evaluating 2 expressions
