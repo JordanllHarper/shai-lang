@@ -174,7 +174,7 @@ pub enum Expression {
     SingleValue(SingleValue),
     MultipleValues(Vec<Expression>),
     Statement {
-        expression: Box<Expression>,
+        expression: Option<Box<Expression>>,
         operation: Operation,
     },
     Operation {
@@ -290,9 +290,10 @@ pub enum Operation {
         math_operation: Option<MathOperation>,
         type_assertion: Option<NativeType>,
         is_constant: bool,
-    }, 
+    },
     Return,
     FunctionCall, // fx args...
+    Break,
 }
 
 /// Various methods of evaluating 2 expressions

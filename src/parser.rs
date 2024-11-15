@@ -343,7 +343,13 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
         Kwd::While => on_while(state),
         Kwd::For => on_for(state),
         Kwd::If => on_if(state),
-        Kwd::Break => todo!(),
+        Kwd::Break => (
+            Expression::Statement {
+                expression: None,
+                operation: Operation::Break,
+            },
+            state,
+        ),
         Kwd::Include => todo!(),
         Kwd::Else => on_else(state),
         Kwd::Const => on_const(state),
@@ -494,7 +500,7 @@ fn on_return(state: ParseState) -> ExpressionState {
     let (e, state) = on_expression(state);
     (
         Expression::Statement {
-            expression: e.boxed(),
+            expression: Some(e.boxed()),
             operation: Operation::Return,
         },
         state,
@@ -519,6 +525,98 @@ mod tests {
     fn test(input: Vec<Token>, expected: Expression) {
         let actual = parse(input);
         assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn break_statements() {
+        // break
+        test(
+            vec![Token::Kwd(Kwd::Break)],
+            Expression::Statement {
+                expression: None,
+                operation: Operation::Break,
+            },
+        );
+
+        // for i in numbers  {
+        //     break
+        // }
+
+        test(
+            vec![
+                Token::Kwd(Kwd::For),
+                Token::Ident("i".to_string()),
+                Token::Kwd(Kwd::In),
+                Token::Ident("numbers".to_string()),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Kwd(Kwd::Break),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::For {
+                scoped_variable: SingleValue::new_identifier_expression("i").boxed(),
+                iterable: SingleValue::new_identifier_expression("numbers").boxed(),
+                body: Expression::Body(vec![Expression::Statement {
+                    expression: None,
+                    operation: Operation::Break,
+                }])
+                .boxed(),
+            },
+        );
+
+        // for i in numbers  {
+        //     if i < 0 {
+        //         break
+        //     } else {
+        //         print "hi"
+        //     }
+        // }
+        test(
+            vec![
+                Token::Kwd(Kwd::For),
+                Token::Ident("i".to_string()),
+                Token::Kwd(Kwd::In),
+                Token::Ident("numbers".to_string()),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Kwd(Kwd::If),
+                Token::Ident("i".to_string()),
+                Token::Symbol(Symbol::Evaluation(EvaluationSymbol::Lz)),
+                Token::Literal(Literal::Int(0)),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Kwd(Kwd::Break),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Kwd(Kwd::Else),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Ident("print".to_string()),
+                Token::Literal(Literal::String("hi".to_string())),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::For {
+                scoped_variable: SingleValue::new_identifier_expression("i").boxed(),
+                iterable: SingleValue::new_identifier_expression("numbers").boxed(),
+                body: Expression::Body(vec![Expression::If(Box::new(If::new(
+                    Expression::Evaluation(Evaluation::new(
+                        SingleValue::new_identifier_expression("i"),
+                        Some(SingleValue::new_value_literal_expression(
+                            ValueLiteral::new(NativeType::Int, "0"),
+                        )),
+                        EvaluationOperator::Lz,
+                    )),
+                    Expression::Body(vec![Expression::Statement {
+                        expression: None,
+                        operation: Operation::Break,
+                    }]),
+                    Some(Expression::Body(vec![Expression::Operation {
+                        lhs: SingleValue::new_identifier_expression("print").boxed(),
+                        rhs: Expression::MultipleValues(vec![
+                            SingleValue::new_value_literal_expression(ValueLiteral::new_string("hi"))
+                        ]).boxed(),
+                        operation: Operation::FunctionCall,
+                    }])),
+                )))])
+                .boxed(),
+            },
+        );
     }
 
     #[test]
@@ -1394,7 +1492,6 @@ mod tests {
             ],
             expected.clone(),
         );
-
 
         // Whitespace handling
         // "x = 5"
