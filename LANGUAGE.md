@@ -236,6 +236,8 @@ Examples:
 
 ## Imports
 
+Declaration: 
+
 `include x`
 
 where
@@ -254,10 +256,15 @@ y = alias
 Examples:
 
 ```
-include foo
+include "foo"
+
+// usage
+x = someFunctionFromFoo()
 ```
 ```
-include bar as baz
+include "bar" as baz
+
+x = baz.someFunctionFromFoo()
 ```
 
 ## If else expressions
