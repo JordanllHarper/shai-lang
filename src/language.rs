@@ -9,9 +9,9 @@ pub enum NativeType {
     String,
     Float,
     Bool,
-    // These recurse - we can have a Vector of Vectors of Integers
+    // These recurse - we can have a Array of Arrays of Integers
     Array(Box<NativeType>),
-    // These recurse - we can have a Dictionary of Vectors to Integers
+    // These recurse - we can have a Dictionary of Arrays to Integers
     Dictionary {
         key: Box<NativeType>,
         value: Box<NativeType>,
@@ -172,15 +172,15 @@ pub type Body = Vec<Expression>;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expression {
     SingleValue(SingleValue),
-    MultipleValues(Vec<Expression>),
+    MultipleValues(MultipleValues),
     Statement {
         expression: Option<Box<Expression>>,
-        operation: Operation,
+        operation: OneSideOperation,
     },
     Operation {
         lhs: Box<Expression>,
         rhs: Box<Expression>,
-        operation: Operation,
+        operation: TwoSideOperation,
     },
     Evaluation(Evaluation),
     Function(Box<Function>),
@@ -285,16 +285,30 @@ impl MathOperation {
 ///
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Operation {
+    OneSide(OneSideOperation),
+    TwoSide(TwoSideOperation),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum OneSideOperation {
+    Break,
+    Continue,
+    Return,
+    Include,
+}
+
+
+type MultipleValues = Vec<Expression>;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum TwoSideOperation {
+    FunctionCall,        // fx arg_one arg_two...
     Math(MathOperation), // +, -, /, *
     Assignment {
         math_operation: Option<MathOperation>,
         type_assertion: Option<NativeType>,
         is_constant: bool,
     },
-    Return,
-    FunctionCall, // fx args...
-    Break,
-    Include,
 }
 
 /// Various methods of evaluating 2 expressions

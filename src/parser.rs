@@ -155,7 +155,7 @@ fn on_assignment(
                     lhs: Expression::SingleValue(SingleValue::Identifier(ident.to_string()))
                         .boxed(),
                     rhs: Box::new(Expression::SingleValue(sv)),
-                    operation: Operation::Assignment {
+                    operation: TwoSideOperation::Assignment {
                         math_operation: None,
                         type_assertion,
                         is_constant: false,
@@ -175,7 +175,7 @@ fn on_assignment(
                 Expression::Operation {
                     lhs: lhs.boxed(),
                     rhs: rhs.boxed(),
-                    operation: Operation::Assignment {
+                    operation: TwoSideOperation::Assignment {
                         math_operation: None,
                         type_assertion,
                         is_constant: false,
@@ -251,7 +251,7 @@ fn on_function_call(state: ParseState, ident: &str, first_arg: &Literal) -> Expr
         Expression::Operation {
             lhs: SingleValue::new_identifier_expression(ident).boxed(),
             rhs: Expression::MultipleValues(args).boxed(),
-            operation: Operation::FunctionCall,
+            operation: TwoSideOperation::FunctionCall,
         },
         state,
     )
@@ -267,7 +267,7 @@ fn on_math_expression(
         Expression::Operation {
             lhs: lhs.boxed(),
             rhs: rhs.boxed(),
-            operation: Operation::Math(operation),
+            operation: TwoSideOperation::Math(operation),
         },
         state,
     )
@@ -344,7 +344,7 @@ fn on_include(state: ParseState) -> ExpressionState {
                 expression: Some(
                     SingleValue::new_value_literal_expression(ValueLiteral::new_string(&s)).boxed(),
                 ),
-                operation: Operation::Include,
+                operation: OneSideOperation::Include,
             },
             state,
         )
@@ -363,7 +363,7 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
         Kwd::Break => (
             Expression::Statement {
                 expression: None,
-                operation: Operation::Break,
+                operation: OneSideOperation::Break,
             },
             state,
         ),
@@ -405,7 +405,7 @@ fn on_const(state: ParseState) -> ExpressionState {
         Expression::Operation {
             lhs: identifier.boxed(),
             rhs: expr.boxed(),
-            operation: Operation::Assignment {
+            operation: TwoSideOperation::Assignment {
                 math_operation: None,
                 type_assertion,
                 is_constant: true,
@@ -518,7 +518,7 @@ fn on_return(state: ParseState) -> ExpressionState {
     (
         Expression::Statement {
             expression: Some(e.boxed()),
-            operation: Operation::Return,
+            operation: OneSideOperation::Return,
         },
         state,
     )
@@ -551,7 +551,7 @@ mod tests {
             vec![Token::Kwd(Kwd::Break)],
             Expression::Statement {
                 expression: None,
-                operation: Operation::Break,
+                operation: OneSideOperation::Break,
             },
         );
 
@@ -574,7 +574,7 @@ mod tests {
                 iterable: SingleValue::new_identifier_expression("numbers").boxed(),
                 body: Expression::Body(vec![Expression::Statement {
                     expression: None,
-                    operation: Operation::Break,
+                    operation: OneSideOperation::Break,
                 }])
                 .boxed(),
             },
@@ -621,7 +621,7 @@ mod tests {
                     )),
                     Expression::Body(vec![Expression::Statement {
                         expression: None,
-                        operation: Operation::Break,
+                        operation: OneSideOperation::Break,
                     }]),
                     Some(Expression::Body(vec![Expression::Operation {
                         lhs: SingleValue::new_identifier_expression("print").boxed(),
@@ -631,7 +631,7 @@ mod tests {
                             )),
                         ])
                         .boxed(),
-                        operation: Operation::FunctionCall,
+                        operation: TwoSideOperation::FunctionCall,
                     }])),
                 )))])
                 .boxed(),
@@ -697,7 +697,7 @@ mod tests {
                         )),
                     ])
                     .boxed(),
-                    operation: Operation::FunctionCall,
+                    operation: TwoSideOperation::FunctionCall,
                 }]),
                 None,
             )),
@@ -731,7 +731,7 @@ mod tests {
                         )),
                     ])
                     .boxed(),
-                    operation: Operation::FunctionCall,
+                    operation: TwoSideOperation::FunctionCall,
                 }]),
                 None,
             )),
@@ -813,7 +813,7 @@ mod tests {
                         )),
                     ])
                     .boxed(),
-                    operation: Operation::FunctionCall,
+                    operation: TwoSideOperation::FunctionCall,
                 }]),
                 Some(Expression::Body(vec![Expression::Operation {
                     lhs: SingleValue::new_identifier_expression("print").boxed(),
@@ -823,7 +823,7 @@ mod tests {
                         )),
                     ])
                     .boxed(),
-                    operation: Operation::FunctionCall,
+                    operation: TwoSideOperation::FunctionCall,
                 }])),
             )),
         );
@@ -857,7 +857,7 @@ mod tests {
                         )),
                     ])
                     .boxed(),
-                    operation: Operation::FunctionCall,
+                    operation: TwoSideOperation::FunctionCall,
                 }]),
                 Some(Expression::Body(vec![Expression::Operation {
                     lhs: SingleValue::new_identifier_expression("print").boxed(),
@@ -867,7 +867,7 @@ mod tests {
                         )),
                     ])
                     .boxed(),
-                    operation: Operation::FunctionCall,
+                    operation: TwoSideOperation::FunctionCall,
                 }])),
             )),
         )
@@ -915,7 +915,7 @@ mod tests {
                         )),
                     ])
                     .boxed(),
-                    operation: Operation::FunctionCall,
+                    operation: TwoSideOperation::FunctionCall,
                 }])
                 .boxed(),
             },
@@ -957,7 +957,7 @@ mod tests {
                         )),
                     ])
                     .boxed(),
-                    operation: Operation::FunctionCall,
+                    operation: TwoSideOperation::FunctionCall,
                 }])
                 .boxed(),
             },
@@ -991,7 +991,7 @@ mod tests {
                         )),
                     ])
                     .boxed(),
-                    operation: Operation::FunctionCall,
+                    operation: TwoSideOperation::FunctionCall,
                 }])
                 .boxed(),
             },
@@ -1072,7 +1072,7 @@ mod tests {
             Expression::Operation {
                 lhs: Box::new(SingleValue::new_identifier_expression("y")),
                 rhs: Box::new(SingleValue::new_identifier_expression("x")),
-                operation: Operation::Assignment {
+                operation: TwoSideOperation::Assignment {
                     math_operation: None,
                     type_assertion: None,
                     is_constant: false,
@@ -1099,9 +1099,9 @@ mod tests {
                     rhs: Box::new(SingleValue::new_value_literal_expression(
                         ValueLiteral::new(NativeType::Int, "3"),
                     )),
-                    operation: Operation::Math(MathOperation::Add),
+                    operation: TwoSideOperation::Math(MathOperation::Add),
                 }),
-                operation: Operation::Assignment {
+                operation: TwoSideOperation::Assignment {
                     math_operation: None,
                     type_assertion: None,
                     is_constant: false,
@@ -1345,7 +1345,7 @@ mod tests {
                     rhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
                         "numTwo".to_string(),
                     ))),
-                    operation: Operation::Math(MathOperation::Add),
+                    operation: TwoSideOperation::Math(MathOperation::Add),
                 },
             ))),
         );
@@ -1367,7 +1367,7 @@ mod tests {
                 rhs: Box::new(Expression::MultipleValues(vec![Expression::SingleValue(
                     SingleValue::ValueLiteral(ValueLiteral::new(NativeType::String, "Hello")),
                 )])),
-                operation: Operation::FunctionCall,
+                operation: TwoSideOperation::FunctionCall,
             },
         );
     }
@@ -1388,7 +1388,7 @@ mod tests {
                 rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                     ValueLiteral::new(NativeType::Float, "3.5"),
                 ))),
-                operation: Operation::Assignment {
+                operation: TwoSideOperation::Assignment {
                     math_operation: None,
                     type_assertion: None,
                     is_constant: false,
@@ -1419,7 +1419,7 @@ mod tests {
                         "World",
                     ))),
                 ])),
-                operation: Operation::FunctionCall,
+                operation: TwoSideOperation::FunctionCall,
             },
         );
     }
@@ -1444,7 +1444,7 @@ mod tests {
                     ))),
                     Expression::SingleValue(SingleValue::Identifier("x".to_string())),
                 ])),
-                operation: Operation::FunctionCall,
+                operation: TwoSideOperation::FunctionCall,
             },
         );
     }
@@ -1472,7 +1472,7 @@ mod tests {
                         "true",
                     ))),
                 ])),
-                operation: Operation::FunctionCall,
+                operation: TwoSideOperation::FunctionCall,
             },
         );
     }
@@ -1487,7 +1487,7 @@ mod tests {
             rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::Int, "5"),
             ))),
-            operation: Operation::Assignment {
+            operation: TwoSideOperation::Assignment {
                 math_operation: None,
                 type_assertion: None,
                 is_constant: false,
@@ -1543,7 +1543,7 @@ mod tests {
             rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::Int, "5"),
             ))),
-            operation: Operation::Assignment {
+            operation: TwoSideOperation::Assignment {
                 math_operation: None,
                 type_assertion: Some(NativeType::Int),
                 is_constant: false,
@@ -1567,7 +1567,7 @@ mod tests {
             rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::Int, "5"),
             ))),
-            operation: Operation::Assignment {
+            operation: TwoSideOperation::Assignment {
                 math_operation: None,
                 type_assertion: None,
                 is_constant: true,
@@ -1591,7 +1591,7 @@ mod tests {
             rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::Int, "5"),
             ))),
-            operation: Operation::Assignment {
+            operation: TwoSideOperation::Assignment {
                 math_operation: None,
                 type_assertion: Some(NativeType::Int),
                 is_constant: true,
@@ -1623,7 +1623,7 @@ mod tests {
                     ))
                     .boxed(),
                 ),
-                operation: Operation::Include,
+                operation: OneSideOperation::Include,
             },
         )
     }
