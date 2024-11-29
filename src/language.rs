@@ -297,18 +297,34 @@ pub enum OneSideOperation {
     Include,
 }
 
-
 type MultipleValues = Vec<Expression>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum TwoSideOperation {
     FunctionCall,        // fx arg_one arg_two...
     Math(MathOperation), // +, -, /, *
-    Assignment {
+    Assignment(Assignment),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Assignment {
+    math_operation: Option<MathOperation>,
+    type_assertion: Option<NativeType>,
+    is_constant: bool,
+}
+
+impl Assignment {
+    pub fn new(
         math_operation: Option<MathOperation>,
         type_assertion: Option<NativeType>,
         is_constant: bool,
-    },
+    ) -> Self {
+        Self {
+            math_operation,
+            type_assertion,
+            is_constant,
+        }
+    }
 }
 
 /// Various methods of evaluating 2 expressions

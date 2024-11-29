@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    language::{Expression, MathOperation, Operation},
+    language::{Assignment, Expression, OneSideOperation, TwoSideOperation},
     parser, Lexer, Token,
 };
 
@@ -17,67 +17,23 @@ enum RuntimeReferenceValue {
 }
 
 pub struct State {
-    next_instruction: String,
+    current_instruction: String,
     references: HashMap<String, RuntimeReferenceValue>,
 }
 
 impl State {
-    pub fn new_init(next_instruction: &str) -> Self {
+    pub fn new_init(current_instruction: &str) -> Self {
         Self {
-            next_instruction: next_instruction.to_string(),
+            current_instruction: current_instruction.to_string(),
             references: HashMap::new(),
         }
     }
     pub fn new(next_instruction: &str, references: HashMap<String, RuntimeReferenceValue>) -> Self {
         Self {
-            next_instruction: next_instruction.to_string(),
+            current_instruction: next_instruction.to_string(),
             references,
         }
     }
-}
-fn evaluate_math(m: MathOperation, lhs: Box<Expression>, rhs: Box<Expression>) -> State {
-    todo!()
-}
-
-fn evaluate_operation(expr: Box<Expression>, operation: Operation) -> State {
-    match operation {
-        Operation::Math(m) => evaluate_math(m, lhs, rhs),
-        Operation::Assignment {
-            math_operation,
-            type_assertion,
-            is_constant,
-        } => evaluate_assignment(math_operation, type_assertion, is_constant, lhs, rhs),
-        Operation::Return => evaluate_return(lhs, rhs),
-        Operation::FunctionCall => evaluate_function_call(lhs, rhs),
-        Operation::Break => evaluate_break(lhs, rhs),
-        Operation::Include => evaluate_include(lhs, rhs),
-    }
-}
-
-fn evaluate_include(lhs: Box<Expression>, rhs: Box<Expression>) -> State {
-    todo!()
-}
-
-fn evaluate_break(lhs: Box<Expression>, rhs: Box<Expression>) -> State {
-    todo!()
-}
-
-fn evaluate_function_call(lhs: Box<Expression>, rhs: Box<Expression>) -> State {
-    todo!()
-}
-
-fn evaluate_return(return_value: Expression) -> State {
-    todo!()
-}
-
-fn evaluate_assignment(
-    math_operation: Option<MathOperation>,
-    type_assertion: Option<crate::language::NativeType>,
-    is_constant: bool,
-    lhs: Box<Expression>,
-    rhs: Box<Expression>,
-) -> State {
-    todo!()
 }
 
 fn evaluate(expression: Expression, state: State) -> State {
@@ -109,12 +65,36 @@ fn evaluate(expression: Expression, state: State) -> State {
     todo!()
 }
 
-fn evaluate_statement(expression: Option<Box<Expression>>, operation: Operation) -> State {
+fn evaluate_statement(expression: Option<Box<Expression>>, operation: OneSideOperation) -> State {
+    match operation {
+        OneSideOperation::Break => {
+            assert!(expression.is_none());
+            todo!()
+        }
+        OneSideOperation::Continue => todo!(),
+        OneSideOperation::Return => todo!(),
+        OneSideOperation::Include => todo!(),
+    }
+}
+fn evaluate_operation(
+    lhs: Box<Expression>,
+    rhs: Box<Expression>,
+    operation: TwoSideOperation,
+) -> State {
+    match operation {
+        TwoSideOperation::FunctionCall => todo!(),
+        TwoSideOperation::Math(_) => todo!(),
+        TwoSideOperation::Assignment(a) => evaluate_assignment(a),
+    };
+    todo!()
+}
+
+fn evaluate_assignment(assignment: Assignment) -> State {
     todo!()
 }
 
 pub fn run(state: State) -> State {
-    let lexer = Lexer::new(&state.next_instruction);
+    let lexer = Lexer::new(&state.current_instruction);
     let tokens = lexer.collect::<Vec<Token>>();
     let expression = parser::parse(tokens);
     evaluate(expression, state)

@@ -155,11 +155,11 @@ fn on_assignment(
                     lhs: Expression::SingleValue(SingleValue::Identifier(ident.to_string()))
                         .boxed(),
                     rhs: Box::new(Expression::SingleValue(sv)),
-                    operation: TwoSideOperation::Assignment {
-                        math_operation: None,
+                    operation: TwoSideOperation::Assignment(Assignment::new(
+                        None,
                         type_assertion,
-                        is_constant: false,
-                    },
+                        false,
+                    )),
                 },
                 state,
             )
@@ -175,11 +175,11 @@ fn on_assignment(
                 Expression::Operation {
                     lhs: lhs.boxed(),
                     rhs: rhs.boxed(),
-                    operation: TwoSideOperation::Assignment {
-                        math_operation: None,
+                    operation: TwoSideOperation::Assignment(Assignment::new(
+                        None,
                         type_assertion,
-                        is_constant: false,
-                    },
+                        false,
+                    )),
                 },
                 state,
             )
@@ -405,11 +405,7 @@ fn on_const(state: ParseState) -> ExpressionState {
         Expression::Operation {
             lhs: identifier.boxed(),
             rhs: expr.boxed(),
-            operation: TwoSideOperation::Assignment {
-                math_operation: None,
-                type_assertion,
-                is_constant: true,
-            },
+            operation: TwoSideOperation::Assignment(Assignment::new(None, type_assertion, true)),
         },
         state,
     )
@@ -1072,11 +1068,7 @@ mod tests {
             Expression::Operation {
                 lhs: Box::new(SingleValue::new_identifier_expression("y")),
                 rhs: Box::new(SingleValue::new_identifier_expression("x")),
-                operation: TwoSideOperation::Assignment {
-                    math_operation: None,
-                    type_assertion: None,
-                    is_constant: false,
-                },
+                operation: TwoSideOperation::Assignment(Assignment::new(None, None, false)),
             },
         )
     }
@@ -1101,11 +1093,7 @@ mod tests {
                     )),
                     operation: TwoSideOperation::Math(MathOperation::Add),
                 }),
-                operation: TwoSideOperation::Assignment {
-                    math_operation: None,
-                    type_assertion: None,
-                    is_constant: false,
-                },
+                operation: TwoSideOperation::Assignment(Assignment::new(None, None, false)),
             },
         )
     }
@@ -1388,11 +1376,7 @@ mod tests {
                 rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                     ValueLiteral::new(NativeType::Float, "3.5"),
                 ))),
-                operation: TwoSideOperation::Assignment {
-                    math_operation: None,
-                    type_assertion: None,
-                    is_constant: false,
-                },
+                operation: TwoSideOperation::Assignment(Assignment::new(None, None, false)),
             },
         );
     }
@@ -1487,11 +1471,7 @@ mod tests {
             rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::Int, "5"),
             ))),
-            operation: TwoSideOperation::Assignment {
-                math_operation: None,
-                type_assertion: None,
-                is_constant: false,
-            },
+            operation: TwoSideOperation::Assignment(Assignment::new(None, None, false)),
         };
         test(
             vec![
@@ -1543,11 +1523,11 @@ mod tests {
             rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::Int, "5"),
             ))),
-            operation: TwoSideOperation::Assignment {
-                math_operation: None,
-                type_assertion: Some(NativeType::Int),
-                is_constant: false,
-            },
+            operation: TwoSideOperation::Assignment(Assignment::new(
+                None,
+                Some(NativeType::Int),
+                false,
+            )),
         };
         test(
             vec![
@@ -1567,11 +1547,7 @@ mod tests {
             rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::Int, "5"),
             ))),
-            operation: TwoSideOperation::Assignment {
-                math_operation: None,
-                type_assertion: None,
-                is_constant: true,
-            },
+            operation: TwoSideOperation::Assignment(Assignment::new(None, None, true)),
         };
         test(
             vec![
@@ -1591,11 +1567,11 @@ mod tests {
             rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
                 ValueLiteral::new(NativeType::Int, "5"),
             ))),
-            operation: TwoSideOperation::Assignment {
-                math_operation: None,
-                type_assertion: Some(NativeType::Int),
-                is_constant: true,
-            },
+            operation: TwoSideOperation::Assignment(Assignment::new(
+                None,
+                Some(NativeType::Int),
+                true,
+            )),
         };
         test(
             vec![
