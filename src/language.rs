@@ -43,12 +43,12 @@ impl NativeType {
 ///      |- the value literal 'c', with a native type of 'char'
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ValueLiteral {
-    native_type: NativeType,
+    pub native_type: NativeType,
     // NOTE: This can be "5", but it might mean 5. String is for storing in a
     // flexible format.
     // Use native type to figure out how this should actually be utilised.
     // E.g. "5" with a native type of int -> 5
-    representation: String,
+    pub representation: String,
 }
 
 impl ValueLiteral {
@@ -308,9 +308,9 @@ pub enum TwoSideOperation {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Assignment {
-    math_operation: Option<MathOperation>,
-    type_assertion: Option<NativeType>,
-    is_constant: bool,
+    pub math_operation: Option<MathOperation>,
+    pub type_assertion: Option<NativeType>,
+    pub is_constant: bool,
 }
 
 impl Assignment {

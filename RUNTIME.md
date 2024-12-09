@@ -121,6 +121,9 @@ Then when we call it, we execute that behaviour.
 
 In fact, we could just store the syntax tree, and then we evaluate it when the function is called.
 
+> [!QUESTION]
+> We need to figure out how to store a body. Maybe something to give a type? Or we could use our expression tree and then evaluate at runtime?
+
 #### What does evaluating mean here though? 
 
 It means traversing the tree.
@@ -132,3 +135,34 @@ This actually reminds me of the fetch decode execute cycle of cpus.
 We fetch the next instruction. We decode the references. We execute an operation. And then we go to the next instruction.
 
 Therefore, we can use this cycle to model how we should do this.
+
+
+## Hook Design
+
+The runtime will expose a hook `run` to allow for different execution contexts. These will be the REPL runtime, and the standard file runtime.
+
+This will take in an application `ScopeState` that the caller will manage, and the most recent `code_blob` representing a complete line or block of code.
+
+Examples of a `code_blob` are: 
+
+```
+// single line
+x = 5
+```
+
+
+```
+//multi line
+x () { 
+    return 46
+}
+```
+
+```
+//multi line
+if true { 
+    ...
+} else {
+    ...
+}
+```
