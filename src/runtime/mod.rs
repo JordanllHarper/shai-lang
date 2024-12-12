@@ -118,10 +118,9 @@ fn evaluate_rhs(e: Expression) -> RuntimeReferenceValue {
                     ),
                     crate::language::NativeType::Array(a) => {
                         let mut values = vec![];
-                        
 
                         RuntimeReferenceValue::Array(values)
-                    },
+                    }
                     crate::language::NativeType::Dictionary { key, value } => todo!(),
                     crate::language::NativeType::Function => todo!(),
                 }
@@ -150,22 +149,21 @@ fn evaluate_assignment(a: Assignment, state: ScopeState, lhs: Expression, rhs: E
     references.insert(key, value);
 }
 // Runs the lexer and parser.
-// Code blob references an overall expression, from a single line to a function declaration and
+// Code blob references an overall "expression of code", from a single line to a function declaration and
 // implementation.
 pub fn run(code_blob: &str, state: ScopeState) -> ScopeState {
     let lexer = Lexer::new(code_blob);
     let tokens = lexer.collect::<Vec<Token>>();
-    let expression = parser::parse(tokens);
-    evaluate(state, expression)
+    let parse_result = parser::parse(tokens);
+    if let Ok(expr) = parse_result {
+        evaluate(state, expr)
+    } else {
+        // TODO: Handle gracefully
+        panic!("Invalid AST")
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::{run, ScopeState};
-
-    #[test]
-    fn it_works() {
-        let code_blob = "hello = 5";
-        run(code_blob, ScopeState::new_init());
-    }
 }

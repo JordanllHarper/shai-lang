@@ -6,8 +6,12 @@ type ExpressionState = (Expression, ParseState);
 
 type ParseResult<T> = Result<T, ParseError>;
 
+#[derive(Debug)]
 pub enum ParseError {
-    InvalidSyntax { expected: Token, actual: Token },
+    InvalidSyntax {
+        message: String,
+        token_context: Token,
+    },
     NoMoreTokens,
 }
 
@@ -16,19 +20,19 @@ fn is_new_body(t: Option<&Token>) -> bool {
 }
 
 type ArgumentsState = (FunctionArguments, ParseState);
-fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ArgumentsState {
+fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ParseResult<ArgumentsState> {
     let peek = state.peek();
 
     match peek {
-        Some(Token::Symbol(Symbol::Newline)) => return (args.to_vec(), state.advance()),
-        Some(Token::Symbol(Symbol::BraceClose)) => return (args.to_vec(), state),
+        Some(Token::Symbol(Symbol::Newline)) => return Ok((args.to_vec(), state.advance())),
+        Some(Token::Symbol(Symbol::BraceClose)) => return Ok((args.to_vec(), state)),
         _ => (),
     }
 
     let (next, state) = state.next();
 
     let state = if is_new_body(next.as_ref()) {
-        let (body, state) = on_body(state);
+        let (body, state) = on_body(state)?;
         args.push(body);
         state
     } else {
@@ -38,12 +42,18 @@ fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> Arguments
     match next {
         Some(Token::Literal(l)) => args.push(Expression::SingleValue(l.to_single_value())),
         Some(Token::Ident(i)) => args.push(SingleValue::new_identifier_expression(&i)),
-        _ => unreachable!("Invalid syntax"),
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected parameter notation".to_string(),
+                token_context: t,
+            })
+        }
+        None => return Err(ParseError::NoMoreTokens),
     };
     parse_arguments(state, args)
 }
 
-fn on_arguments(state: ParseState, first_arg: SingleValue) -> ArgumentsState {
+fn on_arguments(state: ParseState, first_arg: SingleValue) -> ParseResult<ArgumentsState> {
     parse_arguments(state, &mut vec![Expression::SingleValue(first_arg)])
 }
 
@@ -58,17 +68,26 @@ fn on_parameter_identifier(state: ParseState, ident: &str) -> (Parameter, ParseS
     (Parameter::new(ident, native_type), state)
 }
 
-fn parse_parameters(state: ParseState, parameters: &mut Vec<Parameter>) -> ParametersState {
+fn parse_parameters(
+    state: ParseState,
+    parameters: &mut Vec<Parameter>,
+) -> ParseResult<ParametersState> {
     let (t, state) = state.next();
     match t {
-        Some(Token::Symbol(Symbol::ParenClose)) => return (parameters.to_vec(), state),
+        Some(Token::Symbol(Symbol::ParenClose)) => return Ok((parameters.to_vec(), state)),
         Some(Token::Symbol(Symbol::Comma)) => return parse_parameters(state, parameters),
         _ => (),
     }
 
     let (parameter, state) = match t {
         Some(Token::Ident(ident)) => on_parameter_identifier(state, &ident),
-        _ => unreachable!(),
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected a parameter identifier".to_string(),
+                token_context: t,
+            })
+        }
+        None => return Err(ParseError::NoMoreTokens),
     };
     parameters.push(parameter);
 
@@ -77,33 +96,37 @@ fn parse_parameters(state: ParseState, parameters: &mut Vec<Parameter>) -> Param
 
 type ParametersState = (FunctionParameters, ParseState);
 
-fn on_parameters(state: ParseState) -> ParametersState {
+fn on_parameters(state: ParseState) -> ParseResult<ParametersState> {
     parse_parameters(state, &mut vec![])
 }
 
-fn on_function(state: ParseState, ident: &str) -> ExpressionState {
-    let (params, state) = on_parameters(state);
-    let (return_type, state) = on_return_type(state);
+fn on_function(state: ParseState, ident: &str) -> ParseResult<ExpressionState> {
+    let (params, state) = on_parameters(state)?;
+    let (return_type, state) = on_return_type(state)?;
 
     let (next, state) = state.next();
     match next {
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             // Body
-            let (body, state) = on_body(state);
+            let (body, state) = on_body(state)?;
             let f = Function::new(ident, params, return_type, body);
-            (Expression::Function(Box::new(f)), state)
+            Ok((Expression::Function(Box::new(f)), state))
         }
         Some(Token::Symbol(Symbol::Equals)) => {
-            let (expression, state) = on_expression(state);
+            let (expression, state) = on_expression(state)?;
             let function = Function::new(ident, params, return_type, expression);
-            (Expression::Function(Box::new(function)), state)
+            Ok((Expression::Function(Box::new(function)), state))
         }
-        _ => unreachable!("Invalid syntax"),
+        Some(t) => Err(ParseError::InvalidSyntax {
+            message: "Expected a function body or expression".to_string(),
+            token_context: t,
+        }),
+        None => Err(ParseError::NoMoreTokens),
     }
 }
 
 type ReturnState = (Option<NativeType>, ParseState);
-fn on_return_type(state: ParseState) -> ReturnState {
+fn on_return_type(state: ParseState) -> ParseResult<ReturnState> {
     let peek = state.peek();
     match peek {
         Some(Token::Symbol(Symbol::Arrow)) => {
@@ -111,46 +134,54 @@ fn on_return_type(state: ParseState) -> ReturnState {
             let (next, state) = state.next();
             let ret_type = match next {
                 Some(Token::Kwd(Kwd::DataType(d))) => Some(NativeType::from_datatype_kwd(&d)),
-                _ => unreachable!("Invalid syntax"),
+                Some(t) => {
+                    return Err(ParseError::InvalidSyntax {
+                        message:
+                            "Expected a data type keyword as a return type after a return arrow"
+                                .to_string(),
+                        token_context: t,
+                    })
+                }
+                None => return Err(ParseError::NoMoreTokens),
             };
-            (ret_type, state)
+            Ok((ret_type, state))
         }
-        _ => (None, state),
+        _ => Ok((None, state)),
     }
 }
 
 type BodyState = (Body, ParseState);
-fn parse_body(state: ParseState, body: &mut Body) -> BodyState {
+fn parse_body(state: ParseState, body: &mut Body) -> ParseResult<BodyState> {
     let peek = state.peek();
 
     match peek {
-        Some(Token::Symbol(Symbol::BraceClose)) => return (body.to_vec(), state.advance()),
+        Some(Token::Symbol(Symbol::BraceClose)) => return Ok((body.to_vec(), state.advance())),
         Some(Token::Symbol(Symbol::Newline)) => return parse_body(state.advance(), body),
         _ => (),
     }
 
-    let (expression, state) = on_expression(state);
+    let (expression, state) = on_expression(state)?;
 
     body.push(expression);
 
     parse_body(state, body)
 }
 
-fn on_body(state: ParseState) -> ExpressionState {
-    let (body, state) = parse_body(state, &mut vec![]);
-    (Expression::Body(body), state)
+fn on_body(state: ParseState) -> ParseResult<ExpressionState> {
+    let (body, state) = parse_body(state, &mut vec![])?;
+    Ok((Expression::Body(body), state))
 }
 
 fn on_assignment(
     state: ParseState,
     ident: &str,
     type_assertion: Option<NativeType>,
-) -> ExpressionState {
+) -> ParseResult<ExpressionState> {
     let (t, state) = state.next();
     match t {
         Some(Token::Literal(l)) => {
             let sv = l.to_single_value();
-            (
+            Ok((
                 Expression::Operation {
                     lhs: Expression::SingleValue(SingleValue::Identifier(ident.to_string()))
                         .boxed(),
@@ -162,7 +193,7 @@ fn on_assignment(
                     )),
                 },
                 state,
-            )
+            ))
         }
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             // TODO: Expression assignment
@@ -170,8 +201,8 @@ fn on_assignment(
         }
         Some(Token::Ident(i)) => {
             let lhs = SingleValue::new_identifier_expression(ident);
-            let (rhs, state) = on_identifier(state, &i);
-            (
+            let (rhs, state) = on_identifier(state, &i)?;
+            Ok((
                 Expression::Operation {
                     lhs: lhs.boxed(),
                     rhs: rhs.boxed(),
@@ -182,9 +213,13 @@ fn on_assignment(
                     )),
                 },
                 state,
-            )
+            ))
         }
-        _ => todo!(),
+        Some(t) => Err(ParseError::InvalidSyntax {
+            message: "Expected a valid assignment: literal value, ".to_string(),
+            token_context: t,
+        }),
+        None => Err(ParseError::NoMoreTokens),
     }
 }
 
@@ -193,153 +228,194 @@ fn on_assignment(
 // Variable usage
 // y = *x* + 3
 //      |- here is usage
-fn on_identifier(state: ParseState, ident: &str) -> ExpressionState {
+fn on_identifier(state: ParseState, ident: &str) -> ParseResult<ExpressionState> {
     // TODO: Expression (empty statement) e.g. x + y
     // TODO: Variable Usage e.g. y = x + 3
     let t = state.peek();
 
     if let Some(Token::Kwd(Kwd::In)) = t {
-        return (
+        return Ok((
             Expression::SingleValue(SingleValue::Identifier(ident.to_string())),
             state,
-        );
+        ));
     }
     let (t, state) = state.next();
     match t {
         // Assignment
-        Some(Token::Symbol(Symbol::Equals)) => on_assignment(state, ident, None),
+        Some(Token::Symbol(Symbol::Equals)) => Ok(on_assignment(state, ident, None)?),
 
         Some(Token::Symbol(Symbol::Math(t))) => {
             let operation = MathOperation::from_token(&t);
-            on_math_expression(
+            Ok(on_math_expression(
                 state,
                 operation,
                 SingleValue::new_identifier_expression(ident),
-            )
+            )?)
         }
 
         // Operations
         // Function call if value literal or string
-        Some(Token::Literal(l)) => on_function_call(state, ident, &l),
-        Some(Token::Symbol(Symbol::Range)) => {
-            on_range(state, SingleValue::new_identifier_expression(ident), false)
-        }
-        Some(Token::Symbol(Symbol::RangeEq)) => {
-            on_range(state, SingleValue::new_identifier_expression(ident), true)
-        }
-        Some(Token::Symbol(Symbol::ParenOpen)) => on_function(state, ident),
-        Some(Token::Symbol(Symbol::Colon)) => on_variable_type_assertion(state, ident),
-        _ => (SingleValue::new_identifier_expression(ident), state),
+        Some(Token::Literal(l)) => Ok(on_function_call(state, ident, &l)?),
+        Some(Token::Symbol(Symbol::Range)) => Ok(on_range(
+            state,
+            SingleValue::new_identifier_expression(ident),
+            false,
+        )?),
+        Some(Token::Symbol(Symbol::RangeEq)) => Ok(on_range(
+            state,
+            SingleValue::new_identifier_expression(ident),
+            true,
+        )?),
+        Some(Token::Symbol(Symbol::ParenOpen)) => Ok(on_function(state, ident)?),
+        Some(Token::Symbol(Symbol::Colon)) => Ok(on_variable_type_assertion(state, ident)?),
+        _ => Ok((SingleValue::new_identifier_expression(ident), state)),
     }
 }
 
-fn on_variable_type_assertion(state: ParseState, ident: &str) -> ExpressionState {
+fn on_variable_type_assertion(state: ParseState, ident: &str) -> ParseResult<ExpressionState> {
     let (var_type, state) = state.next();
-    if let Some(Token::Kwd(Kwd::DataType(d))) = var_type {
-        let kwd = NativeType::from_datatype_kwd(&d);
-        let (next, state) = state.next();
-        assert_eq!(Some(Token::Symbol(Symbol::Equals)), next);
-        on_assignment(state, ident, Some(kwd))
-    } else {
-        unreachable!("Invalid syntax!")
+    match var_type {
+        Some(Token::Kwd(Kwd::DataType(d))) => {
+            let kwd = NativeType::from_datatype_kwd(&d);
+            let (next, state) = state.next();
+            match next {
+                Some(Token::Symbol(Symbol::Equals)) => { /* Continue */ }
+                Some(t) => {
+                    return Err(ParseError::InvalidSyntax {
+                        message: "Expected an equals sign".to_string(),
+                        token_context: t,
+                    });
+                }
+                None => return Err(ParseError::NoMoreTokens),
+            }
+            Ok(on_assignment(state, ident, Some(kwd))?)
+        }
+        Some(t) => Err(ParseError::InvalidSyntax {
+            message: "Expected a data type".to_string(),
+            token_context: t,
+        }),
+        None => Err(ParseError::NoMoreTokens),
     }
 }
 
-fn on_function_call(state: ParseState, ident: &str, first_arg: &Literal) -> ExpressionState {
-    let (args, state) = on_arguments(state, first_arg.to_single_value());
-    (
+fn on_function_call(
+    state: ParseState,
+    ident: &str,
+    first_arg: &Literal,
+) -> ParseResult<ExpressionState> {
+    let (args, state) = on_arguments(state, first_arg.to_single_value())?;
+    Ok((
         Expression::Operation {
             lhs: SingleValue::new_identifier_expression(ident).boxed(),
             rhs: Expression::MultipleValues(args).boxed(),
             operation: TwoSideOperation::FunctionCall,
         },
         state,
-    )
+    ))
 }
 
 fn on_math_expression(
     state: ParseState,
     operation: MathOperation,
     lhs: Expression,
-) -> ExpressionState {
-    let (rhs, state) = on_expression(state);
-    (
+) -> ParseResult<ExpressionState> {
+    let (rhs, state) = on_expression(state)?;
+    Ok((
         Expression::Operation {
             lhs: lhs.boxed(),
             rhs: rhs.boxed(),
             operation: TwoSideOperation::Math(operation),
         },
         state,
-    )
+    ))
 }
 
-fn on_single_value(state: ParseState) -> ExpressionState {
+fn on_single_value(state: ParseState) -> ParseResult<ExpressionState> {
     let (next, state) = state.next();
     let single_value = match next {
         Some(Token::Literal(l)) => Expression::SingleValue(l.to_single_value()),
         Some(Token::Ident(i)) => SingleValue::new_identifier_expression(&i),
-        _ => unreachable!("Invalid syntax"),
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected a value literal or identifier".to_string(),
+                token_context: t,
+            })
+        }
+        None => return Err(ParseError::NoMoreTokens),
     };
-    (single_value, state)
+    Ok((single_value, state))
 }
 
-fn on_evaluation(state: ParseState) -> ExpressionState {
-    let (lhs, state) = on_single_value(state);
+fn on_evaluation(state: ParseState) -> ParseResult<ExpressionState> {
+    let (lhs, state) = on_single_value(state)?;
 
     let peek = state.peek();
     // truthy value e.g. if x { ... }
     if is_new_body(peek) {
-        return (
+        return Ok((
             Expression::Evaluation(Evaluation::new(
                 lhs,
                 None,
                 EvaluationOperator::BooleanTruthy,
             )),
             state,
-        );
+        ));
     }
     let (next, state) = state.next();
 
-    let evaluation_operator = if let Some(Token::Symbol(Symbol::Evaluation(e))) = next {
-        EvaluationOperator::from_evaluation_symbol(&e)
-    } else {
-        unreachable!("Invalid syntax")
+    let evaluation_operator = match next {
+        Some(Token::Symbol(Symbol::Evaluation(e))) => {
+            EvaluationOperator::from_evaluation_symbol(&e)
+        }
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected an evaluation symbol".to_string(),
+                token_context: t,
+            })
+        }
+        None => return Err(ParseError::NoMoreTokens),
     };
 
-    let (rhs, state) = on_single_value(state);
-    (
+    let (rhs, state) = on_single_value(state)?;
+    Ok((
         Expression::Evaluation(Evaluation::new(lhs, Some(rhs), evaluation_operator)),
         state,
-    )
+    ))
 }
 
-fn on_range(state: ParseState, lhs: Expression, inclusive: bool) -> ExpressionState {
-    let (rhs, state) = on_single_value(state);
-    (
+fn on_range(state: ParseState, lhs: Expression, inclusive: bool) -> ParseResult<ExpressionState> {
+    let (rhs, state) = on_single_value(state)?;
+    Ok((
         Expression::Range(Range::new(lhs.boxed(), rhs.boxed(), inclusive)),
         state,
-    )
+    ))
 }
 
-fn on_expression(state: ParseState) -> ExpressionState {
+fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
     let (next, state) = state.next();
-    match next.expect("There should be more tokens given this function is called") {
-        Token::Ident(ident) => on_identifier(state, &ident),
-        Token::Kwd(k) => on_keyword(state, &k),
+
+    let expr = match next.ok_or::<ParseError>(ParseError::NoMoreTokens)? {
+        Token::Ident(ident) => on_identifier(state, &ident)?,
+        Token::Kwd(k) => on_keyword(state, &k)?,
         Token::Literal(l) => (Expression::SingleValue(l.to_single_value()), state),
-        Token::Symbol(Symbol::BraceOpen) => on_body(state),
-        Token::Symbol(Symbol::Newline) => on_expression(state),
+        Token::Symbol(Symbol::BraceOpen) => on_body(state)?,
+        Token::Symbol(Symbol::Newline) => on_expression(state)?,
 
         t => {
-            panic!("Invalid token. Got {:?}", t)
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected an identifier, keyword, literal, body open or newline"
+                    .to_string(),
+                token_context: t,
+            })
         }
-    }
+    };
+    Ok(expr)
 }
 
-fn on_include(state: ParseState) -> ExpressionState {
+fn on_include(state: ParseState) -> ParseResult<ExpressionState> {
     let (package, state) = state.next();
-    if let Some(Token::Literal(Literal::String(s))) = package {
-        (
+    match package {
+        Some(Token::Literal(Literal::String(s))) => Ok((
             Expression::Statement {
                 expression: Some(
                     SingleValue::new_value_literal_expression(ValueLiteral::new_string(&s)).boxed(),
@@ -347,19 +423,21 @@ fn on_include(state: ParseState) -> ExpressionState {
                 operation: OneSideOperation::Include,
             },
             state,
-        )
-    } else {
-        unreachable!("Invalid syntax: expected a string for the package name")
+        )),
+        Some(t) => Err(ParseError::InvalidSyntax {
+            message: "Expected a string for the package name".to_string(),
+            token_context: t,
+        }),
+        None => Err(ParseError::NoMoreTokens),
     }
 }
 
-fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
-    match k {
-        Kwd::Return => on_return(state),
-        Kwd::DataType(_) => todo!(),
-        Kwd::While => on_while(state),
-        Kwd::For => on_for(state),
-        Kwd::If => on_if(state),
+fn on_keyword(state: ParseState, k: &Kwd) -> ParseResult<ExpressionState> {
+    let expr = match k {
+        Kwd::Return => on_return(state)?,
+        Kwd::While => on_while(state)?,
+        Kwd::For => on_for(state)?,
+        Kwd::If => on_if(state)?,
         Kwd::Break => (
             Expression::Statement {
                 expression: None,
@@ -367,165 +445,241 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ExpressionState {
             },
             state,
         ),
-        Kwd::Include => on_include(state),
-        Kwd::Else => on_else(state),
-        Kwd::Const => on_const(state),
-        _ => unreachable!("Invalid syntax"),
-    }
+        Kwd::Include => on_include(state)?,
+        Kwd::Else => on_else(state)?,
+        Kwd::Const => on_const(state)?,
+        t => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Invalid use of keyword, this should be used in for loop".to_string(),
+                token_context: Token::Kwd(t.clone()),
+            })
+        }
+    };
+
+    Ok(expr)
 }
 
-fn on_constant_type_assertion(state: ParseState) -> (NativeType, ParseState) {
+fn on_constant_type_assertion(state: ParseState) -> ParseResult<(NativeType, ParseState)> {
     let (var_type, state) = state.next();
-    if let Some(Token::Kwd(Kwd::DataType(d))) = var_type {
-        (NativeType::from_datatype_kwd(&d), state)
-    } else {
-        unreachable!("Invalid syntax!")
+    match var_type {
+        Some(Token::Kwd(Kwd::DataType(d))) => Ok((NativeType::from_datatype_kwd(&d), state)),
+        Some(t) => Err(ParseError::InvalidSyntax {
+            message: "Expected datatype".to_string(),
+            token_context: t,
+        }),
+        None => Err(ParseError::NoMoreTokens),
     }
 }
 
-fn on_const(state: ParseState) -> ExpressionState {
+fn on_const(state: ParseState) -> ParseResult<ExpressionState> {
     let (next, state) = state.next();
-    let identifier = if let Some(Token::Ident(ident)) = next {
-        SingleValue::new_identifier_expression(&ident)
-    } else {
-        unreachable!("Invalid syntax")
+    let identifier = match next {
+        Some(Token::Ident(ident)) => SingleValue::new_identifier_expression(&ident),
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected identifier".to_string(),
+                token_context: t,
+            })
+        }
+        None => return Err(ParseError::NoMoreTokens),
     };
     let peek = state.peek();
     let (type_assertion, state) = if let Some(Token::Symbol(Symbol::Colon)) = peek {
         let state = state.advance();
-        let (expr, state) = on_constant_type_assertion(state);
+        let (expr, state) = on_constant_type_assertion(state)?;
         (Some(expr), state)
     } else {
         (None, state)
     };
     let (next, state) = state.next();
-    assert_eq!(Some(Token::Symbol(Symbol::Equals)), next);
-    let (expr, state) = on_expression(state);
-    (
+
+    match next {
+        Some(Token::Symbol(Symbol::Equals)) => { /* Continue */ }
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected an equals sign".to_string(),
+                token_context: t,
+            });
+        }
+        None => return Err(ParseError::NoMoreTokens),
+    }
+
+    let (expr, state) = on_expression(state)?;
+    Ok((
         Expression::Operation {
             lhs: identifier.boxed(),
             rhs: expr.boxed(),
             operation: TwoSideOperation::Assignment(Assignment::new(None, type_assertion, true)),
         },
         state,
-    )
+    ))
 }
 
-fn on_while(state: ParseState) -> ExpressionState {
+fn on_while(state: ParseState) -> ParseResult<ExpressionState> {
     let peeked = state.peek();
 
     if is_new_body(peeked) {
         // handle infinite loops
         let state = state.advance();
 
-        let (body, state) = on_body(state);
-        return (
+        let (body, state) = on_body(state)?;
+        return Ok((
             Expression::While {
                 condition: None,
                 body: body.boxed(),
             },
             state,
-        );
+        ));
     }
 
-    let (evaluation, state) = on_evaluation(state);
+    let (evaluation, state) = on_evaluation(state)?;
 
     let (next, state) = state.next();
 
     assert_eq!(Some(Token::Symbol(Symbol::BraceOpen)), next);
 
-    let (body, state) = on_body(state);
+    match next {
+        Some(Token::Symbol(Symbol::BraceOpen)) => { /* Continue */ }
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected a brace open sign".to_string(),
+                token_context: t,
+            });
+        }
+        None => return Err(ParseError::NoMoreTokens),
+    }
+
+    let (body, state) = on_body(state)?;
     let while_expr = Expression::While {
         condition: Some(evaluation.boxed()),
         body: body.boxed(),
     };
-    (while_expr, state)
+    Ok((while_expr, state))
 }
 
-fn on_iterable(state: ParseState) -> ExpressionState {
-    let (lhs, state) = on_single_value(state);
+fn on_iterable(state: ParseState) -> ParseResult<ExpressionState> {
+    let (lhs, state) = on_single_value(state)?;
     let peek = state.peek();
     if is_new_body(peek) {
-        return (lhs, state);
+        return Ok((lhs, state));
     };
 
     let (next, state) = state.next();
     match next {
         Some(Token::Symbol(Symbol::Range)) => on_range(state, lhs, false),
         Some(Token::Symbol(Symbol::RangeEq)) => on_range(state, lhs, true),
-        t => unreachable!("Invalid syntax: {:?}", t),
+
+        Some(t) => Err(ParseError::InvalidSyntax {
+            message: "Expected Range or Range Equals operator".to_string(),
+            token_context: t,
+        }),
+        None => Err(ParseError::NoMoreTokens),
     }
 }
 
-fn on_for(state: ParseState) -> ExpressionState {
-    let (scoped_variable, state) = on_single_value(state);
+fn on_for(state: ParseState) -> ParseResult<ExpressionState> {
+    let (scoped_variable, state) = on_single_value(state)?;
     let (next, state) = state.next();
-    assert_eq!(Some(Token::Kwd(Kwd::In)), next);
-    let (iterable, state) = on_iterable(state);
-    let (next, state) = state.next();
-    assert_eq!(Some(Token::Symbol(Symbol::BraceOpen)), next);
-    let (body, state) = on_body(state);
 
-    (
+    match next {
+        Some(Token::Kwd(Kwd::In)) => { /* Continue */ }
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected an In keyword".to_string(),
+                token_context: t,
+            });
+        }
+        None => return Err(ParseError::NoMoreTokens),
+    }
+
+    let (iterable, state) = on_iterable(state)?;
+    let (next, state) = state.next();
+    match next {
+        Some(Token::Symbol(Symbol::BraceOpen)) => { /* Continue */ }
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected a opening brace".to_string(),
+                token_context: t,
+            });
+        }
+        None => return Err(ParseError::NoMoreTokens),
+    }
+    let (body, state) = on_body(state)?;
+
+    Ok((
         Expression::For {
             scoped_variable: Box::new(scoped_variable),
             iterable: Box::new(iterable),
             body: Box::new(body),
         },
         state,
-    )
+    ))
 }
 
-fn on_else(state: ParseState) -> ExpressionState {
+fn on_else(state: ParseState) -> ParseResult<ExpressionState> {
     let (next, state) = state.next();
     match next {
         Some(Token::Symbol(Symbol::BraceOpen)) => on_body(state),
         Some(Token::Kwd(Kwd::If)) => on_if(state),
-        _ => unreachable!("Invalid syntax"),
+        Some(t) => Err(ParseError::InvalidSyntax {
+            message: "Expected a body or if else".to_string(),
+            token_context: t,
+        }),
+        None => Err(ParseError::NoMoreTokens),
     }
 }
 
-fn on_if(state: ParseState) -> ExpressionState {
-    let (evaluation, state) = on_evaluation(state);
+fn on_if(state: ParseState) -> ParseResult<ExpressionState> {
+    let (evaluation, state) = on_evaluation(state)?;
     let (next, state) = state.next();
 
-    assert_eq!(Some(Token::Symbol(Symbol::BraceOpen)), next);
+    match next {
+        Some(Token::Symbol(Symbol::BraceOpen)) => { /* Continue */ }
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected an In keyword".to_string(),
+                token_context: t,
+            });
+        }
+        None => return Err(ParseError::NoMoreTokens),
+    }
 
-    let (on_true_evaluation, state) = on_body(state);
+    let (on_true_evaluation, state) = on_body(state)?;
     let (next, state) = state.next();
     let (on_false_evaluation, state) = if let Some(Token::Kwd(Kwd::Else)) = next {
-        let (expr, state) = on_else(state);
+        let (expr, state) = on_else(state)?;
         (Some(expr), state)
     } else {
         (None, state)
     };
-    (
+    Ok((
         Expression::If(If::new_boxed(
             evaluation,
             on_true_evaluation,
             on_false_evaluation,
         )),
         state,
-    )
+    ))
 }
 
-fn on_return(state: ParseState) -> ExpressionState {
-    let (e, state) = on_expression(state);
-    (
+fn on_return(state: ParseState) -> ParseResult<ExpressionState> {
+    let (e, state) = on_expression(state)?;
+    Ok((
         Expression::Statement {
             expression: Some(e.boxed()),
             operation: OneSideOperation::Return,
         },
         state,
-    )
+    ))
 }
 
-pub fn parse<I>(tokens: I) -> Expression
+pub fn parse<I>(tokens: I) -> ParseResult<Expression>
 where
     I: std::iter::IntoIterator<Item = Token>,
 {
     let parse_state = ParseState::new(tokens.into_iter().collect::<Vec<Token>>(), 0);
-    on_expression(parse_state).0
+    let (expr, _) = on_expression(parse_state)?;
+    Ok(expr)
 }
 
 #[cfg(test)]
@@ -536,7 +690,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn test(input: Vec<Token>, expected: Expression) {
-        let actual = parse(input);
+        let actual = parse(input).unwrap();
         assert_eq!(expected, actual);
     }
 
@@ -1587,6 +1741,7 @@ mod tests {
     }
     #[test]
     fn include_kwd() {
+        // include "my_package"
         test(
             vec![
                 Token::Kwd(Kwd::Include),
