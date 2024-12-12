@@ -211,6 +211,15 @@ impl Expression {
 }
 
 impl SingleValue {
+    pub fn from_literal(l: &Literal) -> Self {
+        match l {
+            Literal::Bool(b) => SingleValue::new_bool(&b.to_string()),
+            Literal::Int(i) => SingleValue::new_int(&i.to_string()),
+            Literal::String(s) => SingleValue::new_string(&s.to_string()),
+            Literal::Float(f) => SingleValue::new_float(&f.to_string()),
+        }
+    }
+
     pub fn new_identifier_expression(ident: &str) -> Expression {
         Expression::SingleValue(SingleValue::Identifier(ident.to_string()))
     }
@@ -234,6 +243,7 @@ impl SingleValue {
     pub fn new_float(representation: &str) -> Self {
         Self::ValueLiteral(ValueLiteral::new(NativeType::Float, representation))
     }
+
     pub fn new_array(representation: &str, native_type: NativeType) -> Self {
         Self::ValueLiteral(ValueLiteral::new(
             NativeType::Array(Box::new(native_type)),
@@ -265,28 +275,6 @@ impl MathOperation {
             MathSymbol::Minus => Self::Subtract,
         }
     }
-}
-
-/// Representation of the operations supported in the language.
-///
-/// Examples:
-///
-/// Math operation
-/// 5 + 3
-///
-/// Assignment operation
-/// x = 5
-///
-/// Assignment operation specified with math operation
-/// x += 5
-///
-/// Function calls
-/// print "Hello, World!"
-///
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Operation {
-    OneSide(OneSideOperation),
-    TwoSide(TwoSideOperation),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -417,7 +405,7 @@ pub type ReturnType = NativeType;
 ///
 /// Example:
 ///
-/// ```
+/// ```shai
 /// add(x, y) -> int {
 ///     return x + y
 /// }
@@ -430,7 +418,7 @@ pub type ReturnType = NativeType;
 /// int = return type
 /// { return x + y } = Expression
 ///
-/// ```
+/// ```shai
 ///
 /// add(x, y) = return x + y
 ///
@@ -463,11 +451,13 @@ impl Function {
 ///
 /// Given on_false_evaluation is *not* None, this represents an else branch:
 ///
+/// ```shai
 /// if true {
 ///     ...
 /// } else {
 ///     ...      
 /// }
+/// ```
 ///
 /// ...otherwise it's a single if branch.
 

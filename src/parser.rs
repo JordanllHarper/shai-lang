@@ -40,7 +40,9 @@ fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ParseResu
     };
 
     match next {
-        Some(Token::Literal(l)) => args.push(Expression::SingleValue(l.to_single_value())),
+        Some(Token::Literal(l)) => {
+            args.push(Expression::SingleValue(SingleValue::from_literal(&l)))
+        }
         Some(Token::Ident(i)) => args.push(SingleValue::new_identifier_expression(&i)),
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
@@ -180,7 +182,7 @@ fn on_assignment(
     let (t, state) = state.next();
     match t {
         Some(Token::Literal(l)) => {
-            let sv = l.to_single_value();
+            let sv = SingleValue::from_literal(&l);
             Ok((
                 Expression::Operation {
                     lhs: Expression::SingleValue(SingleValue::Identifier(ident.to_string()))
@@ -303,7 +305,7 @@ fn on_function_call(
     ident: &str,
     first_arg: &Literal,
 ) -> ParseResult<ExpressionState> {
-    let (args, state) = on_arguments(state, first_arg.to_single_value())?;
+    let (args, state) = on_arguments(state, SingleValue::from_literal(first_arg))?;
     Ok((
         Expression::Operation {
             lhs: SingleValue::new_identifier_expression(ident).boxed(),
@@ -333,7 +335,7 @@ fn on_math_expression(
 fn on_single_value(state: ParseState) -> ParseResult<ExpressionState> {
     let (next, state) = state.next();
     let single_value = match next {
-        Some(Token::Literal(l)) => Expression::SingleValue(l.to_single_value()),
+        Some(Token::Literal(l)) => Expression::SingleValue(SingleValue::from_literal(&l)),
         Some(Token::Ident(i)) => SingleValue::new_identifier_expression(&i),
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
@@ -397,7 +399,10 @@ fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
     let expr = match next.ok_or::<ParseError>(ParseError::NoMoreTokens)? {
         Token::Ident(ident) => on_identifier(state, &ident)?,
         Token::Kwd(k) => on_keyword(state, &k)?,
-        Token::Literal(l) => (Expression::SingleValue(l.to_single_value()), state),
+        Token::Literal(l) => (
+            Expression::SingleValue(SingleValue::from_literal(&l)),
+            state,
+        ),
         Token::Symbol(Symbol::BraceOpen) => on_body(state)?,
         Token::Symbol(Symbol::Newline) => on_expression(state)?,
 

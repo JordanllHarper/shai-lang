@@ -1,49 +1,52 @@
 use std::collections::HashMap;
 
 use crate::{
-    language::{Assignment, Expression, SingleValue},
+    language::{Assignment, Expression, Function, NativeType, SingleValue, TwoSideOperation},
     parser, Lexer, Token,
 };
 
-enum RuntimeReferenceValue {
+enum ScopeValue {
     Void,
     Int(i32),
     String(String),
     Char(char),
-    Array(Vec<RuntimeReferenceValue>),
-    Dictionary(HashMap<RuntimeReferenceValue, RuntimeReferenceValue>),
+    Array(Vec<ScopeValue>),
+    Dictionary(HashMap<ScopeValue, ScopeValue>),
     Bool(bool),
     Float(f32),
-    // Question: how do we encode a function as a reference value?
+    Function(Function),
 }
 
-pub struct ScopeState {
+pub struct Scope {
     //            name of reference -> the value
     //            e.g. x            -> 5
     //            e.g. print        -> Function that prints to stdout
-    references: HashMap<String, RuntimeReferenceValue>,
-    inner_scopes: Vec<ScopeState>,
+    scope_values: HashMap<String, ScopeValue>,
+    inner_scopes: Vec<Scope>,
 }
 
-impl ScopeState {
+impl Scope {
     pub fn new_init() -> Self {
         Self {
-            references: HashMap::new(),
+            scope_values: HashMap::new(),
             inner_scopes: Vec::new(),
         }
     }
-    pub fn new(
-        references: HashMap<String, RuntimeReferenceValue>,
-        inner_scopes: Vec<ScopeState>,
-    ) -> Self {
+
+    pub fn new(scope_values: HashMap<String, ScopeValue>, inner_scopes: Vec<Scope>) -> Self {
         Self {
-            references,
+            scope_values,
             inner_scopes,
         }
     }
+
+    pub fn add_reference(mut self, key: String, reference: ScopeValue) -> Self {
+        self.scope_values.insert(key, reference);
+        self
+    }
 }
 
-fn evaluate(state: ScopeState, expression: Expression) -> ScopeState {
+fn evaluate(state: Scope, expression: Expression) -> Scope {
     match expression {
         Expression::Operation {
             lhs,
@@ -54,7 +57,7 @@ fn evaluate(state: ScopeState, expression: Expression) -> ScopeState {
     }
     /*
     # TODO: list:
-    - [ ] Save variables into the state using the variable name.
+    - [ ] Save variables into the scope using the variable name.
     - [ ] Save function declaration and implemention into state.
     - [ ] Run a print function.
     - [ ] Mutate a variable in the state.
@@ -65,13 +68,13 @@ fn evaluate(state: ScopeState, expression: Expression) -> ScopeState {
 fn evaluate_operation(
     lhs: Expression,
     rhs: Expression,
-    operation: crate::language::TwoSideOperation,
-    state: ScopeState,
+    operation: TwoSideOperation,
+    state: Scope,
 ) {
     match operation {
-        crate::language::TwoSideOperation::FunctionCall => todo!(),
-        crate::language::TwoSideOperation::Math(_) => todo!(),
-        crate::language::TwoSideOperation::Assignment(a) => evaluate_assignment(a, state, lhs, rhs),
+        TwoSideOperation::FunctionCall => todo!(),
+        TwoSideOperation::Math(_) => todo!(),
+        TwoSideOperation::Assignment(a) => evaluate_assignment(a, state, lhs, rhs),
     }
     todo!()
 }
@@ -84,7 +87,7 @@ fn expect_identifier_or_error(e: Expression) -> String {
     panic!("Invalid syntax. Expected identifier, found {:?}", e)
 }
 
-fn evaluate_rhs(e: Expression) -> RuntimeReferenceValue {
+fn evaluate_rhs(e: Expression) -> ScopeValue {
     // x = 5
     // x = "some string"
     // x = 'c'
@@ -99,30 +102,28 @@ fn evaluate_rhs(e: Expression) -> RuntimeReferenceValue {
             SingleValue::ValueLiteral(l) => {
                 let representation = l.representation;
                 match l.native_type {
-                    crate::language::NativeType::Void => RuntimeReferenceValue::Void,
-                    crate::language::NativeType::Char => RuntimeReferenceValue::Char(
+                    NativeType::Void => ScopeValue::Void,
+                    NativeType::Char => ScopeValue::Char(
                         representation.chars().next().expect("This is a character"),
                     ),
-                    crate::language::NativeType::Int => RuntimeReferenceValue::Int(
+                    NativeType::Int => ScopeValue::Int(
                         str::parse::<i32>(&representation).expect("This should be a number"),
                     ),
-                    crate::language::NativeType::String => {
-                        RuntimeReferenceValue::String(representation)
-                    }
-                    crate::language::NativeType::Float => RuntimeReferenceValue::Float(
+                    NativeType::String => ScopeValue::String(representation),
+                    NativeType::Float => ScopeValue::Float(
                         str::parse::<f32>(&representation)
                             .expect("This should be a floating point number"),
                     ),
-                    crate::language::NativeType::Bool => RuntimeReferenceValue::Bool(
+                    NativeType::Bool => ScopeValue::Bool(
                         str::parse::<bool>(&representation).expect("This to be a boolean."),
                     ),
-                    crate::language::NativeType::Array(a) => {
+                    NativeType::Array(a) => {
                         let mut values = vec![];
 
-                        RuntimeReferenceValue::Array(values)
+                        ScopeValue::Array(values)
                     }
-                    crate::language::NativeType::Dictionary { key, value } => todo!(),
-                    crate::language::NativeType::Function => todo!(),
+                    NativeType::Dictionary { key, value } => todo!(),
+                    NativeType::Function => todo!(),
                 }
             }
             SingleValue::Identifier(_) => todo!(),
@@ -141,8 +142,8 @@ fn evaluate_rhs(e: Expression) -> RuntimeReferenceValue {
     }
 }
 
-fn evaluate_assignment(a: Assignment, state: ScopeState, lhs: Expression, rhs: Expression) {
-    let mut references = state.references;
+fn evaluate_assignment(a: Assignment, state: Scope, lhs: Expression, rhs: Expression) {
+    let mut references = state.scope_values;
     let key = expect_identifier_or_error(lhs);
     let value = evaluate_rhs(rhs);
 
@@ -151,7 +152,7 @@ fn evaluate_assignment(a: Assignment, state: ScopeState, lhs: Expression, rhs: E
 // Runs the lexer and parser.
 // Code blob references an overall "expression of code", from a single line to a function declaration and
 // implementation.
-pub fn run(code_blob: &str, state: ScopeState) -> ScopeState {
+pub fn run(code_blob: &str, state: Scope) -> Scope {
     let lexer = Lexer::new(code_blob);
     let tokens = lexer.collect::<Vec<Token>>();
     let parse_result = parser::parse(tokens);
@@ -162,8 +163,8 @@ pub fn run(code_blob: &str, state: ScopeState) -> ScopeState {
         panic!("Invalid AST")
     }
 }
-
 #[cfg(test)]
 mod test {
-    use super::{run, ScopeState};
+    #[test]
+    fn it_runs() {}
 }
