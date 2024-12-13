@@ -1,10 +1,40 @@
 use pretty_assertions::assert_eq;
 
-use crate::{language::*, lexer::*, parse_state::ParseState};
+use crate::{language::*, lexer::*};
 
 type ExpressionState = (Expression, ParseState);
 
 type ParseResult<T> = Result<T, ParseError>;
+
+use crate::Token;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParseState {
+    tokens: Vec<Token>,
+    position: usize,
+}
+
+impl ParseState {
+    pub fn peek(&self) -> Option<&Token> {
+        self.tokens.get(self.position)
+    }
+    pub fn advance(self) -> Self {
+        ParseState::new(self.tokens, self.position + 1)
+    }
+
+    pub fn next(self) -> (Option<Token>, Self) {
+        let next = self.tokens.get(self.position).cloned();
+        let new_position = self.position + 1;
+        let new_state = ParseState::new(self.tokens, new_position);
+        println!("Parser state next: {:?}", next);
+
+        (next, new_state)
+    }
+
+    pub fn new(tokens: Vec<Token>, position: usize) -> Self {
+        Self { tokens, position }
+    }
+}
 
 #[derive(Debug)]
 pub enum ParseError {

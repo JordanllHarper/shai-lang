@@ -65,19 +65,14 @@ fn evaluate(state: Scope, expression: Expression) -> Scope {
     todo!()
 }
 
-fn evaluate_operation(
-    lhs: Expression,
-    rhs: Expression,
-    operation: TwoSideOperation,
-    state: Scope,
-) {
+fn evaluate_operation(lhs: Expression, rhs: Expression, operation: TwoSideOperation, state: Scope) {
     match operation {
         TwoSideOperation::FunctionCall => todo!(),
         TwoSideOperation::Math(_) => todo!(),
         TwoSideOperation::Assignment(a) => evaluate_assignment(a, state, lhs, rhs),
     }
-    todo!()
 }
+
 fn expect_identifier_or_error(e: Expression) -> String {
     if let Expression::SingleValue(ref s) = e {
         if let SingleValue::Identifier(i) = s {

@@ -14,7 +14,7 @@
 
 use std::{
     collections::HashSet,
-    fmt::{Display, Formatter, Write},
+    fmt::{Display, Formatter},
 };
 
 #[derive(Debug, PartialEq, Clone)]
