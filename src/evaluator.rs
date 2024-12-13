@@ -48,6 +48,7 @@ impl Scope {
 
 fn evaluate(state: Scope, expression: Expression) -> Scope {
     match expression {
+        Expression::Assignment(a)=> evaluate_assignment(a, state),
         Expression::Operation {
             lhs,
             rhs,
@@ -69,17 +70,7 @@ fn evaluate_operation(lhs: Expression, rhs: Expression, operation: TwoSideOperat
     match operation {
         TwoSideOperation::FunctionCall => todo!(),
         TwoSideOperation::Math(_) => todo!(),
-        TwoSideOperation::Assignment(a) => evaluate_assignment(a, state, lhs, rhs),
     }
-}
-
-fn expect_identifier_or_error(e: Expression) -> String {
-    if let Expression::SingleValue(ref s) = e {
-        if let SingleValue::Identifier(i) = s {
-            return i.to_string();
-        }
-    };
-    panic!("Invalid syntax. Expected identifier, found {:?}", e)
 }
 
 fn evaluate_rhs(e: Expression) -> ScopeValue {
@@ -123,6 +114,7 @@ fn evaluate_rhs(e: Expression) -> ScopeValue {
             }
             SingleValue::Identifier(_) => todo!(),
         },
+        // Expression::Assignment(a) => evaluate_assignment(a, state),
         _ => todo!(),
         // Expression::MultipleValues(_) => todo!(),
         // Expression::Statement { expression, operation } => todo!(),
@@ -137,11 +129,10 @@ fn evaluate_rhs(e: Expression) -> ScopeValue {
     }
 }
 
-fn evaluate_assignment(a: Assignment, state: Scope, lhs: Expression, rhs: Expression) {
+fn evaluate_assignment(a: Assignment, state: Scope) {
     let mut references = state.scope_values;
-    let key = expect_identifier_or_error(lhs);
-    let value = evaluate_rhs(rhs);
-
+    let key = a.identifier;
+    let value = evaluate_rhs(*a.rhs);
     references.insert(key, value);
 }
 // Runs the lexer and parser.

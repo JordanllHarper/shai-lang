@@ -214,16 +214,13 @@ fn on_assignment(
         Some(Token::Literal(l)) => {
             let sv = SingleValue::from_literal(&l);
             Ok((
-                Expression::Operation {
-                    lhs: Expression::SingleValue(SingleValue::Identifier(ident.to_string()))
-                        .boxed(),
-                    rhs: Box::new(Expression::SingleValue(sv)),
-                    operation: TwoSideOperation::Assignment(Assignment::new(
-                        None,
-                        type_assertion,
-                        false,
-                    )),
-                },
+                Expression::Assignment(Assignment::new(
+                    ident,
+                    Expression::SingleValue(sv),
+                    None,
+                    type_assertion,
+                    false,
+                )),
                 state,
             ))
         }
@@ -232,18 +229,9 @@ fn on_assignment(
             todo!()
         }
         Some(Token::Ident(i)) => {
-            let lhs = SingleValue::new_identifier_expression(ident);
             let (rhs, state) = on_identifier(state, &i)?;
             Ok((
-                Expression::Operation {
-                    lhs: lhs.boxed(),
-                    rhs: rhs.boxed(),
-                    operation: TwoSideOperation::Assignment(Assignment::new(
-                        None,
-                        type_assertion,
-                        false,
-                    )),
-                },
+                Expression::Assignment(Assignment::new(ident, rhs, None, type_assertion, false)),
                 state,
             ))
         }
@@ -509,7 +497,7 @@ fn on_constant_type_assertion(state: ParseState) -> ParseResult<(NativeType, Par
 fn on_const(state: ParseState) -> ParseResult<ExpressionState> {
     let (next, state) = state.next();
     let identifier = match next {
-        Some(Token::Ident(ident)) => SingleValue::new_identifier_expression(&ident),
+        Some(Token::Ident(ident)) => ident,
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected identifier".to_string(),
@@ -541,11 +529,13 @@ fn on_const(state: ParseState) -> ParseResult<ExpressionState> {
 
     let (expr, state) = on_expression(state)?;
     Ok((
-        Expression::Operation {
-            lhs: identifier.boxed(),
-            rhs: expr.boxed(),
-            operation: TwoSideOperation::Assignment(Assignment::new(None, type_assertion, true)),
-        },
+        Expression::Assignment(Assignment::new(
+            &identifier,
+            expr,
+            None,
+            type_assertion,
+            true,
+        )),
         state,
     ))
 }
@@ -1247,18 +1237,20 @@ mod tests {
 
     #[test]
     fn variable_assignment_with_another_variable() {
-        // y = x + 3
+        // y = x
         test(
             vec![
                 Token::Ident("y".to_string()),
                 Token::Symbol(Symbol::Equals),
                 Token::Ident("x".to_string()),
             ],
-            Expression::Operation {
-                lhs: Box::new(SingleValue::new_identifier_expression("y")),
-                rhs: Box::new(SingleValue::new_identifier_expression("x")),
-                operation: TwoSideOperation::Assignment(Assignment::new(None, None, false)),
-            },
+            Expression::Assignment(Assignment::new(
+                "y",
+                SingleValue::new_identifier_expression("x"),
+                None,
+                None,
+                false,
+            )),
         )
     }
 
@@ -1273,17 +1265,19 @@ mod tests {
                 Token::Symbol(Symbol::Math(MathSymbol::Plus)),
                 Token::Literal(Literal::Int(3)),
             ],
-            Expression::Operation {
-                lhs: Box::new(SingleValue::new_identifier_expression("y")),
-                rhs: Box::new(Expression::Operation {
+            Expression::Assignment(Assignment::new(
+                "y",
+                Expression::Operation {
                     lhs: Box::new(SingleValue::new_identifier_expression("x")),
                     rhs: Box::new(SingleValue::new_value_literal_expression(
                         ValueLiteral::new(NativeType::Int, "3"),
                     )),
                     operation: TwoSideOperation::Math(MathOperation::Add),
-                }),
-                operation: TwoSideOperation::Assignment(Assignment::new(None, None, false)),
-            },
+                },
+                None,
+                None,
+                false,
+            )),
         )
     }
 
@@ -1558,15 +1552,16 @@ mod tests {
                 Token::Symbol(Symbol::Equals),
                 Token::Literal(Literal::Float(3.5)),
             ],
-            Expression::Operation {
-                lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                    "x".to_string(),
+            Expression::Assignment(Assignment::new(
+                "x",
+                Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+                    NativeType::Float,
+                    "3.5",
                 ))),
-                rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
-                    ValueLiteral::new(NativeType::Float, "3.5"),
-                ))),
-                operation: TwoSideOperation::Assignment(Assignment::new(None, None, false)),
-            },
+                None,
+                None,
+                false,
+            )),
         );
     }
 
@@ -1653,15 +1648,16 @@ mod tests {
     #[test]
     fn literal_assignment() {
         // "x=5"
-        let expected = Expression::Operation {
-            lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                "x".to_string(),
+        let expected = Expression::Assignment(Assignment::new(
+            "x",
+            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+                NativeType::Int,
+                "5",
             ))),
-            rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
-                ValueLiteral::new(NativeType::Int, "5"),
-            ))),
-            operation: TwoSideOperation::Assignment(Assignment::new(None, None, false)),
-        };
+            None,
+            None,
+            false,
+        ));
         test(
             vec![
                 Token::Ident("x".to_string()),
@@ -1705,19 +1701,16 @@ mod tests {
             expected,
         );
 
-        let expected = Expression::Operation {
-            lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                "x".to_string(),
+        let expected = Expression::Assignment(Assignment::new(
+            "x",
+            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+                NativeType::Int,
+                "5",
             ))),
-            rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
-                ValueLiteral::new(NativeType::Int, "5"),
-            ))),
-            operation: TwoSideOperation::Assignment(Assignment::new(
-                None,
-                Some(NativeType::Int),
-                false,
-            )),
-        };
+            None,
+            Some(NativeType::Int),
+            false,
+        ));
         test(
             vec![
                 Token::Ident("x".to_string()),
@@ -1729,15 +1722,16 @@ mod tests {
             expected,
         );
         // const x = 5
-        let expected = Expression::Operation {
-            lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                "x".to_string(),
+        let expected = Expression::Assignment(Assignment::new(
+            "x",
+            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+                NativeType::Int,
+                "5",
             ))),
-            rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
-                ValueLiteral::new(NativeType::Int, "5"),
-            ))),
-            operation: TwoSideOperation::Assignment(Assignment::new(None, None, true)),
-        };
+            None,
+            None,
+            true,
+        ));
         test(
             vec![
                 Token::Kwd(Kwd::Const),
@@ -1749,19 +1743,16 @@ mod tests {
         );
 
         // const x : Int = 5
-        let expected = Expression::Operation {
-            lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                "x".to_string(),
+        let expected = Expression::Assignment(Assignment::new(
+            "x",
+            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
+                NativeType::Int,
+                "5",
             ))),
-            rhs: Box::new(Expression::SingleValue(SingleValue::ValueLiteral(
-                ValueLiteral::new(NativeType::Int, "5"),
-            ))),
-            operation: TwoSideOperation::Assignment(Assignment::new(
-                None,
-                Some(NativeType::Int),
-                true,
-            )),
-        };
+            None,
+            Some(NativeType::Int),
+            true,
+        ));
         test(
             vec![
                 Token::Kwd(Kwd::Const),

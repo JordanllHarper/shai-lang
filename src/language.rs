@@ -196,6 +196,7 @@ pub enum Expression {
     },
     Body(Body),
     Range(Range),
+    Assignment (Assignment),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -291,11 +292,12 @@ type MultipleValues = Vec<Expression>;
 pub enum TwoSideOperation {
     FunctionCall,        // fx arg_one arg_two...
     Math(MathOperation), // +, -, /, *
-    Assignment(Assignment),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Assignment {
+    pub identifier: String,
+    pub rhs: Box< Expression >,
     pub math_operation: Option<MathOperation>,
     pub type_assertion: Option<NativeType>,
     pub is_constant: bool,
@@ -303,6 +305,8 @@ pub struct Assignment {
 
 impl Assignment {
     pub fn new(
+        identifier: &str,
+        rhs: Expression,
         math_operation: Option<MathOperation>,
         type_assertion: Option<NativeType>,
         is_constant: bool,
@@ -311,6 +315,8 @@ impl Assignment {
             math_operation,
             type_assertion,
             is_constant,
+            identifier: identifier.to_string(),
+            rhs: Box::new(rhs),
         }
     }
 }
