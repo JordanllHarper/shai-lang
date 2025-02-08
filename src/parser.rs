@@ -702,7 +702,11 @@ pub fn parse<I>(tokens: I) -> ParseResult<Expression>
 where
     I: std::iter::IntoIterator<Item = Token>,
 {
-    let parse_state = ParseState::new(tokens.into_iter().collect::<Vec<Token>>(), 0);
+    let tokens = tokens
+        .into_iter()
+        .filter(|each| each != &Token::whitespace())
+        .collect::<Vec<Token>>();
+    let parse_state = ParseState::new(tokens, 0);
     let (expr, _) = on_expression(parse_state)?;
     Ok(expr)
 }
@@ -1683,7 +1687,9 @@ mod tests {
         test(
             vec![
                 Token::Ident("x".to_string()),
+                Token::whitespace(),
                 Token::Symbol(Symbol::Equals),
+                Token::whitespace(),
                 Token::Literal(Literal::Int(5)),
             ],
             expected.clone(),
