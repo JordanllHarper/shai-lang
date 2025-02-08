@@ -678,11 +678,7 @@ fn on_if(state: ParseState) -> ParseResult<ExpressionState> {
         (None, state)
     };
     Ok((
-        Expression::If(If::new_boxed(
-            evaluation,
-            on_true_evaluation,
-            on_false_evaluation,
-        )),
+        Expression::If(If::new(evaluation, on_true_evaluation, on_false_evaluation)),
         state,
     ))
 }
@@ -790,7 +786,7 @@ mod tests {
             Expression::For {
                 scoped_variable: SingleValue::new_identifier_expression("i").boxed(),
                 iterable: SingleValue::new_identifier_expression("numbers").boxed(),
-                body: Expression::Body(vec![Expression::If(Box::new(If::new(
+                body: Expression::Body(vec![Expression::If(If::new(
                     Expression::Evaluation(Evaluation::new(
                         SingleValue::new_identifier_expression("i"),
                         Some(SingleValue::new_value_literal_expression(
@@ -812,7 +808,7 @@ mod tests {
                         .boxed(),
                         operation: TwoSideOperation::FunctionCall,
                     }])),
-                )))])
+                ))])
                 .boxed(),
             },
         );
@@ -828,7 +824,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new_boxed(
+            Expression::If(If::new(
                 Expression::Evaluation(Evaluation::new(
                     SingleValue::new_value_literal_expression(ValueLiteral::new(
                         NativeType::Bool,
@@ -857,7 +853,7 @@ mod tests {
                 Token::Literal(Literal::String("Hello".to_string())),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new_boxed(
+            Expression::If(If::new(
                 Expression::Evaluation(Evaluation::new(
                     SingleValue::new_value_literal_expression(ValueLiteral::new(
                         NativeType::Int,
@@ -896,7 +892,7 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new_boxed(
+            Expression::If(If::new(
                 Expression::Evaluation(Evaluation::new(
                     SingleValue::new_identifier_expression("x"),
                     None,
@@ -934,7 +930,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new_boxed(
+            Expression::If(If::new(
                 Expression::Evaluation(Evaluation::new(
                     SingleValue::new_value_literal_expression(ValueLiteral::new(
                         NativeType::Bool,
@@ -973,7 +969,7 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new_boxed(
+            Expression::If(If::new(
                 Expression::Evaluation(Evaluation::new(
                     SingleValue::new_value_literal_expression(ValueLiteral::new(
                         NativeType::Int,
@@ -1022,7 +1018,7 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new_boxed(
+            Expression::If(If::new(
                 Expression::Evaluation(Evaluation::new(
                     SingleValue::new_identifier_expression("x"),
                     None,

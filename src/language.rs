@@ -475,27 +475,16 @@ pub struct If {
 }
 
 impl If {
-    pub fn new_boxed<'a>(
-        evaluation: Expression,
-        on_true_evaluation: Expression,
-        on_false_evaluation: Option<Expression>,
-    ) -> &'a Self {
-        Box::new(Self::new(
-            evaluation,
-            on_true_evaluation,
-            on_false_evaluation,
-        ))
-    }
     pub fn new(
         evaluation: Expression,
         on_true_evaluation: Expression,
         on_false_evaluation: Option<Expression>,
-    ) -> Self {
-        Self {
+    ) -> Box<Self> {
+        Box::new(Self {
             evaluation,
             on_true_evaluation,
             on_false_evaluation,
-        }
+        })
     }
 }
 
