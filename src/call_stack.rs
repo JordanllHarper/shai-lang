@@ -18,16 +18,16 @@ pub enum StackFrameValue {
 #[derive(Debug, PartialEq)]
 pub struct StackFrameReference {
     value: StackFrameValue,
-    is_mutable: bool,
+    is_constant: bool,
 }
 
 impl StackFrameReference {
-    pub fn new(value: StackFrameValue, is_mutable: bool) -> Self {
-        Self { value, is_mutable }
+    pub fn new(value: StackFrameValue, is_constant: bool) -> Self {
+        Self { value, is_constant }
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct StackFrame {
     //            name of reference -> the value
     //            e.g. x            -> 5
@@ -56,8 +56,8 @@ impl StackFrame {
         }
     }
 
-    pub fn add_or_mutate_reference(mut self, key: String, reference: StackFrameReference) -> Self {
-        self.values.insert(key, reference);
+    pub fn add_or_mutate_reference(mut self, key: &str, reference: StackFrameReference) -> Self {
+        self.values.insert(key.to_string(), reference);
         self
     }
 
