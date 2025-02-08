@@ -1,17 +1,3 @@
-//   _____ __ __   ____  ____      _        ___  __ __    ___  ____
-//  / ___/|  |  | /    ||    |    | |      /  _]|  |  |  /  _]|    \
-// (   \_ |  |  ||  o  | |  |     | |     /  [_ |  |  | /  [_ |  D  )
-//  \__  ||  _  ||     | |  |     | |___ |    _]|_   _||    _]|    /
-//  /  \ ||  |  ||  _  | |  |     |     ||   [_ |     ||   [_ |    \
-//  \    ||  |  ||  |  | |  |     |     ||     ||  |  ||     ||  .  \
-//   \___||__|__||__|__||____|    |_____||_____||__|__||_____||__|\_|
-
-// Translates raw text into a stream of tokens
-//
-//
-//
-// DATA STRUCTS
-
 use std::{
     collections::HashSet,
     fmt::{Display, Formatter},
@@ -167,7 +153,6 @@ pub enum Literal {
     Float(f32),
     String(String),
 }
-
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum MathSymbol {
@@ -581,8 +566,18 @@ impl Iterator for Lexer {
                         )
                     }
                 }
-                '=' => peek_symbol(self, '=', Symbol::Evaluation(EvaluationSymbol::Equality), Symbol::Equals),
-                '!' => peek_symbol(self, '=', Symbol::Evaluation(EvaluationSymbol::NotEquality), Symbol::Bang),
+                '=' => peek_symbol(
+                    self,
+                    '=',
+                    Symbol::Evaluation(EvaluationSymbol::Equality),
+                    Symbol::Equals,
+                ),
+                '!' => peek_symbol(
+                    self,
+                    '=',
+                    Symbol::Evaluation(EvaluationSymbol::NotEquality),
+                    Symbol::Bang,
+                ),
                 '&' => peek_symbol(self, '&', Symbol::And, Symbol::Ampsnd),
                 '|' => peek_symbol(self, '|', Symbol::Or, Symbol::Pipe),
                 _ => peek_non_symbol(self)?,
@@ -805,8 +800,18 @@ add (x, y) {
 
     #[test]
     fn read_2_char_symbols() {
-        test("==", vec![Token::Symbol(Symbol::Evaluation(EvaluationSymbol::Equality))]);
-        test("!=", vec![Token::Symbol(Symbol::Evaluation(EvaluationSymbol::NotEquality))]);
+        test(
+            "==",
+            vec![Token::Symbol(Symbol::Evaluation(
+                EvaluationSymbol::Equality,
+            ))],
+        );
+        test(
+            "!=",
+            vec![Token::Symbol(Symbol::Evaluation(
+                EvaluationSymbol::NotEquality,
+            ))],
+        );
         test("+=", vec![Token::Symbol(Symbol::PlusAssign)]);
         test("-=", vec![Token::Symbol(Symbol::MinusAssign)]);
         test("*=", vec![Token::Symbol(Symbol::MultiplyAssign)]);
@@ -814,8 +819,14 @@ add (x, y) {
         test("->", vec![Token::Symbol(Symbol::Arrow)]);
         test("&&", vec![Token::Symbol(Symbol::And)]);
         test("||", vec![Token::Symbol(Symbol::Or)]);
-        test(">=", vec![Token::Symbol(Symbol::Evaluation(EvaluationSymbol::GzEq))]);
-        test("<=", vec![Token::Symbol(Symbol::Evaluation(EvaluationSymbol::LzEq))]);
+        test(
+            ">=",
+            vec![Token::Symbol(Symbol::Evaluation(EvaluationSymbol::GzEq))],
+        );
+        test(
+            "<=",
+            vec![Token::Symbol(Symbol::Evaluation(EvaluationSymbol::LzEq))],
+        );
         test("[]", vec![Token::Symbol(Symbol::Array)]);
         test("..", vec![Token::Symbol(Symbol::Range)]);
     }

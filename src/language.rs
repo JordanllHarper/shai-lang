@@ -196,7 +196,7 @@ pub enum Expression {
     },
     Body(Body),
     Range(Range),
-    Assignment (Assignment),
+    Assignment(Assignment),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -297,7 +297,7 @@ pub enum TwoSideOperation {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Assignment {
     pub identifier: String,
-    pub rhs: Box< Expression >,
+    pub rhs: Box<Expression>,
     pub math_operation: Option<MathOperation>,
     pub type_assertion: Option<NativeType>,
     pub is_constant: bool,
@@ -475,11 +475,11 @@ pub struct If {
 }
 
 impl If {
-    pub fn new_boxed(
+    pub fn new_boxed<'a>(
         evaluation: Expression,
         on_true_evaluation: Expression,
         on_false_evaluation: Option<Expression>,
-    ) -> Box<Self> {
+    ) -> &'a Self {
         Box::new(Self::new(
             evaluation,
             on_true_evaluation,
