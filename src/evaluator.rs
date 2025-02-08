@@ -1,42 +1,50 @@
-use std::collections::HashMap;
+use crate::{
+    call_stack::{StackFrame, StackFrameReference, StackFrameValue},
+    language::{Assignment, Expression, Ident, NativeType, SingleValue, TwoSideOperation},
+    parser, Lexer, Token,
+};
 
-use crate::language::{Assignment, Expression, Function, NativeType, SingleValue};
-#[derive(PartialEq, Debug)]
-pub enum ScopeValue {
-    Void,
-    Int(i32),
-    String(String),
-    Char(char),
-    Array(Vec<ScopeValue>),
-    Bool(bool),
-    Float(f32),
-    Function(Function),
-}
-
-#[derive(Default, Debug, PartialEq)]
-pub struct Scope {
-    //            name of reference -> the value
-    //            e.g. x            -> 5
-    //            e.g. print        -> Function that prints to stdout
-    scope_values: HashMap<String, ScopeValue>,
-    inner_scopes: Vec<Scope>,
-}
-
-impl Scope {
-    pub fn new(scope_values: HashMap<String, ScopeValue>, inner_scopes: Vec<Scope>) -> Self {
-        Self {
-            scope_values,
-            inner_scopes,
-        }
+fn evaluate(frame: StackFrame, expression: Expression) -> StackFrame {
+    match expression {
+        Expression::Assignment(a) => evaluate_assignment(a, frame),
+        Expression::Operation {
+            lhs,
+            rhs,
+            operation,
+        } => evaluate_operation(*lhs, *rhs, operation, frame),
+        _ => todo!(),
     }
+    /*
+    # TODO: list:
+    - [ ] Save variables into the frame using the variable name.
+    - [ ] Save function declaration and implemention.
+    - [ ] Run a print function.
+    - [ ] Mutate a variable in a future frame.
+     */
+}
 
-    fn add_reference(mut self, key: String, value: ScopeValue) -> Self {
-        self.scope_values.insert(key, value);
-        self
+fn evaluate_identifier(frame: StackFrame, ident: Ident) -> StackFrameReference {
+    let value_associated = frame.get_reference(&ident);
+    if let Some(v) = value_associated {
+        v
+    } else {
+        panic!()
     }
 }
 
-fn evaluate_rhs(e: Expression) -> ScopeValue {
+fn evaluate_operation(
+    lhs: Expression,
+    rhs: Expression,
+    operation: TwoSideOperation,
+    frame: StackFrame,
+) -> StackFrame {
+    match operation {
+        TwoSideOperation::FunctionCall => todo!(),
+        TwoSideOperation::Math(_) => todo!(),
+    }
+}
+
+fn evaluate_assignment_rhs(e: Expression) -> StackFrameReference {
     // x = 5
     // x = "some string"
     // x = 'c'
@@ -50,20 +58,20 @@ fn evaluate_rhs(e: Expression) -> ScopeValue {
         Expression::SingleValue(s) => match s {
             SingleValue::ValueLiteral(l) => {
                 let representation = l.representation;
-                match l.native_type {
-                    NativeType::Void => ScopeValue::Void,
-                    NativeType::Char => ScopeValue::Char(
+                let value = match l.native_type {
+                    NativeType::Void => StackFrameValue::Void,
+                    NativeType::Char => StackFrameValue::Char(
                         representation.chars().next().expect("This is a character"),
                     ),
-                    NativeType::Int => ScopeValue::Int(
+                    NativeType::Int => StackFrameValue::Int(
                         str::parse::<i32>(&representation).expect("This should be a number"),
                     ),
-                    NativeType::String => ScopeValue::String(representation),
-                    NativeType::Float => ScopeValue::Float(
+                    NativeType::String => StackFrameValue::String(representation),
+                    NativeType::Float => StackFrameValue::Float(
                         str::parse::<f32>(&representation)
                             .expect("This should be a floating point number"),
                     ),
-                    NativeType::Bool => ScopeValue::Bool(
+                    NativeType::Bool => StackFrameValue::Bool(
                         str::parse::<bool>(&representation).expect("This to be a boolean."),
                     ),
                     NativeType::Array(a) => {
@@ -73,9 +81,10 @@ fn evaluate_rhs(e: Expression) -> ScopeValue {
                     }
                     NativeType::Dictionary { key, value } => todo!(),
                     NativeType::Function => todo!(),
-                }
+                };
+                StackFrameReference::new(value, true)
             }
-            SingleValue::Identifier(_) => todo!(),
+            SingleValue::Identifier(i) => evaluate_identifier(frame, i),
         },
         // Expression::Assignment(a) => evaluate_assignment(a, state),
         _ => todo!(),

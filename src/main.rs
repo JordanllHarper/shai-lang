@@ -1,7 +1,8 @@
+pub mod call_stack;
+pub mod evaluator;
 mod language;
 pub mod lexer;
 pub mod parser;
-pub mod evaluator;
 
 use crate::lexer::*;
 
