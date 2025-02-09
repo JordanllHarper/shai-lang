@@ -1,16 +1,6 @@
-use crate::{call_stack::*, language::*};
+use FunctionCall;
 
-fn evaluate_operation(
-    lhs: Expression,
-    rhs: Expression,
-    operation: TwoSideOperation,
-    frame: StackFrame,
-) -> StackFrame {
-    match operation {
-        TwoSideOperation::FunctionCall => todo!(),
-        TwoSideOperation::Math(_) => todo!(),
-    }
-}
+use crate::{call_stack::*, language::*};
 
 fn evaluate_assignment_rhs(
     frame: StackFrame,
@@ -28,51 +18,45 @@ fn evaluate_assignment_rhs(
     // x = [ 1, 2, 3 ]
 
     let value = match e {
-        Expression::SingleValue(s) => {
-            let single_value = match s {
-                SingleValue::ValueLiteral(l) => {
-                    let representation = l.representation;
-                    match l.native_type {
-                        NativeType::Void => StackFrameValue::Void,
-                        NativeType::Char => StackFrameValue::Char(
-                            representation.chars().next().expect("This is a character"),
-                        ),
-                        NativeType::Int => StackFrameValue::Int(
-                            str::parse::<i32>(&representation).expect("This should be a number"),
-                        ),
-                        NativeType::String => StackFrameValue::String(representation),
-                        NativeType::Float => StackFrameValue::Float(
-                            str::parse::<f32>(&representation)
-                                .expect("This should be a floating point number"),
-                        ),
-                        NativeType::Bool => StackFrameValue::Bool(
-                            str::parse::<bool>(&representation).expect("This to be a boolean."),
-                        ),
-                        NativeType::Array(a) => {
-                            let mut values = vec![];
-                            // NOTE: Requires implementation of array literals
-                            StackFrameValue::Array(values)
-                        }
-                        NativeType::Dictionary { key, value } => todo!(),
-                        NativeType::Function => todo!(),
-                    }
+        Expression::ValueLiteral(l) => {
+            let representation = l.representation;
+            match l.native_type {
+                NativeType::Void => StackFrameValue::Void,
+                NativeType::Char => StackFrameValue::Char(
+                    representation.chars().next().expect("This is a character"),
+                ),
+                NativeType::Int => StackFrameValue::Int(
+                    str::parse::<i32>(&representation).expect("This should be a number"),
+                ),
+                NativeType::String => StackFrameValue::String(representation),
+                NativeType::Float => StackFrameValue::Float(
+                    str::parse::<f32>(&representation)
+                        .expect("This should be a floating point number"),
+                ),
+                NativeType::Bool => StackFrameValue::Bool(
+                    str::parse::<bool>(&representation).expect("This to be a boolean."),
+                ),
+                NativeType::Array(a) => {
+                    let values = vec![];
+                    // NOTE: Requires implementation of array literals
+                    StackFrameValue::Array(values)
                 }
-                SingleValue::Identifier(i) => {
-                    let reference = frame.get_reference(&i);
-                    if let Some(v) = reference {
-                        todo!();
-                    } else {
-                        panic!("Invalid, no reference associated with key")
-                    }
-                }
-            };
-            single_value
+                NativeType::Dictionary(d) => todo!(),
+                NativeType::Function => todo!(),
+            }
+        }
+        Expression::Identifier(i) => {
+            let reference = frame.get_reference(&i);
+            if let Some(v) = reference {
+                todo!();
+            } else {
+                panic!("Invalid, no reference associated with key")
+            }
         }
         // Expression::Assignment(a) => evaluate_assignment(a, state),
         _ => todo!(),
         // Expression::MultipleValues(_) => todo!(),
         // Expression::Statement { expression, operation } => todo!(),
-        // Expression::Operation { lhs, rhs, operation } => todo!(),
         // Expression::Evaluation(_) => todo!(),
         // Expression::Function(_) => todo!(),
         // Expression::If(_) => todo!(),
@@ -87,16 +71,18 @@ fn evaluate_assignment_rhs(
     frame.add_or_mutate_reference(key, reference)
 }
 
-fn evaluate_assignment(a: Assignment, frame: StackFrame) -> StackFrame {
-    let key = a.identifier;
-    evaluate_assignment_rhs(frame, &key, *a.rhs, a.is_constant)
-}
-
 // Evaluates the expression in the frame and adds it as a value
-pub fn evaluate(expression: Expression, frame: StackFrame) -> StackFrame {
+pub fn evaluate(frame: StackFrame, expression: Expression) -> StackFrame {
     match expression {
-        Expression::Assignment(a) => evaluate_assignment(a, frame),
-        Expression::Function(f) => evaluate_function(frame, *f),
+        Expression::Assignment(a) => {
+            let key = a.identifier;
+            evaluate_assignment_rhs(frame, &key, *a.rhs, a.is_constant)
+        }
+        Expression::Function(f) => evaluate_function_definition(frame, f),
+
+        Expression::FunctionCall(FunctionCall { identifier, args }) => {
+            evaluate_function_call(frame, &identifier, args)
+        }
         //Expression::Operation {
         //    lhs,
         //    rhs,
@@ -106,7 +92,18 @@ pub fn evaluate(expression: Expression, frame: StackFrame) -> StackFrame {
     }
 }
 
-fn evaluate_function(state: StackFrame, f: Function) -> StackFrame {
+fn evaluate_function_call(
+    frame: StackFrame,
+    identifier: &str,
+    args: Vec<Expression>,
+) -> StackFrame {
+    // TODO:
+    // evaluate the body of the function
+    // update variables that apply to this stack frame
+    todo!()
+}
+
+fn evaluate_function_definition(frame: StackFrame, f: Function) -> StackFrame {
     todo!()
 }
 
@@ -116,23 +113,15 @@ mod test {
 
     use crate::{
         call_stack::StackFrameReference,
-        language::{Assignment, Expression, NativeType, SingleValue, ValueLiteral},
+        language::{Expression, NativeType, ValueLiteral},
     };
 
     use super::{evaluate, StackFrame, StackFrameValue};
 
     #[test]
     fn add_and_replace_variables_to_frame() {
-        let add_int_expression = Expression::Assignment(Assignment::new(
-            "x",
-            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
-                NativeType::Int,
-                "5",
-            ))),
-            None,
-            None,
-            false,
-        ));
+        let add_int_expression =
+            Expression::new_assignment("x", Expression::new_int("5"), None, None, false);
         let expected = StackFrame::new(
             BTreeMap::from([(
                 "x".to_string(),
@@ -140,19 +129,11 @@ mod test {
             )]),
             vec![],
         );
-        let frame = evaluate(add_int_expression, StackFrame::default());
+        let frame = evaluate(StackFrame::default(), add_int_expression);
         assert_eq!(expected, frame);
 
-        let add_bool_expression = Expression::Assignment(Assignment::new(
-            "y",
-            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
-                NativeType::Bool,
-                "true",
-            ))),
-            None,
-            None,
-            false,
-        ));
+        let add_bool_expression =
+            Expression::new_assignment("y", Expression::new_bool("true"), None, None, false);
 
         let expected = StackFrame::new(
             BTreeMap::from([
@@ -168,19 +149,11 @@ mod test {
             vec![],
         );
 
-        let frame = evaluate(add_bool_expression, frame);
+        let frame = evaluate(frame, add_bool_expression);
         assert_eq!(expected, frame);
 
-        let add_float_expression = Expression::Assignment(Assignment::new(
-            "z",
-            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
-                NativeType::Float,
-                "3.1",
-            ))),
-            None,
-            None,
-            false,
-        ));
+        let add_float_expression =
+            Expression::new_assignment("z", Expression::new_float("3.1"), None, None, false);
 
         let expected = StackFrame::new(
             BTreeMap::from([
@@ -199,19 +172,11 @@ mod test {
             ]),
             vec![],
         );
-        let frame = evaluate(add_float_expression, frame);
+        let frame = evaluate(frame, add_float_expression);
         assert_eq!(expected, frame);
 
-        let replace_expression = Expression::Assignment(Assignment::new(
-            "z",
-            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
-                NativeType::Char,
-                "c",
-            ))),
-            None,
-            None,
-            false,
-        ));
+        let replace_expression =
+            Expression::new_assignment("z", Expression::new_char("c"), None, None, false);
 
         let expected = StackFrame::new(
             BTreeMap::from([
@@ -230,7 +195,7 @@ mod test {
             ]),
             vec![],
         );
-        let frame = evaluate(replace_expression, frame);
+        let frame = evaluate(frame, replace_expression);
         assert_eq!(expected, frame);
         // TODO: More tests for the other data types
     }
@@ -238,7 +203,7 @@ mod test {
     # TODO:
     - [x] Mutate a variable in the state.
     - [x] Save variables into the frame using the variable name.
-    - [ ] Save function declaration and implemention into state.
+    - [ ] Save function declaration and implemention into frame.
     - [ ] Run a print function.
      */
 }

@@ -1,4 +1,7 @@
 use pretty_assertions::assert_eq;
+use For;
+use FunctionCall;
+use Statement;
 
 use crate::{language::*, lexer::*};
 
@@ -70,10 +73,8 @@ fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ParseResu
     };
 
     match next {
-        Some(Token::Literal(l)) => {
-            args.push(Expression::SingleValue(SingleValue::from_literal(&l)))
-        }
-        Some(Token::Ident(i)) => args.push(SingleValue::new_identifier_expression(&i)),
+        Some(Token::Literal(l)) => args.push(Expression::new_from_literal(&l)),
+        Some(Token::Ident(i)) => args.push(Expression::new_identifier(&i)),
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected parameter notation".to_string(),
@@ -85,8 +86,8 @@ fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ParseResu
     parse_arguments(state, args)
 }
 
-fn on_arguments(state: ParseState, first_arg: SingleValue) -> ParseResult<ArgumentsState> {
-    parse_arguments(state, &mut vec![Expression::SingleValue(first_arg)])
+fn on_arguments(state: ParseState, first_arg: Expression) -> ParseResult<ArgumentsState> {
+    parse_arguments(state, &mut vec![first_arg])
 }
 
 fn on_parameter_identifier(state: ParseState, ident: &str) -> (Parameter, ParseState) {
@@ -141,13 +142,13 @@ fn on_function(state: ParseState, ident: &str) -> ParseResult<ExpressionState> {
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             // Body
             let (body, state) = on_body(state)?;
-            let f = Function::new(ident, params, return_type, body);
-            Ok((Expression::Function(Box::new(f)), state))
+            let f = Expression::new_function(ident, params, return_type, body);
+            Ok((f, state))
         }
         Some(Token::Symbol(Symbol::Equals)) => {
-            let (expression, state) = on_expression(state)?;
-            let function = Function::new(ident, params, return_type, expression);
-            Ok((Expression::Function(Box::new(function)), state))
+            let (body, state) = on_expression(state)?;
+            let function = Expression::new_function(ident, params, return_type, body);
+            Ok((function, state))
         }
         Some(t) => Err(ParseError::InvalidSyntax {
             message: "Expected a function body or expression".to_string(),
@@ -212,15 +213,9 @@ fn on_assignment(
     let (t, state) = state.next();
     match t {
         Some(Token::Literal(l)) => {
-            let sv = SingleValue::from_literal(&l);
+            let sv = Expression::new_from_literal(&l);
             Ok((
-                Expression::Assignment(Assignment::new(
-                    ident,
-                    Expression::SingleValue(sv),
-                    None,
-                    type_assertion,
-                    false,
-                )),
+                Expression::new_assignment(ident, sv, None, type_assertion, false),
                 state,
             ))
         }
@@ -231,7 +226,7 @@ fn on_assignment(
         Some(Token::Ident(i)) => {
             let (rhs, state) = on_identifier(state, &i)?;
             Ok((
-                Expression::Assignment(Assignment::new(ident, rhs, None, type_assertion, false)),
+                Expression::new_assignment(ident, rhs, None, type_assertion, false),
                 state,
             ))
         }
@@ -254,10 +249,7 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<ExpressionState>
     let t = state.peek();
 
     if let Some(Token::Kwd(Kwd::In)) = t {
-        return Ok((
-            Expression::SingleValue(SingleValue::Identifier(ident.to_string())),
-            state,
-        ));
+        return Ok((Expression::Identifier(ident.to_string()), state));
     }
     let (t, state) = state.next();
     match t {
@@ -265,30 +257,26 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<ExpressionState>
         Some(Token::Symbol(Symbol::Equals)) => Ok(on_assignment(state, ident, None)?),
 
         Some(Token::Symbol(Symbol::Math(t))) => {
-            let operation = MathOperation::from_token(&t);
+            let operation = Math::from_token(&t);
             Ok(on_math_expression(
                 state,
                 operation,
-                SingleValue::new_identifier_expression(ident),
+                Expression::new_identifier(ident),
             )?)
         }
 
         // Operations
         // Function call if value literal or string
         Some(Token::Literal(l)) => Ok(on_function_call(state, ident, &l)?),
-        Some(Token::Symbol(Symbol::Range)) => Ok(on_range(
-            state,
-            SingleValue::new_identifier_expression(ident),
-            false,
-        )?),
-        Some(Token::Symbol(Symbol::RangeEq)) => Ok(on_range(
-            state,
-            SingleValue::new_identifier_expression(ident),
-            true,
-        )?),
+        Some(Token::Symbol(Symbol::Range)) => {
+            Ok(on_range(state, Expression::new_identifier(ident), false)?)
+        }
+        Some(Token::Symbol(Symbol::RangeEq)) => {
+            Ok(on_range(state, Expression::new_identifier(ident), true)?)
+        }
         Some(Token::Symbol(Symbol::ParenOpen)) => Ok(on_function(state, ident)?),
         Some(Token::Symbol(Symbol::Colon)) => Ok(on_variable_type_assertion(state, ident)?),
-        _ => Ok((SingleValue::new_identifier_expression(ident), state)),
+        _ => Ok((Expression::new_identifier(ident), state)),
     }
 }
 
@@ -323,38 +311,30 @@ fn on_function_call(
     ident: &str,
     first_arg: &Literal,
 ) -> ParseResult<ExpressionState> {
-    let (args, state) = on_arguments(state, SingleValue::from_literal(first_arg))?;
+    let (args, state) = on_arguments(state, Expression::new_from_literal(first_arg))?;
     Ok((
-        Expression::Operation {
-            lhs: SingleValue::new_identifier_expression(ident).boxed(),
-            rhs: Expression::MultipleValues(args).boxed(),
-            operation: TwoSideOperation::FunctionCall,
-        },
+        Expression::FunctionCall(FunctionCall {
+            identifier: ident.to_string(),
+            args,
+        }),
         state,
     ))
 }
 
 fn on_math_expression(
     state: ParseState,
-    operation: MathOperation,
+    operation: Math,
     lhs: Expression,
 ) -> ParseResult<ExpressionState> {
     let (rhs, state) = on_expression(state)?;
-    Ok((
-        Expression::Operation {
-            lhs: lhs.boxed(),
-            rhs: rhs.boxed(),
-            operation: TwoSideOperation::Math(operation),
-        },
-        state,
-    ))
+    Ok((Expression::new_math_expression(lhs, rhs, operation), state))
 }
 
 fn on_single_value(state: ParseState) -> ParseResult<ExpressionState> {
     let (next, state) = state.next();
     let single_value = match next {
-        Some(Token::Literal(l)) => Expression::SingleValue(SingleValue::from_literal(&l)),
-        Some(Token::Ident(i)) => SingleValue::new_identifier_expression(&i),
+        Some(Token::Literal(l)) => Expression::new_from_literal(&l),
+        Some(Token::Ident(i)) => Expression::new_identifier(&i),
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected a value literal or identifier".to_string(),
@@ -373,11 +353,7 @@ fn on_evaluation(state: ParseState) -> ParseResult<ExpressionState> {
     // truthy value e.g. if x { ... }
     if is_new_body(peek) {
         return Ok((
-            Expression::Evaluation(Evaluation::new(
-                lhs,
-                None,
-                EvaluationOperator::BooleanTruthy,
-            )),
+            Expression::new_evaluation(lhs, None, EvaluationOperator::BooleanTruthy),
             state,
         ));
     }
@@ -398,17 +374,14 @@ fn on_evaluation(state: ParseState) -> ParseResult<ExpressionState> {
 
     let (rhs, state) = on_single_value(state)?;
     Ok((
-        Expression::Evaluation(Evaluation::new(lhs, Some(rhs), evaluation_operator)),
+        Expression::new_evaluation(lhs, Some(rhs), evaluation_operator),
         state,
     ))
 }
 
 fn on_range(state: ParseState, lhs: Expression, inclusive: bool) -> ParseResult<ExpressionState> {
     let (rhs, state) = on_single_value(state)?;
-    Ok((
-        Expression::Range(Range::new(lhs.boxed(), rhs.boxed(), inclusive)),
-        state,
-    ))
+    Ok((Expression::new_range(lhs, rhs, inclusive), state))
 }
 
 fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
@@ -417,10 +390,7 @@ fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
     let expr = match next.ok_or::<ParseError>(ParseError::NoMoreTokens)? {
         Token::Ident(ident) => on_identifier(state, &ident)?,
         Token::Kwd(k) => on_keyword(state, &k)?,
-        Token::Literal(l) => (
-            Expression::SingleValue(SingleValue::from_literal(&l)),
-            state,
-        ),
+        Token::Literal(l) => (Expression::new_from_literal(&l), state),
         Token::Symbol(Symbol::BraceOpen) => on_body(state)?,
         Token::Symbol(Symbol::Newline) => on_expression(state)?,
 
@@ -439,12 +409,7 @@ fn on_include(state: ParseState) -> ParseResult<ExpressionState> {
     let (package, state) = state.next();
     match package {
         Some(Token::Literal(Literal::String(s))) => Ok((
-            Expression::Statement {
-                expression: Some(
-                    SingleValue::new_value_literal_expression(ValueLiteral::new_string(&s)).boxed(),
-                ),
-                operation: OneSideOperation::Include,
-            },
+            Expression::new_statement(Some(Expression::new_string(&s)), StatementOperator::Include),
             state,
         )),
         Some(t) => Err(ParseError::InvalidSyntax {
@@ -462,10 +427,10 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ParseResult<ExpressionState> {
         Kwd::For => on_for(state)?,
         Kwd::If => on_if(state)?,
         Kwd::Break => (
-            Expression::Statement {
+            Expression::Statement(Statement {
                 expression: None,
-                operation: OneSideOperation::Break,
-            },
+                operation: StatementOperator::Break,
+            }),
             state,
         ),
         Kwd::Include => on_include(state)?,
@@ -529,13 +494,7 @@ fn on_const(state: ParseState) -> ParseResult<ExpressionState> {
 
     let (expr, state) = on_expression(state)?;
     Ok((
-        Expression::Assignment(Assignment::new(
-            &identifier,
-            expr,
-            None,
-            type_assertion,
-            true,
-        )),
+        Expression::new_assignment(&identifier, expr, None, type_assertion, true),
         state,
     ))
 }
@@ -548,13 +507,7 @@ fn on_while(state: ParseState) -> ParseResult<ExpressionState> {
         let state = state.advance();
 
         let (body, state) = on_body(state)?;
-        return Ok((
-            Expression::While {
-                condition: None,
-                body: body.boxed(),
-            },
-            state,
-        ));
+        return Ok((Expression::new_while(None, body), state));
     }
 
     let (evaluation, state) = on_evaluation(state)?;
@@ -575,10 +528,7 @@ fn on_while(state: ParseState) -> ParseResult<ExpressionState> {
     }
 
     let (body, state) = on_body(state)?;
-    let while_expr = Expression::While {
-        condition: Some(evaluation.boxed()),
-        body: body.boxed(),
-    };
+    let while_expr = Expression::new_while(Some(evaluation), body);
     Ok((while_expr, state))
 }
 
@@ -632,11 +582,11 @@ fn on_for(state: ParseState) -> ParseResult<ExpressionState> {
     let (body, state) = on_body(state)?;
 
     Ok((
-        Expression::For {
+        Expression::For(For {
             scoped_variable: Box::new(scoped_variable),
             iterable: Box::new(iterable),
             body: Box::new(body),
-        },
+        }),
         state,
     ))
 }
@@ -678,7 +628,7 @@ fn on_if(state: ParseState) -> ParseResult<ExpressionState> {
         (None, state)
     };
     Ok((
-        Expression::If(If::new(evaluation, on_true_evaluation, on_false_evaluation)),
+        Expression::new_if(evaluation, on_true_evaluation, on_false_evaluation),
         state,
     ))
 }
@@ -686,10 +636,7 @@ fn on_if(state: ParseState) -> ParseResult<ExpressionState> {
 fn on_return(state: ParseState) -> ParseResult<ExpressionState> {
     let (e, state) = on_expression(state)?;
     Ok((
-        Expression::Statement {
-            expression: Some(e.boxed()),
-            operation: OneSideOperation::Return,
-        },
+        Expression::new_statement(Some(e), StatementOperator::Return),
         state,
     ))
 }
@@ -724,10 +671,7 @@ mod tests {
         // break
         test(
             vec![Token::Kwd(Kwd::Break)],
-            Expression::Statement {
-                expression: None,
-                operation: OneSideOperation::Break,
-            },
+            Expression::new_statement(None, StatementOperator::Break),
         );
 
         // for i in numbers  {
@@ -744,15 +688,14 @@ mod tests {
                 Token::Kwd(Kwd::Break),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::For {
-                scoped_variable: SingleValue::new_identifier_expression("i").boxed(),
-                iterable: SingleValue::new_identifier_expression("numbers").boxed(),
-                body: Expression::Body(vec![Expression::Statement {
-                    expression: None,
-                    operation: OneSideOperation::Break,
-                }])
-                .boxed(),
-            },
+            Expression::new_for(
+                Expression::new_identifier("i"),
+                Expression::new_identifier("numbers"),
+                Expression::new_body(vec![Expression::new_statement(
+                    None,
+                    StatementOperator::Break,
+                )]),
+            ),
         );
 
         // for i in numbers  {
@@ -783,34 +726,25 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::For {
-                scoped_variable: SingleValue::new_identifier_expression("i").boxed(),
-                iterable: SingleValue::new_identifier_expression("numbers").boxed(),
-                body: Expression::Body(vec![Expression::If(If::new(
-                    Expression::Evaluation(Evaluation::new(
-                        SingleValue::new_identifier_expression("i"),
-                        Some(SingleValue::new_value_literal_expression(
-                            ValueLiteral::new(NativeType::Int, "0"),
-                        )),
+            Expression::new_for(
+                Expression::new_identifier("i"),
+                Expression::new_identifier("numbers"),
+                Expression::Body(vec![Expression::new_if(
+                    Expression::new_evaluation(
+                        Expression::new_identifier("i"),
+                        Some(Expression::new_int("0")),
                         EvaluationOperator::Lz,
-                    )),
-                    Expression::Body(vec![Expression::Statement {
-                        expression: None,
-                        operation: OneSideOperation::Break,
-                    }]),
-                    Some(Expression::Body(vec![Expression::Operation {
-                        lhs: SingleValue::new_identifier_expression("print").boxed(),
-                        rhs: Expression::MultipleValues(vec![
-                            SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                                "hi",
-                            )),
-                        ])
-                        .boxed(),
-                        operation: TwoSideOperation::FunctionCall,
-                    }])),
-                ))])
-                .boxed(),
-            },
+                    ),
+                    Expression::new_body(vec![Expression::new_statement(
+                        None,
+                        StatementOperator::Break,
+                    )]),
+                    Some(Expression::new_body(vec![Expression::new_function_call(
+                        "print",
+                        vec![Expression::new_string("hi")],
+                    )])),
+                )]),
+            ),
         );
     }
 
@@ -824,20 +758,17 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new(
-                Expression::Evaluation(Evaluation::new(
-                    SingleValue::new_value_literal_expression(ValueLiteral::new(
-                        NativeType::Bool,
-                        "true",
-                    )),
+            Expression::new_if(
+                Expression::new_evaluation(
+                    Expression::new_bool("true"),
                     None,
                     EvaluationOperator::BooleanTruthy,
-                )),
+                ),
                 Expression::Body(vec![
                     // empty body
                 ]),
                 None,
-            )),
+            ),
         );
         test(
             // if 3 == 3 {
@@ -853,29 +784,18 @@ mod tests {
                 Token::Literal(Literal::String("Hello".to_string())),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new(
-                Expression::Evaluation(Evaluation::new(
-                    SingleValue::new_value_literal_expression(ValueLiteral::new(
-                        NativeType::Int,
-                        "3",
-                    )),
-                    Some(SingleValue::new_value_literal_expression(
-                        ValueLiteral::new(NativeType::Int, "3"),
-                    )),
+            Expression::new_if(
+                Expression::new_evaluation(
+                    Expression::new_int("3"),
+                    Some(Expression::new_int("3")),
                     EvaluationOperator::Eq,
-                )),
-                Expression::Body(vec![Expression::Operation {
-                    lhs: SingleValue::new_identifier_expression("print").boxed(),
-                    rhs: Expression::MultipleValues(vec![
-                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                            "Hello",
-                        )),
-                    ])
-                    .boxed(),
-                    operation: TwoSideOperation::FunctionCall,
-                }]),
+                ),
+                Expression::new_body(vec![Expression::new_function_call(
+                    "print",
+                    vec![Expression::new_string("Hello")],
+                )]),
                 None,
-            )),
+            ),
         );
         // where x might be true or false
         // if x {
@@ -892,24 +812,18 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new(
-                Expression::Evaluation(Evaluation::new(
-                    SingleValue::new_identifier_expression("x"),
+            Expression::new_if(
+                Expression::new_evaluation(
+                    Expression::new_identifier("x"),
                     None,
                     EvaluationOperator::BooleanTruthy,
-                )),
-                Expression::Body(vec![Expression::Operation {
-                    lhs: SingleValue::new_identifier_expression("print").boxed(),
-                    rhs: Expression::MultipleValues(vec![
-                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                            "Hello",
-                        )),
-                    ])
-                    .boxed(),
-                    operation: TwoSideOperation::FunctionCall,
-                }]),
+                ),
+                Expression::Body(vec![Expression::new_function_call(
+                    "print",
+                    vec![Expression::new_string("Hello")],
+                )]),
                 None,
-            )),
+            ),
         );
     }
 
@@ -930,20 +844,17 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new(
-                Expression::Evaluation(Evaluation::new(
-                    SingleValue::new_value_literal_expression(ValueLiteral::new(
-                        NativeType::Bool,
-                        "true",
-                    )),
+            Expression::new_if(
+                Expression::new_evaluation(
+                    Expression::new_bool("true"),
                     None,
                     EvaluationOperator::BooleanTruthy,
-                )),
+                ),
                 Expression::Body(vec![
                     // empty body
                 ]),
                 Some(Expression::Body(vec![])),
-            )),
+            ),
         );
 
         // if 3 == 3 {
@@ -969,38 +880,21 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new(
-                Expression::Evaluation(Evaluation::new(
-                    SingleValue::new_value_literal_expression(ValueLiteral::new(
-                        NativeType::Int,
-                        "3",
-                    )),
-                    Some(SingleValue::new_value_literal_expression(
-                        ValueLiteral::new(NativeType::Int, "3"),
-                    )),
+            Expression::new_if(
+                Expression::new_evaluation(
+                    Expression::new_int("3"),
+                    Some(Expression::new_int("3")),
                     EvaluationOperator::Eq,
-                )),
-                Expression::Body(vec![Expression::Operation {
-                    lhs: SingleValue::new_identifier_expression("print").boxed(),
-                    rhs: Expression::MultipleValues(vec![
-                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                            "Hello",
-                        )),
-                    ])
-                    .boxed(),
-                    operation: TwoSideOperation::FunctionCall,
-                }]),
-                Some(Expression::Body(vec![Expression::Operation {
-                    lhs: SingleValue::new_identifier_expression("print").boxed(),
-                    rhs: Expression::MultipleValues(vec![
-                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                            "Goodbye",
-                        )),
-                    ])
-                    .boxed(),
-                    operation: TwoSideOperation::FunctionCall,
-                }])),
-            )),
+                ),
+                Expression::new_body(vec![Expression::new_function_call(
+                    "print",
+                    vec![Expression::new_string("Hello")],
+                )]),
+                Some(Expression::new_body(vec![Expression::new_function_call(
+                    "print",
+                    vec![Expression::new_string("Goodbye")],
+                )])),
+            ),
         );
         test(
             vec![
@@ -1018,33 +912,21 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::If(If::new(
-                Expression::Evaluation(Evaluation::new(
-                    SingleValue::new_identifier_expression("x"),
+            Expression::new_if(
+                Expression::new_evaluation(
+                    Expression::new_identifier("x"),
                     None,
                     EvaluationOperator::BooleanTruthy,
-                )),
-                Expression::Body(vec![Expression::Operation {
-                    lhs: SingleValue::new_identifier_expression("print").boxed(),
-                    rhs: Expression::MultipleValues(vec![
-                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                            "Hello",
-                        )),
-                    ])
-                    .boxed(),
-                    operation: TwoSideOperation::FunctionCall,
-                }]),
-                Some(Expression::Body(vec![Expression::Operation {
-                    lhs: SingleValue::new_identifier_expression("print").boxed(),
-                    rhs: Expression::MultipleValues(vec![
-                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                            "Goodbye",
-                        )),
-                    ])
-                    .boxed(),
-                    operation: TwoSideOperation::FunctionCall,
-                }])),
-            )),
+                ),
+                Expression::Body(vec![Expression::new_function_call(
+                    "print",
+                    vec![Expression::new_string("Hello")],
+                )]),
+                Some(Expression::Body(vec![Expression::new_function_call(
+                    "print",
+                    vec![Expression::new_string("Goodbye")],
+                )])),
+            ),
         )
     }
 
@@ -1061,10 +943,7 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::While {
-                condition: None,
-                body: Expression::Body(Body::new()).boxed(),
-            },
+            Expression::new_while(None, Expression::new_body(vec![])),
         );
         // With function call:
         // while {
@@ -1080,20 +959,13 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::While {
-                condition: None,
-                body: Expression::Body(vec![Expression::Operation {
-                    lhs: SingleValue::new_identifier_expression("print").boxed(),
-                    rhs: Expression::MultipleValues(vec![
-                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                            "Hello",
-                        )),
-                    ])
-                    .boxed(),
-                    operation: TwoSideOperation::FunctionCall,
-                }])
-                .boxed(),
-            },
+            Expression::new_while(
+                None,
+                Expression::new_body(vec![Expression::new_function_call(
+                    "print",
+                    vec![Expression::new_string("Hello")],
+                )]),
+            ),
         );
 
         // With condition
@@ -1110,32 +982,17 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::While {
-                condition: Some(
-                    Expression::Evaluation(Evaluation::new(
-                        SingleValue::new_value_literal_expression(ValueLiteral::new(
-                            NativeType::Int,
-                            "3",
-                        )),
-                        Some(SingleValue::new_value_literal_expression(
-                            ValueLiteral::new(NativeType::Int, "3"),
-                        )),
-                        EvaluationOperator::Eq,
-                    ))
-                    .boxed(),
-                ),
-                body: Expression::Body(vec![Expression::Operation {
-                    lhs: SingleValue::new_identifier_expression("print").boxed(),
-                    rhs: Expression::MultipleValues(vec![
-                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                            "Hello",
-                        )),
-                    ])
-                    .boxed(),
-                    operation: TwoSideOperation::FunctionCall,
-                }])
-                .boxed(),
-            },
+            Expression::new_while(
+                Some(Expression::new_evaluation(
+                    Expression::new_int("3"),
+                    Some(Expression::new_int("3")),
+                    EvaluationOperator::Eq,
+                )),
+                Expression::Body(vec![Expression::new_function_call(
+                    "print",
+                    vec![Expression::new_string("Hello")],
+                )]),
+            ),
         );
 
         test(
@@ -1149,27 +1006,17 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::While {
-                condition: Some(
-                    Expression::Evaluation(Evaluation::new(
-                        SingleValue::new_identifier_expression("x"),
-                        None,
-                        EvaluationOperator::BooleanTruthy,
-                    ))
-                    .boxed(),
-                ),
-                body: Expression::Body(vec![Expression::Operation {
-                    lhs: SingleValue::new_identifier_expression("print").boxed(),
-                    rhs: Expression::MultipleValues(vec![
-                        SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                            "Hello",
-                        )),
-                    ])
-                    .boxed(),
-                    operation: TwoSideOperation::FunctionCall,
-                }])
-                .boxed(),
-            },
+            Expression::new_while(
+                Some(Expression::new_evaluation(
+                    Expression::new_identifier("x"),
+                    None,
+                    EvaluationOperator::BooleanTruthy,
+                )),
+                Expression::new_body(vec![Expression::new_function_call(
+                    "print",
+                    vec![Expression::new_string("Hello")],
+                )]),
+            ),
         );
     }
 
@@ -1189,24 +1036,11 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::For {
-                scoped_variable: SingleValue::new_identifier_expression("x").boxed(),
-                iterable: Expression::Range(Range::new(
-                    SingleValue::new_value_literal_expression(ValueLiteral::new(
-                        NativeType::Int,
-                        "0",
-                    ))
-                    .boxed(),
-                    SingleValue::new_value_literal_expression(ValueLiteral::new(
-                        NativeType::Int,
-                        "5",
-                    ))
-                    .boxed(),
-                    false,
-                ))
-                .boxed(),
-                body: Expression::Body(Body::new()).boxed(),
-            },
+            Expression::new_for(
+                Expression::new_identifier("x"),
+                Expression::new_range(Expression::new_int("0"), Expression::new_int("5"), false),
+                Expression::Body(Body::new()),
+            ),
         );
         // for x in y..z {
         //
@@ -1222,16 +1056,15 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::For {
-                scoped_variable: SingleValue::new_identifier_expression("x").boxed(),
-                iterable: Expression::Range(Range::new(
-                    SingleValue::new_identifier_expression("y").boxed(),
-                    SingleValue::new_identifier_expression("z").boxed(),
+            Expression::new_for(
+                Expression::new_identifier("x"),
+                Expression::new_range(
+                    Expression::new_identifier("y"),
+                    Expression::new_identifier("z"),
                     false,
-                ))
-                .boxed(),
-                body: Expression::Body(Body::new()).boxed(),
-            },
+                ),
+                Expression::Body(Body::new()),
+            ),
         );
     }
 
@@ -1244,13 +1077,7 @@ mod tests {
                 Token::Symbol(Symbol::Equals),
                 Token::Ident("x".to_string()),
             ],
-            Expression::Assignment(Assignment::new(
-                "y",
-                SingleValue::new_identifier_expression("x"),
-                None,
-                None,
-                false,
-            )),
+            Expression::new_assignment("y", Expression::new_identifier("x"), None, None, false),
         )
     }
 
@@ -1265,19 +1092,17 @@ mod tests {
                 Token::Symbol(Symbol::Math(MathSymbol::Plus)),
                 Token::Literal(Literal::Int(3)),
             ],
-            Expression::Assignment(Assignment::new(
+            Expression::new_assignment(
                 "y",
-                Expression::Operation {
-                    lhs: Box::new(SingleValue::new_identifier_expression("x")),
-                    rhs: Box::new(SingleValue::new_value_literal_expression(
-                        ValueLiteral::new(NativeType::Int, "3"),
-                    )),
-                    operation: TwoSideOperation::Math(MathOperation::Add),
-                },
+                Expression::MathOperation(MathOperation {
+                    lhs: Box::new(Expression::new_identifier("x")),
+                    rhs: Box::new(Expression::new_int("3")),
+                    operation: Math::Add,
+                }),
                 None,
                 None,
                 false,
-            )),
+            ),
         )
     }
 
@@ -1300,12 +1125,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::Function(Box::new(Function::new(
-                "do_nothing",
-                vec![],
-                None,
-                Expression::Body(vec![]),
-            ))),
+            Expression::new_function("do_nothing", vec![], None, Expression::Body(vec![])),
         );
     }
 
@@ -1332,12 +1152,12 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::Function(Box::new(Function::new(
+            Expression::new_function(
                 "do_nothing",
                 vec![],
                 Some(NativeType::Int),
                 Expression::Body(vec![]),
-            ))),
+            ),
         );
         // with body
     }
@@ -1364,7 +1184,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::Function(Box::new(Function::new(
+            Expression::new_function(
                 "do_nothing",
                 vec![
                     Parameter::new("numOne", None),
@@ -1372,7 +1192,7 @@ mod tests {
                 ],
                 None,
                 Expression::Body(vec![]),
-            ))),
+            ),
         );
         // typed arguments
         test(
@@ -1394,7 +1214,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::Function(Box::new(Function::new(
+            Expression::new_function(
                 "do_nothing",
                 vec![
                     Parameter::new("numOne", Some(NativeType::Int)),
@@ -1402,7 +1222,7 @@ mod tests {
                 ],
                 None,
                 Expression::Body(vec![]),
-            ))),
+            ),
         )
     }
 
@@ -1432,7 +1252,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::Function(Box::new(Function::new(
+            Expression::new_function(
                 "do_nothing",
                 vec![
                     Parameter::new("numOne", None),
@@ -1440,7 +1260,7 @@ mod tests {
                 ],
                 Some(NativeType::Int),
                 Expression::Body(vec![]),
-            ))),
+            ),
         );
         // Typed Parameters
         test(
@@ -1466,7 +1286,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::Function(Box::new(Function::new(
+            Expression::new_function(
                 "do_nothing",
                 vec![
                     Parameter::new("numOne", Some(NativeType::Int)),
@@ -1474,7 +1294,7 @@ mod tests {
                 ],
                 Some(NativeType::Int),
                 Expression::Body(vec![]),
-            ))),
+            ),
         )
     }
 
@@ -1502,23 +1322,19 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 // end
             ],
-            Expression::Function(Box::new(Function::new(
+            Expression::new_function(
                 "add",
                 vec![
                     Parameter::new("numOne", None),
                     Parameter::new("numTwo", None),
                 ],
                 None,
-                Expression::Operation {
-                    lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                        "numOne".to_string(),
-                    ))),
-                    rhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                        "numTwo".to_string(),
-                    ))),
-                    operation: TwoSideOperation::Math(MathOperation::Add),
-                },
-            ))),
+                Expression::new_math_expression(
+                    Expression::new_identifier("numOne"),
+                    Expression::new_identifier("numTwo"),
+                    Math::Add,
+                ),
+            ),
         );
     }
 
@@ -1531,15 +1347,10 @@ mod tests {
                 Token::Literal(Literal::String("Hello".to_string())),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::Operation {
-                lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                    "print".to_string(),
-                ))),
-                rhs: Box::new(Expression::MultipleValues(vec![Expression::SingleValue(
-                    SingleValue::ValueLiteral(ValueLiteral::new(NativeType::String, "Hello")),
-                )])),
-                operation: TwoSideOperation::FunctionCall,
-            },
+            Expression::FunctionCall(FunctionCall {
+                identifier: "print".to_string(),
+                args: vec![Expression::new_string("Hello")],
+            }),
         );
     }
 
@@ -1552,16 +1363,7 @@ mod tests {
                 Token::Symbol(Symbol::Equals),
                 Token::Literal(Literal::Float(3.5)),
             ],
-            Expression::Assignment(Assignment::new(
-                "x",
-                Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
-                    NativeType::Float,
-                    "3.5",
-                ))),
-                None,
-                None,
-                false,
-            )),
+            Expression::new_assignment("x", Expression::new_float("3.5"), None, None, false),
         );
     }
 
@@ -1575,20 +1377,13 @@ mod tests {
                 Token::Literal(Literal::String("World".to_string())),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::Operation {
-                lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                    "print".to_string(),
-                ))),
-                rhs: Box::new(Expression::MultipleValues(vec![
-                    Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new_string(
-                        "Hello",
-                    ))),
-                    Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new_string(
-                        "World",
-                    ))),
-                ])),
-                operation: TwoSideOperation::FunctionCall,
-            },
+            Expression::new_function_call(
+                "print",
+                vec![
+                    Expression::new_string("Hello"),
+                    Expression::new_string("World"),
+                ],
+            ),
         );
     }
 
@@ -1602,18 +1397,13 @@ mod tests {
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::Operation {
-                lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                    "print".to_string(),
-                ))),
-                rhs: Box::new(Expression::MultipleValues(vec![
-                    Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new_string(
-                        "Hello",
-                    ))),
-                    Expression::SingleValue(SingleValue::Identifier("x".to_string())),
-                ])),
-                operation: TwoSideOperation::FunctionCall,
-            },
+            Expression::FunctionCall(FunctionCall {
+                identifier: "print".to_string(),
+                args: vec![
+                    Expression::new_string("Hello"),
+                    Expression::new_identifier("x"),
+                ],
+            }),
         );
     }
 
@@ -1627,37 +1417,20 @@ mod tests {
                 Token::Literal(Literal::Bool(true)),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::Operation {
-                lhs: Box::new(Expression::SingleValue(SingleValue::Identifier(
-                    "print".to_string(),
-                ))),
-                rhs: Box::new(Expression::MultipleValues(vec![
-                    Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new_string(
-                        "Hello",
-                    ))),
-                    Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
-                        NativeType::Bool,
-                        "true",
-                    ))),
-                ])),
-                operation: TwoSideOperation::FunctionCall,
-            },
+            Expression::new_function_call(
+                "print",
+                vec![
+                    Expression::new_string("Hello"),
+                    Expression::new_bool("true"),
+                ],
+            ),
         );
     }
 
     #[test]
     fn literal_assignment() {
         // "x=5"
-        let expected = Expression::Assignment(Assignment::new(
-            "x",
-            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
-                NativeType::Int,
-                "5",
-            ))),
-            None,
-            None,
-            false,
-        ));
+        let expected = Expression::new_assignment("x", Expression::new_int("5"), None, None, false);
         test(
             vec![
                 Token::Ident("x".to_string()),
@@ -1703,16 +1476,13 @@ mod tests {
             expected,
         );
 
-        let expected = Expression::Assignment(Assignment::new(
+        let expected = Expression::new_assignment(
             "x",
-            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
-                NativeType::Int,
-                "5",
-            ))),
+            Expression::new_int("5"),
             None,
             Some(NativeType::Int),
             false,
-        ));
+        );
         test(
             vec![
                 Token::Ident("x".to_string()),
@@ -1724,16 +1494,7 @@ mod tests {
             expected,
         );
         // const x = 5
-        let expected = Expression::Assignment(Assignment::new(
-            "x",
-            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
-                NativeType::Int,
-                "5",
-            ))),
-            None,
-            None,
-            true,
-        ));
+        let expected = Expression::new_assignment("x", Expression::new_int("5"), None, None, true);
         test(
             vec![
                 Token::Kwd(Kwd::Const),
@@ -1745,16 +1506,13 @@ mod tests {
         );
 
         // const x : Int = 5
-        let expected = Expression::Assignment(Assignment::new(
+        let expected = Expression::new_assignment(
             "x",
-            Expression::SingleValue(SingleValue::ValueLiteral(ValueLiteral::new(
-                NativeType::Int,
-                "5",
-            ))),
+            Expression::new_int("5"),
             None,
             Some(NativeType::Int),
             true,
-        ));
+        );
         test(
             vec![
                 Token::Kwd(Kwd::Const),
@@ -1775,15 +1533,10 @@ mod tests {
                 Token::Kwd(Kwd::Include),
                 Token::Literal(Literal::String("my_package".to_string())),
             ],
-            Expression::Statement {
-                expression: Some(
-                    SingleValue::new_value_literal_expression(ValueLiteral::new_string(
-                        "my_package",
-                    ))
-                    .boxed(),
-                ),
-                operation: OneSideOperation::Include,
-            },
+            Expression::new_statement(
+                Some(Expression::new_string("my_package")),
+                StatementOperator::Include,
+            ),
         )
     }
 }
