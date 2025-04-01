@@ -7,6 +7,7 @@ fn evaluate_assignment_rhs(
     key: &str,
     e: Expression,
     is_constant: bool,
+    math_operation: Option<Math>,
 ) -> StackFrame {
     // x = 5
     // x = "some string"
@@ -71,32 +72,42 @@ fn evaluate_assignment_rhs(
     frame.add_or_mutate_reference(key, reference)
 }
 
-// Evaluates the expression in the frame and adds it as a value
+fn evaluate_if(frame: StackFrame, if_statement: If) -> StackFrame {
+    todo!()
+}
+
+/// Evaluates the expression in the frame
 pub fn evaluate(frame: StackFrame, expression: Expression) -> StackFrame {
     match expression {
-        Expression::Assignment(a) => {
-            let key = a.identifier;
-            evaluate_assignment_rhs(frame, &key, *a.rhs, a.is_constant)
-        }
+        Expression::Assignment(a) => evaluate_assignment_rhs(
+            frame,
+            &a.identifier,
+            *a.rhs,
+            a.is_constant,
+            a.math_operation,
+        ),
         Expression::Function(f) => evaluate_function_definition(frame, f),
-
-        Expression::FunctionCall(FunctionCall { identifier, args }) => {
-            evaluate_function_call(frame, &identifier, args)
+        Expression::FunctionCall(f) => evaluate_function_call(frame, f),
+        Expression::ValueLiteral(vl) => frame,
+        Expression::Identifier(i) => {
+            if !frame.contains_reference(&i) {
+                panic!("Invalid identifier not found")
+            }
+            frame
         }
-        //Expression::Operation {
-        //    lhs,
-        //    rhs,
-        //    operation,
-        //} => evaluate_operation(*lhs, *rhs, operation, state),
-        _ => todo!(),
+        Expression::If(if_statement) => evaluate_if(frame, if_statement),
+        Expression::MultipleValues(v) => frame,
+        Expression::Statement(s) => frame,
+        Expression::MathOperation(o) => frame,
+        Expression::Evaluation(_) => todo!(),
+        Expression::While(_) => todo!(),
+        Expression::For(_) => todo!(),
+        Expression::Body(_) => todo!(),
+        Expression::Range(_) => todo!(),
     }
 }
 
-fn evaluate_function_call(
-    frame: StackFrame,
-    identifier: &str,
-    args: Vec<Expression>,
-) -> StackFrame {
+fn evaluate_function_call(frame: StackFrame, f: FunctionCall) -> StackFrame {
     // TODO:
     // evaluate the body of the function
     // update variables that apply to this stack frame
@@ -104,17 +115,17 @@ fn evaluate_function_call(
 }
 
 fn evaluate_function_definition(frame: StackFrame, f: Function) -> StackFrame {
-    todo!()
+    frame.add_or_mutate_reference(
+        &f.ident.to_string(),
+        StackFrameReference::new(StackFrameValue::Function(f), true),
+    )
 }
 
 #[cfg(test)]
 mod test {
     use std::collections::BTreeMap;
 
-    use crate::{
-        call_stack::StackFrameReference,
-        language::{Expression, NativeType, ValueLiteral},
-    };
+    use crate::{call_stack::StackFrameReference, language::Expression};
 
     use super::{evaluate, StackFrame, StackFrameValue};
 

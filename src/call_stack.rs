@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::language::Function;
+use crate::language::{Expression, Function};
 
 #[derive(Debug, PartialEq)]
 pub enum StackFrameValue {
@@ -63,5 +63,8 @@ impl StackFrame {
 
     pub fn get_reference(&self, ident: &str) -> Option<&StackFrameReference> {
         self.values.get(ident)
+    }
+    pub fn contains_reference(&self, ident: &str) -> bool {
+        self.values.contains_key(ident)
     }
 }

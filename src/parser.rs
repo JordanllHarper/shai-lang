@@ -275,31 +275,23 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<ExpressionState>
             Ok(on_range(state, Expression::new_identifier(ident), true)?)
         }
         Some(Token::Symbol(Symbol::ParenOpen)) => Ok(on_function(state, ident)?),
-        Some(Token::Symbol(Symbol::Colon)) => Ok(on_variable_type_assertion(state, ident)?),
+        Some(Token::Kwd(Kwd::DataType(d))) => Ok(on_variable_type_assertion(state, ident, d)?),
         _ => Ok((Expression::new_identifier(ident), state)),
     }
 }
 
-fn on_variable_type_assertion(state: ParseState, ident: &str) -> ParseResult<ExpressionState> {
-    let (var_type, state) = state.next();
-    match var_type {
-        Some(Token::Kwd(Kwd::DataType(d))) => {
-            let kwd = NativeType::from_datatype_kwd(&d);
-            let (next, state) = state.next();
-            match next {
-                Some(Token::Symbol(Symbol::Equals)) => { /* Continue */ }
-                Some(t) => {
-                    return Err(ParseError::InvalidSyntax {
-                        message: "Expected an equals sign".to_string(),
-                        token_context: t,
-                    });
-                }
-                None => return Err(ParseError::NoMoreTokens),
-            }
-            Ok(on_assignment(state, ident, Some(kwd))?)
-        }
+fn on_variable_type_assertion(
+    state: ParseState,
+    ident: &str,
+    d: DataTypeKwd,
+) -> ParseResult<ExpressionState> {
+    let kwd = NativeType::from_datatype_kwd(&d);
+    let (next, state) = state.next();
+    println!("{:?}", next);
+    match next {
+        Some(Token::Symbol(Symbol::Equals)) => Ok(on_assignment(state, ident, Some(kwd))?),
         Some(t) => Err(ParseError::InvalidSyntax {
-            message: "Expected a data type".to_string(),
+            message: "Expected an equals sign".to_string(),
             token_context: t,
         }),
         None => Err(ParseError::NoMoreTokens),
@@ -447,16 +439,11 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ParseResult<ExpressionState> {
     Ok(expr)
 }
 
-fn on_constant_type_assertion(state: ParseState) -> ParseResult<(NativeType, ParseState)> {
-    let (var_type, state) = state.next();
-    match var_type {
-        Some(Token::Kwd(Kwd::DataType(d))) => Ok((NativeType::from_datatype_kwd(&d), state)),
-        Some(t) => Err(ParseError::InvalidSyntax {
-            message: "Expected datatype".to_string(),
-            token_context: t,
-        }),
-        None => Err(ParseError::NoMoreTokens),
-    }
+fn on_constant_type_assertion(
+    state: ParseState,
+    d: &DataTypeKwd,
+) -> ParseResult<(NativeType, ParseState)> {
+    Ok((NativeType::from_datatype_kwd(&d), state))
 }
 
 fn on_const(state: ParseState) -> ParseResult<ExpressionState> {
@@ -472,9 +459,9 @@ fn on_const(state: ParseState) -> ParseResult<ExpressionState> {
         None => return Err(ParseError::NoMoreTokens),
     };
     let peek = state.peek();
-    let (type_assertion, state) = if let Some(Token::Symbol(Symbol::Colon)) = peek {
+    let (type_assertion, state) = if let Some(Token::Kwd(Kwd::DataType(d))) = peek {
+        let expr = NativeType::from_datatype_kwd(d);
         let state = state.advance();
-        let (expr, state) = on_constant_type_assertion(state)?;
         (Some(expr), state)
     } else {
         (None, state)
@@ -1103,7 +1090,29 @@ mod tests {
                 None,
                 false,
             ),
-        )
+        );
+
+        test(
+            vec![
+                Token::Ident("y".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
+                Token::Symbol(Symbol::Equals),
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Math(MathSymbol::Plus)),
+                Token::Literal(Literal::Int(3)),
+            ],
+            Expression::new_assignment(
+                "y",
+                Expression::MathOperation(MathOperation {
+                    lhs: Box::new(Expression::new_identifier("x")),
+                    rhs: Box::new(Expression::new_int("3")),
+                    operation: Math::Add,
+                }),
+                None,
+                Some(NativeType::Int),
+                false,
+            ),
+        );
     }
 
     #[test]
@@ -1486,7 +1495,6 @@ mod tests {
         test(
             vec![
                 Token::Ident("x".to_string()),
-                Token::Symbol(Symbol::Colon),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
                 Token::Symbol(Symbol::Equals),
                 Token::Literal(Literal::Int(5)),
@@ -1505,7 +1513,7 @@ mod tests {
             expected,
         );
 
-        // const x : Int = 5
+        // const x Int = 5
         let expected = Expression::new_assignment(
             "x",
             Expression::new_int("5"),
@@ -1517,7 +1525,6 @@ mod tests {
             vec![
                 Token::Kwd(Kwd::Const),
                 Token::Ident("x".to_string()),
-                Token::Symbol(Symbol::Colon),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
                 Token::Symbol(Symbol::Equals),
                 Token::Literal(Literal::Int(5)),

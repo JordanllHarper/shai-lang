@@ -119,10 +119,10 @@ pub struct For {
 /// ```
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Function {
-    ident: String,
-    params: FunctionParameters,
-    return_type: Option<ReturnType>,
-    body: Box<Expression>,
+    pub ident: String,
+    pub params: FunctionParameters,
+    pub return_type: Option<ReturnType>,
+    pub body: Box<Expression>,
 }
 
 /// Type alias to represent a collection of parameters in a function
@@ -203,9 +203,9 @@ pub struct Statement {
 /// ...otherwise it's a single if branch.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct If {
-    evaluation: Box<Expression>,
-    on_true_evaluation: Box<Expression>,
-    on_false_evaluation: Option<Box<Expression>>,
+    pub evaluation: Box<Expression>,
+    pub on_true_evaluation: Box<Expression>,
+    pub on_false_evaluation: Option<Box<Expression>>,
 }
 
 /// Defines the 4 basic math operations supported

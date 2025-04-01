@@ -19,13 +19,13 @@ Declaration:
 
 `// C `
 
-where 
+where
 
 C = comment text
 
-OR 
+OR
 
-/* 
+/*
    C
 */
 C = comment text
@@ -34,8 +34,8 @@ Examples:
 `// This is a comment`
 
 ```
-/* 
-    This is a 
+/*
+    This is a
     multiline comment
 */
 ```
@@ -54,9 +54,9 @@ Examples:
 
 ## Variable assignment
 
-Declaration: 
+Declaration:
 
-`x : T = y`
+`x = y`
 
 where
 
@@ -68,7 +68,7 @@ OR
 
 x = y
 
-where 
+where
 
 x = variable name
 y = variable value
@@ -96,7 +96,7 @@ Declaration:
 
 `const x = y`
 OR
-`const x : T = y`
+`const x T = y`
 
 where
 
@@ -104,14 +104,14 @@ x = variable name
 T = type
 y = value
 
-Examples: 
+Examples:
 const x : int = 5 // immutable
 
 ## Functions
 
-Declaration: 
+Declaration:
 
-fx (y T1, z T2, ... T...) -> RT 
+fx (y T1, z T2, ... T...) -> RT
 { ... }
 
 where
@@ -144,7 +144,7 @@ y, z and ... = arguments (types inferred)
 > [!NOTE]
 > Return type is inferred
 
-Examples: 
+Examples:
 
 ```
 calculateArea (l int, w int) -> int {
@@ -159,46 +159,46 @@ calculateArea (x, y) -> int {
 ```
 
 ```
-concatString (s1, s2) -> string { 
+concatString (s1, s2) -> string {
     return s1 + s2
 }
 ```
 
 ```
-concatString (s1, s2) { 
+concatString (s1, s2) {
     return s1 + s2 // Return type is string
 }
 ```
 
 ```
-concatStringAndInt (s1, i1) { 
+concatStringAndInt (s1, i1) {
     return s1 + i1 // Return type is string
 }
 ```
 
 ## Array Literals
 
-Declaration: 
+Declaration:
 
 `a : T[] = [v1, v2, v3]`
 
-where 
+where
 
 T = array type
 a = array name
 \[v1, v2, v3] = array initialization values
 
-Examples: 
+Examples:
 ```
 values : string[] = ["one", "two", "three"]
 ```
 ## Function calls
 
-Declaration: 
+Declaration:
 
 `x ...`
 
-where 
+where
 
 x = function name
 ... = arguments specified
@@ -209,8 +209,8 @@ Examples:
     OR
 > With inferred type
 `area = calculateArea 9 10`
-    OR  
-> With explicit type 
+    OR
+> With explicit type
 `area : int = calculateArea 9 10`
 
 
@@ -227,16 +227,16 @@ p = property on expression
 
 Examples:
 
-``` 
+```
 "hello".chars // char[]
 ```
-``` 
+```
 "5".parseInt // 5
 ```
 
 ## Imports
 
-Declaration: 
+Declaration:
 
 `include x`
 
@@ -244,7 +244,7 @@ where
 
 x = file name
 
-OR 
+OR
 
 include x as y
 
@@ -269,30 +269,30 @@ x = baz.someFunctionFromFoo()
 
 ## If else expressions
 
-Declaration: 
+Declaration:
 
 `if x { ... }`
 
-where 
+where
 
 x = condition to enter block if evaluated to true
 
-Examples: 
+Examples:
 ```
-if true { 
+if true {
     //always go in here
 }
 ```
 ```
 i = 5
-if i > 3 { 
+if i > 3 {
     print i
 }
 ```
 
 ```
 i = 5
-if i > 3 { 
+if i > 3 {
     print i
 } else {
     print i + 1
@@ -309,12 +309,12 @@ for x in y {
 
 ```
 
-where 
+where
 
 x = scoped variable
 y = range
 
-Examples: 
+Examples:
 ```
 for i in 0..10{
     print i
@@ -327,25 +327,25 @@ for name in names {
 }
 ```
 
-## While loop 
+## While loop
 
 Declaration:
 
 ```
-while x { 
-    
+while x {
+
 }
 ```
 
-where 
+where
 
-x is loop continuation condition that evaluates to true or false. 
+x is loop continuation condition that evaluates to true or false.
 
 > [!NOTE]
 > If x is ommitted, loop will continue until a break statement is hit
 
 ```
-while { 
+while {
     print "hello"
     // infinite loop
 }
@@ -353,7 +353,7 @@ while {
 ```
 // print hello 10 times
 i = 0
-while i < 10 { 
+while i < 10 {
     print "hello"
     i+=1
 }
@@ -361,7 +361,7 @@ while i < 10 {
 ```
 // print hello 3 times
 i = 0
-while i < 10 { 
+while i < 10 {
     print "hello"
     if i / 2 == 1 {
         break
