@@ -37,8 +37,8 @@ pub enum NativeType {
     Float,
     Bool,
     // These recurse - we can have a Array of Arrays of Integers
-    Array(Box<NativeType>),
-    Dictionary(Dictionary),
+    Array,
+    Dictionary,
     Function,
 }
 
@@ -419,11 +419,8 @@ impl Expression {
         Self::ValueLiteral(ValueLiteral::new(NativeType::Float, representation))
     }
 
-    pub fn new_array(representation: &str, native_type: NativeType) -> Self {
-        Self::ValueLiteral(ValueLiteral::new(
-            NativeType::Array(Box::new(native_type)),
-            representation,
-        ))
+    pub fn new_array(representation: &str) -> Self {
+        Self::ValueLiteral(ValueLiteral::new(NativeType::Array, representation))
     }
     pub fn new_math_expression(lhs: Expression, rhs: Expression, operation: Math) -> Expression {
         Expression::MathOperation(MathOperation::new(lhs, rhs, operation))
@@ -533,15 +530,6 @@ impl FunctionCall {
         Self {
             identifier: identifier.to_string(),
             args,
-        }
-    }
-}
-
-impl Dictionary {
-    fn new(key: NativeType, value: NativeType) -> Self {
-        Self {
-            key: Box::new(key),
-            value: Box::new(value),
         }
     }
 }
