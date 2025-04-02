@@ -205,6 +205,18 @@ fn on_body(state: ParseState) -> ParseResult<ExpressionState> {
     Ok((Expression::Body(body), state))
 }
 
+fn parse_array_body(
+    state: ParseState,
+    array: &mut Vec<Expression>,
+) -> ParseResult<ExpressionState> {
+    let (t, state) = state.next();
+    todo!();
+}
+
+fn on_array_literal(state: ParseState) -> ParseResult<ExpressionState> {
+    parse_array_body(state, &mut vec![])
+}
+
 fn on_assignment(
     state: ParseState,
     ident: &str,
@@ -219,10 +231,7 @@ fn on_assignment(
                 state,
             ))
         }
-        Some(Token::Symbol(Symbol::BraceOpen)) => {
-            // TODO: Expression assignment
-            todo!()
-        }
+        Some(Token::Symbol(Symbol::AngOpen)) => on_array_literal(state),
         Some(Token::Ident(i)) => {
             let (rhs, state) = on_identifier(state, &i)?;
             Ok((
@@ -231,7 +240,7 @@ fn on_assignment(
             ))
         }
         Some(t) => Err(ParseError::InvalidSyntax {
-            message: "Expected a valid assignment: literal value, ".to_string(),
+            message: "Expected a valid assignment: literal value".to_string(),
             token_context: t,
         }),
         None => Err(ParseError::NoMoreTokens),
@@ -719,7 +728,7 @@ mod tests {
                 Expression::Body(vec![Expression::new_if(
                     Expression::new_evaluation(
                         Expression::new_identifier("i"),
-                        Some(Expression::new_int("0")),
+                        Some(Expression::new_int(0)),
                         EvaluationOperator::Lz,
                     ),
                     Expression::new_body(vec![Expression::new_statement(
@@ -747,7 +756,7 @@ mod tests {
             ],
             Expression::new_if(
                 Expression::new_evaluation(
-                    Expression::new_bool("true"),
+                    Expression::new_bool(true),
                     None,
                     EvaluationOperator::BooleanTruthy,
                 ),
@@ -773,8 +782,8 @@ mod tests {
             ],
             Expression::new_if(
                 Expression::new_evaluation(
-                    Expression::new_int("3"),
-                    Some(Expression::new_int("3")),
+                    Expression::new_int(3),
+                    Some(Expression::new_int(3)),
                     EvaluationOperator::Eq,
                 ),
                 Expression::new_body(vec![Expression::new_function_call(
@@ -833,7 +842,7 @@ mod tests {
             ],
             Expression::new_if(
                 Expression::new_evaluation(
-                    Expression::new_bool("true"),
+                    Expression::new_bool(true),
                     None,
                     EvaluationOperator::BooleanTruthy,
                 ),
@@ -869,8 +878,8 @@ mod tests {
             ],
             Expression::new_if(
                 Expression::new_evaluation(
-                    Expression::new_int("3"),
-                    Some(Expression::new_int("3")),
+                    Expression::new_int(3),
+                    Some(Expression::new_int(3)),
                     EvaluationOperator::Eq,
                 ),
                 Expression::new_body(vec![Expression::new_function_call(
@@ -971,8 +980,8 @@ mod tests {
             ],
             Expression::new_while(
                 Some(Expression::new_evaluation(
-                    Expression::new_int("3"),
-                    Some(Expression::new_int("3")),
+                    Expression::new_int(3),
+                    Some(Expression::new_int(3)),
                     EvaluationOperator::Eq,
                 )),
                 Expression::Body(vec![Expression::new_function_call(
@@ -1025,7 +1034,7 @@ mod tests {
             ],
             Expression::new_for(
                 Expression::new_identifier("x"),
-                Expression::new_range(Expression::new_int("0"), Expression::new_int("5"), false),
+                Expression::new_range(Expression::new_int(0), Expression::new_int(5), false),
                 Expression::Body(Body::new()),
             ),
         );
@@ -1083,7 +1092,7 @@ mod tests {
                 "y",
                 Expression::MathOperation(MathOperation {
                     lhs: Box::new(Expression::new_identifier("x")),
-                    rhs: Box::new(Expression::new_int("3")),
+                    rhs: Box::new(Expression::new_int(3)),
                     operation: Math::Add,
                 }),
                 None,
@@ -1105,7 +1114,7 @@ mod tests {
                 "y",
                 Expression::MathOperation(MathOperation {
                     lhs: Box::new(Expression::new_identifier("x")),
-                    rhs: Box::new(Expression::new_int("3")),
+                    rhs: Box::new(Expression::new_int(3)),
                     operation: Math::Add,
                 }),
                 None,
@@ -1372,7 +1381,7 @@ mod tests {
                 Token::Symbol(Symbol::Equals),
                 Token::Literal(Literal::Float(3.5)),
             ],
-            Expression::new_assignment("x", Expression::new_float("3.5"), None, None, false),
+            Expression::new_assignment("x", Expression::new_float(3.5), None, None, false),
         );
     }
 
@@ -1428,10 +1437,7 @@ mod tests {
             ],
             Expression::new_function_call(
                 "print",
-                vec![
-                    Expression::new_string("Hello"),
-                    Expression::new_bool("true"),
-                ],
+                vec![Expression::new_string("Hello"), Expression::new_bool(true)],
             ),
         );
     }
@@ -1439,7 +1445,7 @@ mod tests {
     #[test]
     fn literal_assignment() {
         // "x=5"
-        let expected = Expression::new_assignment("x", Expression::new_int("5"), None, None, false);
+        let expected = Expression::new_assignment("x", Expression::new_int(5), None, None, false);
         test(
             vec![
                 Token::Ident("x".to_string()),
@@ -1487,7 +1493,7 @@ mod tests {
 
         let expected = Expression::new_assignment(
             "x",
-            Expression::new_int("5"),
+            Expression::new_int(5),
             None,
             Some(NativeType::Int),
             false,
@@ -1502,7 +1508,7 @@ mod tests {
             expected,
         );
         // const x = 5
-        let expected = Expression::new_assignment("x", Expression::new_int("5"), None, None, true);
+        let expected = Expression::new_assignment("x", Expression::new_int(5), None, None, true);
         test(
             vec![
                 Token::Kwd(Kwd::Const),
@@ -1516,7 +1522,7 @@ mod tests {
         // const x Int = 5
         let expected = Expression::new_assignment(
             "x",
-            Expression::new_int("5"),
+            Expression::new_int(5),
             None,
             Some(NativeType::Int),
             true,

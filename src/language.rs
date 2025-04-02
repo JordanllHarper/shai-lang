@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::*;
 
 type MultipleValues = Vec<Expression>;
@@ -42,14 +44,7 @@ pub enum NativeType {
     Function,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-/// A set of key value pairs.
-pub struct Dictionary {
-    pub key: Box<NativeType>,
-    pub value: Box<NativeType>,
-}
-
-/// A single value representation. Representation is held as a String to be deserialized.
+/// A single value representation.
 ///
 /// Example:
 ///
@@ -58,11 +53,53 @@ pub struct Dictionary {
 ///
 /// x = 'c'
 ///      |- the value literal 'c', with a native type of 'char'
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct ValueLiteral {
-    pub native_type: NativeType,
-    pub representation: String,
+#[derive(Debug, Clone)]
+pub enum ValueLiteral {
+    Char(char),
+    Int(i32),
+    String(String),
+    Float(f32),
+    Bool(bool),
+    // These recurse - we can have a Array of Arrays of Integers
+    Array(Vec<ValueLiteral>),
+    Dictionary(HashMap<ValueLiteral, ValueLiteral>),
+    Function,
 }
+
+impl PartialEq for ValueLiteral {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ValueLiteral::Char(c1), ValueLiteral::Char(c2)) => c1 == c2,
+            (ValueLiteral::Int(i1), ValueLiteral::Int(i2)) => i1 == i2,
+            (ValueLiteral::String(s1), ValueLiteral::String(s2)) => s1 == s2,
+            (ValueLiteral::Float(f1), ValueLiteral::Float(f2)) => f1 == f2,
+            (ValueLiteral::Bool(b1), ValueLiteral::Bool(b2)) => b1 == b2,
+            (ValueLiteral::Array(a1), ValueLiteral::Array(a2)) => a1 == a2,
+            (ValueLiteral::Dictionary(d1), ValueLiteral::Dictionary(d2)) => {
+                if d1.len() != d2.len() {
+                    return false;
+                }
+
+                for (key_1, key_2) in d1.keys().zip(d2.keys()) {
+                    if key_1 != key_2 {
+                        return false;
+                    }
+                }
+
+                true
+            }
+            (ValueLiteral::Function, ValueLiteral::Function) => false,
+            _ => false,
+        }
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
+    // add code here
+}
+
+impl Eq for ValueLiteral {}
 
 /// Represents a program 'body'. That is, a collection of expressions in a row.
 ///
@@ -342,10 +379,12 @@ impl Range {
 }
 
 impl ValueLiteral {
-    fn new(native_type: NativeType, representation: &str) -> Self {
-        Self {
-            native_type,
-            representation: representation.to_string(),
+    fn from_literal(representation: &Literal) -> Self {
+        match representation {
+            Literal::Bool(b) => Self::Bool(*b),
+            Literal::Int(i) => Self::Int(*i),
+            Literal::Float(f) => Self::Float(*f),
+            Literal::String(s) => Self::String(s.to_string()),
         }
     }
 }
@@ -390,12 +429,7 @@ impl Statement {
 
 impl Expression {
     pub fn new_from_literal(l: &Literal) -> Self {
-        let l = match l {
-            Literal::Bool(b) => ValueLiteral::new(NativeType::Bool, &b.to_string()),
-            Literal::Int(i) => ValueLiteral::new(NativeType::Int, &i.to_string()),
-            Literal::String(s) => ValueLiteral::new(NativeType::String, &s.to_string()),
-            Literal::Float(f) => ValueLiteral::new(NativeType::Float, &f.to_string()),
-        };
+        let l = ValueLiteral::from_literal(l);
         Expression::ValueLiteral(l)
     }
 
@@ -403,24 +437,24 @@ impl Expression {
         Expression::Identifier(ident.to_string())
     }
 
-    pub fn new_string(representation: &str) -> Self {
-        Self::ValueLiteral(ValueLiteral::new(NativeType::String, representation))
+    pub fn new_string(s: &str) -> Self {
+        Self::ValueLiteral(ValueLiteral::String(s.to_string()))
     }
 
-    pub fn new_int(representation: &str) -> Self {
-        Self::ValueLiteral(ValueLiteral::new(NativeType::Int, representation))
+    pub fn new_int(i: i32) -> Self {
+        Self::ValueLiteral(ValueLiteral::Int(i))
     }
 
-    pub fn new_bool(representation: &str) -> Self {
-        Self::ValueLiteral(ValueLiteral::new(NativeType::Bool, representation))
+    pub fn new_bool(b: bool) -> Self {
+        Self::ValueLiteral(ValueLiteral::Bool(b))
     }
 
-    pub fn new_float(representation: &str) -> Self {
-        Self::ValueLiteral(ValueLiteral::new(NativeType::Float, representation))
+    pub fn new_float(f: f32) -> Self {
+        Self::ValueLiteral(ValueLiteral::Float(f))
     }
 
-    pub fn new_array(representation: &str) -> Self {
-        Self::ValueLiteral(ValueLiteral::new(NativeType::Array, representation))
+    pub fn new_array(arr: Vec<ValueLiteral>) -> Self {
+        Self::ValueLiteral(ValueLiteral::Array(arr))
     }
     pub fn new_math_expression(lhs: Expression, rhs: Expression, operation: Math) -> Expression {
         Expression::MathOperation(MathOperation::new(lhs, rhs, operation))
@@ -489,10 +523,6 @@ impl Expression {
         evaluation_op: EvaluationOperator,
     ) -> Expression {
         Expression::Evaluation(Evaluation::new(lhs, rhs, evaluation_op))
-    }
-
-    pub fn new_char(representation: &str) -> Expression {
-        Expression::ValueLiteral(ValueLiteral::new(NativeType::Char, representation))
     }
 }
 

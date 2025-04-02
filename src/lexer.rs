@@ -146,7 +146,7 @@ impl Display for Literal {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     Bool(bool),
     Int(i32),
