@@ -8,7 +8,7 @@ It takes inspiration from the following languages:
 
 - Bash + Nushell for acting as a Shell scripting language.
 - Go for it's development speed.
-- Python + Lua for dynamic typing and preference for mechanisms over contracts. TODO: Reference TJ Devries here on why Lua in Neovim (this is his idea).
+- Python + Lua for dynamic typing and preference for mechanisms over contracts.
 - Rust + Kotlin for it's expresssion based systems.
 
 Below is an overview of the language.
@@ -47,9 +47,9 @@ Examples:
 - `int`
 - `bool`
 - `float`
-- `T[]`(arrays)
+- `[T]`(arrays)
     - where T is the item stored in the array
-- `K, V{}`(dictionaries)
+- `{K, V}`(dictionaries)
     - where K is the Key type and V is the Value type
 
 ## Variable assignment
@@ -180,7 +180,7 @@ concatStringAndInt (s1, i1) {
 
 Declaration:
 
-`a : T[] = [v1, v2, v3]`
+`a : [T] = [v1, v2, v3]`
 
 where
 
@@ -190,7 +190,7 @@ a = array name
 
 Examples:
 ```
-values : string[] = ["one", "two", "three"]
+values : [string] = ["one", "two", "three"]
 ```
 ## Function calls
 
