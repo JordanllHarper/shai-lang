@@ -44,6 +44,14 @@ pub enum NativeType {
     Function,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum DictionaryKey {
+    String(String),
+    Int(i32),
+    Bool(bool),
+    Identifier(String),
+}
+
 /// A single value representation.
 ///
 /// Example:
@@ -62,7 +70,7 @@ pub enum ValueLiteral {
     Bool(bool),
     // These recurse - we can have a Array of Arrays of Integers
     Array(Vec<Expression>),
-    Dictionary(HashMap<Expression, Expression>),
+    Dictionary(HashMap<DictionaryKey, Expression>),
     Function,
 }
 
@@ -379,8 +387,8 @@ impl Range {
 }
 
 impl ValueLiteral {
-    fn from_literal(representation: &Literal) -> Self {
-        match representation {
+    pub fn from_literal(literal: &Literal) -> Self {
+        match literal {
             Literal::Bool(b) => Self::Bool(*b),
             Literal::Int(i) => Self::Int(*i),
             Literal::Float(f) => Self::Float(*f),
@@ -458,6 +466,11 @@ impl Expression {
     pub fn new_array(arr: Vec<Expression>) -> Self {
         Self::ValueLiteral(ValueLiteral::Array(arr))
     }
+
+    pub fn new_dict(dict: HashMap<DictionaryKey, Expression>) -> Self {
+        Self::ValueLiteral(ValueLiteral::Dictionary(dict))
+    }
+
     pub fn new_math_expression(lhs: Expression, rhs: Expression, operation: Math) -> Expression {
         Expression::MathOperation(MathOperation::new(lhs, rhs, operation))
     }

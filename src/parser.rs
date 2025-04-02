@@ -1,9 +1,14 @@
+use std::{collections::HashMap, os::macos::raw::stat};
+
 use pretty_assertions::assert_eq;
 use For;
 use FunctionCall;
 use Statement;
 
-use crate::{language::*, lexer::*};
+use crate::{
+    language::{self, *},
+    lexer::*,
+};
 
 type ExpressionState = (Expression, ParseState);
 
@@ -39,7 +44,7 @@ impl ParseState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ParseError {
     InvalidSyntax {
         message: String,
@@ -219,7 +224,11 @@ fn parse_array_literal(
             let (_, state) = state.next();
             let peek = state.peek();
             if let Some(Token::Symbol(Symbol::Comma)) = peek {
-                return Err(ParseError::InvalidSyntax { message: "Invalid syntax. Expected an element or a closing angle bracket but found comma.".to_string(), token_context: Token::Symbol(Symbol::Comma) });
+                return Err(ParseError::InvalidSyntax {
+                    message: "Expected an element or a closing angle bracket but found comma."
+                        .to_string(),
+                    token_context: Token::Symbol(Symbol::Comma),
+                });
             }
             parse_array_literal(state, array)
         }
@@ -234,6 +243,94 @@ fn parse_array_literal(
 
 fn on_array_literal(state: ParseState) -> ParseResult<ExpressionState> {
     parse_array_literal(state, &mut vec![])
+}
+
+fn parse_dict_key(literal: Literal) -> ParseResult<DictionaryKey> {
+    match literal {
+        Literal::Bool(b) => Ok(DictionaryKey::Bool(b)),
+        Literal::Int(i) => Ok(DictionaryKey::Int(i)),
+        Literal::String(s) => Ok(DictionaryKey::String(s)),
+        Literal::Float(f) => Err(ParseError::InvalidSyntax {
+            message: "Float cannot be used as key to Dictionary".to_string(),
+            token_context: Token::Literal(Literal::Float(f)),
+        }),
+    }
+}
+fn parse_dict_literal(
+    state: ParseState,
+    map: &mut HashMap<DictionaryKey, Expression>,
+) -> ParseResult<ExpressionState> {
+    let (t, state) = state.next();
+
+    match t {
+        Some(Token::Ident(i)) => {
+            let (t, state) = state.next();
+            match t {
+                Some(Token::Symbol(Symbol::Colon)) => {
+                    let (rhs, state) = on_expression(state)?;
+
+                    map.insert(DictionaryKey::Identifier(i), rhs);
+
+                    let (t, state) = state.next();
+                    match t {
+                        Some(Token::Symbol(Symbol::Comma)) => parse_dict_literal(state, map),
+                        Some(t) => Err(ParseError::InvalidSyntax {
+                            message: "Expected a comma".to_string(),
+                            token_context: t,
+                        }),
+                        None => Err(ParseError::NoMoreTokens),
+                    }
+                }
+                Some(t) => Err(ParseError::InvalidSyntax {
+                    message: "Expected a colon".to_string(),
+                    token_context: t,
+                }),
+                None => Err(ParseError::NoMoreTokens),
+            }
+        }
+        Some(Token::Literal(l)) => {
+            let key = parse_dict_key(l)?;
+
+            let (t, state) = state.next();
+            match t {
+                Some(Token::Symbol(Symbol::Colon)) => {
+                    let (rhs, state) = on_expression(state)?;
+                    map.insert(key, rhs);
+                    let t = state.peek();
+                    match t {
+                        Some(Token::Symbol(Symbol::Comma)) => parse_dict_literal(state, map),
+                        Some(Token::Symbol(Symbol::BraceClose)) => {
+                            Ok((Expression::new_dict(map.to_owned()), state))
+                        }
+
+                        Some(t) => Err(ParseError::InvalidSyntax {
+                            message: "Expected a comma".to_string(),
+                            token_context: t.clone(),
+                        }),
+                        None => Err(ParseError::NoMoreTokens),
+                    }
+                }
+                Some(t) => Err(ParseError::InvalidSyntax {
+                    message: "Expected a colon".to_string(),
+                    token_context: t,
+                }),
+                None => Err(ParseError::NoMoreTokens),
+            }
+        }
+        Some(Token::Symbol(Symbol::BraceClose)) => {
+            Ok((Expression::new_dict(map.to_owned()), state))
+        }
+
+        Some(t) => Err(ParseError::InvalidSyntax {
+            message: "Expected an identifier, literal, or closing brace".to_string(),
+            token_context: t,
+        }),
+        None => Err(ParseError::NoMoreTokens),
+    }
+}
+
+fn on_dict_literal(state: ParseState) -> ParseResult<ExpressionState> {
+    parse_dict_literal(state, &mut HashMap::new())
 }
 
 fn on_assignment(
@@ -257,6 +354,13 @@ fn on_assignment(
                 state,
             ))
         }
+        Some(Token::Symbol(Symbol::BraceOpen)) => {
+            let (expr, state) = on_dict_literal(state)?;
+            Ok((
+                Expression::new_assignment(ident, expr, None, type_assertion, false),
+                state,
+            ))
+        }
         Some(Token::Ident(i)) => {
             let (rhs, state) = on_identifier(state, &i)?;
             Ok((
@@ -265,7 +369,8 @@ fn on_assignment(
             ))
         }
         Some(t) => Err(ParseError::InvalidSyntax {
-            message: "Expected a valid assignment: literal value".to_string(),
+            message: "Expected a valid assignment: literal value, identifier, or array syntax"
+                .to_string(),
             token_context: t,
         }),
         None => Err(ParseError::NoMoreTokens),
@@ -673,12 +778,18 @@ where
 #[cfg(test)]
 mod tests {
 
+    use std::collections::HashMap;
+
     use super::*;
 
     use pretty_assertions::assert_eq;
 
     fn test(input: Vec<Token>, expected: Expression) {
         let actual = parse(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+    fn test_err(input: Vec<Token>, expected: ParseError) {
+        let actual = parse(input).unwrap_err();
         assert_eq!(expected, actual);
     }
 
@@ -1660,7 +1771,8 @@ mod tests {
             ),
         );
 
-        test(
+        // x = [3,,4,] == invalid
+        test_err(
             vec![
                 Token::Ident("x".to_string()),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Arr)),
@@ -1668,20 +1780,81 @@ mod tests {
                 Token::Symbol(Symbol::AngOpen),
                 Token::Literal(Literal::Int(3)),
                 Token::Symbol(Symbol::Comma),
+                Token::Symbol(Symbol::Comma),
                 Token::Literal(Literal::Int(4)),
                 Token::Symbol(Symbol::Comma),
                 Token::Symbol(Symbol::AngClose),
             ],
+            ParseError::InvalidSyntax {
+                message: "Expected an element or a closing angle bracket but found comma."
+                    .to_string(),
+                token_context: Token::Symbol(Symbol::Comma),
+            },
+        );
+    }
+    #[test]
+    fn dictionary_literals() {
+        // x dict = {}
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Dict)),
+                Token::Symbol(Symbol::Equals),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::BraceClose),
+            ],
             Expression::new_assignment(
                 "x",
-                Expression::new_array(vec![
-                    Expression::new_from_literal(&Literal::Int(3)),
-                    Expression::new_from_literal(&Literal::Int(4)),
-                ]),
+                Expression::new_dict(HashMap::new()),
                 None,
-                Some(NativeType::Array),
+                Some(NativeType::Dictionary),
                 false,
             ),
+        );
+
+        // x dict = {
+        //  "hello": "world"
+        // }
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Dict)),
+                Token::Symbol(Symbol::Equals),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Literal(Literal::String("hello".to_string())),
+                Token::Symbol(Symbol::Colon),
+                Token::Literal(Literal::String("world".to_string())),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::new_assignment(
+                "x",
+                Expression::new_dict(HashMap::from([(
+                    DictionaryKey::String("hello".to_string()),
+                    Expression::new_string("world"),
+                )])),
+                None,
+                Some(NativeType::Dictionary),
+                false,
+            ),
+        );
+        // x = {"hello": "world",,}
+        test_err(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Dict)),
+                Token::Symbol(Symbol::Equals),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Literal(Literal::String("hello".to_string())),
+                Token::Symbol(Symbol::Colon),
+                Token::Literal(Literal::String("world".to_string())),
+                Token::Symbol(Symbol::Comma),
+                Token::Symbol(Symbol::Comma), // invalid
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            ParseError::InvalidSyntax {
+                message: "Expected an identifier, literal, or closing brace".to_string(),
+                token_context: Token::Symbol(Symbol::Comma),
+            },
         );
     }
 }
