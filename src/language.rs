@@ -61,8 +61,8 @@ pub enum ValueLiteral {
     Float(f32),
     Bool(bool),
     // These recurse - we can have a Array of Arrays of Integers
-    Array(Vec<ValueLiteral>),
-    Dictionary(HashMap<ValueLiteral, ValueLiteral>),
+    Array(Vec<Expression>),
+    Dictionary(HashMap<Expression, Expression>),
     Function,
 }
 
@@ -397,6 +397,8 @@ impl NativeType {
             DataTypeKwd::Int => Self::Int,
             DataTypeKwd::String => Self::String,
             DataTypeKwd::Void => Self::Void,
+            DataTypeKwd::Dict => Self::Dictionary,
+            DataTypeKwd::Arr => Self::Array,
         }
     }
 }
@@ -453,7 +455,7 @@ impl Expression {
         Self::ValueLiteral(ValueLiteral::Float(f))
     }
 
-    pub fn new_array(arr: Vec<ValueLiteral>) -> Self {
+    pub fn new_array(arr: Vec<Expression>) -> Self {
         Self::ValueLiteral(ValueLiteral::Array(arr))
     }
     pub fn new_math_expression(lhs: Expression, rhs: Expression, operation: Math) -> Expression {

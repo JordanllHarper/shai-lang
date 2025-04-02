@@ -205,16 +205,35 @@ fn on_body(state: ParseState) -> ParseResult<ExpressionState> {
     Ok((Expression::Body(body), state))
 }
 
-fn parse_array_body(
+fn parse_array_literal(
     state: ParseState,
     array: &mut Vec<Expression>,
 ) -> ParseResult<ExpressionState> {
-    let (t, state) = state.next();
-    todo!();
+    let t = state.peek();
+    match t {
+        Some(Token::Symbol(Symbol::AngClose)) => {
+            let (_, state) = state.next();
+            Ok((Expression::new_array(array.to_vec()), state))
+        }
+        Some(Token::Symbol(Symbol::Comma)) => {
+            let (_, state) = state.next();
+            let peek = state.peek();
+            if let Some(Token::Symbol(Symbol::Comma)) = peek {
+                return Err(ParseError::InvalidSyntax { message: "Invalid syntax. Expected an element or a closing angle bracket but found comma.".to_string(), token_context: Token::Symbol(Symbol::Comma) });
+            }
+            parse_array_literal(state, array)
+        }
+        Some(_) => {
+            let (expr, state) = on_expression(state)?;
+            array.push(expr);
+            parse_array_literal(state, array)
+        }
+        None => Err(ParseError::NoMoreTokens),
+    }
 }
 
 fn on_array_literal(state: ParseState) -> ParseResult<ExpressionState> {
-    parse_array_body(state, &mut vec![])
+    parse_array_literal(state, &mut vec![])
 }
 
 fn on_assignment(
@@ -231,7 +250,13 @@ fn on_assignment(
                 state,
             ))
         }
-        Some(Token::Symbol(Symbol::AngOpen)) => on_array_literal(state),
+        Some(Token::Symbol(Symbol::AngOpen)) => {
+            let (expr, state) = on_array_literal(state)?;
+            Ok((
+                Expression::new_assignment(ident, expr, None, type_assertion, false),
+                state,
+            ))
+        }
         Some(Token::Ident(i)) => {
             let (rhs, state) = on_identifier(state, &i)?;
             Ok((
@@ -257,9 +282,12 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<ExpressionState>
     // TODO: Variable Usage e.g. y = x + 3
     let t = state.peek();
 
-    if let Some(Token::Kwd(Kwd::In)) = t {
-        return Ok((Expression::Identifier(ident.to_string()), state));
-    }
+    match t {
+        Some(Token::Kwd(Kwd::In)) | Some(Token::Symbol(Symbol::Comma)) => {
+            return Ok((Expression::Identifier(ident.to_string()), state));
+        }
+        _ => { /* Continue */ }
+    };
     let (t, state) = state.next();
     match t {
         // Assignment
@@ -296,7 +324,6 @@ fn on_variable_type_assertion(
 ) -> ParseResult<ExpressionState> {
     let kwd = NativeType::from_datatype_kwd(&d);
     let (next, state) = state.next();
-    println!("{:?}", next);
     match next {
         Some(Token::Symbol(Symbol::Equals)) => Ok(on_assignment(state, ident, Some(kwd))?),
         Some(t) => Err(ParseError::InvalidSyntax {
@@ -446,13 +473,6 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ParseResult<ExpressionState> {
     };
 
     Ok(expr)
-}
-
-fn on_constant_type_assertion(
-    state: ParseState,
-    d: &DataTypeKwd,
-) -> ParseResult<(NativeType, ParseState)> {
-    Ok((NativeType::from_datatype_kwd(&d), state))
 }
 
 fn on_const(state: ParseState) -> ParseResult<ExpressionState> {
@@ -1551,5 +1571,117 @@ mod tests {
                 StatementOperator::Include,
             ),
         )
+    }
+
+    #[test]
+    fn array_literals() {
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Arr)),
+                Token::Symbol(Symbol::Equals),
+                Token::Symbol(Symbol::AngOpen),
+                Token::Symbol(Symbol::AngClose),
+            ],
+            Expression::new_assignment(
+                "x",
+                Expression::new_array(vec![]),
+                None,
+                Some(NativeType::Array),
+                false,
+            ),
+        );
+
+        // x = [3]
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Arr)),
+                Token::Symbol(Symbol::Equals),
+                Token::Symbol(Symbol::AngOpen),
+                Token::Literal(Literal::Int(3)),
+                Token::Symbol(Symbol::AngClose),
+            ],
+            Expression::new_assignment(
+                "x",
+                Expression::new_array(vec![Expression::new_from_literal(&Literal::Int(3))]),
+                None,
+                Some(NativeType::Array),
+                false,
+            ),
+        );
+
+        // x = [3, 4]
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Arr)),
+                Token::Symbol(Symbol::Equals),
+                Token::Symbol(Symbol::AngOpen),
+                Token::Literal(Literal::Int(3)),
+                Token::Symbol(Symbol::Comma),
+                Token::Literal(Literal::Int(4)),
+                Token::Symbol(Symbol::AngClose),
+            ],
+            Expression::new_assignment(
+                "x",
+                Expression::new_array(vec![
+                    Expression::new_from_literal(&Literal::Int(3)),
+                    Expression::new_from_literal(&Literal::Int(4)),
+                ]),
+                None,
+                Some(NativeType::Array),
+                false,
+            ),
+        );
+
+        // x = [3, 4,]
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Arr)),
+                Token::Symbol(Symbol::Equals),
+                Token::Symbol(Symbol::AngOpen),
+                Token::Literal(Literal::Int(3)),
+                Token::Symbol(Symbol::Comma),
+                Token::Literal(Literal::Int(4)),
+                Token::Symbol(Symbol::Comma),
+                Token::Symbol(Symbol::AngClose),
+            ],
+            Expression::new_assignment(
+                "x",
+                Expression::new_array(vec![
+                    Expression::new_from_literal(&Literal::Int(3)),
+                    Expression::new_from_literal(&Literal::Int(4)),
+                ]),
+                None,
+                Some(NativeType::Array),
+                false,
+            ),
+        );
+
+        test(
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Kwd(Kwd::DataType(DataTypeKwd::Arr)),
+                Token::Symbol(Symbol::Equals),
+                Token::Symbol(Symbol::AngOpen),
+                Token::Literal(Literal::Int(3)),
+                Token::Symbol(Symbol::Comma),
+                Token::Literal(Literal::Int(4)),
+                Token::Symbol(Symbol::Comma),
+                Token::Symbol(Symbol::AngClose),
+            ],
+            Expression::new_assignment(
+                "x",
+                Expression::new_array(vec![
+                    Expression::new_from_literal(&Literal::Int(3)),
+                    Expression::new_from_literal(&Literal::Int(4)),
+                ]),
+                None,
+                Some(NativeType::Array),
+                false,
+            ),
+        );
     }
 }

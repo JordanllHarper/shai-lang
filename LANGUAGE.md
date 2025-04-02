@@ -47,9 +47,9 @@ Examples:
 - `int`
 - `bool`
 - `float`
-- `[T]`(arrays)
+- `arr`(arrays)
     - where T is the item stored in the array
-- `{K, V}`(dictionaries)
+- `dict`(dictionaries)
     - where K is the Key type and V is the Value type
 
 ## Variable assignment
@@ -77,16 +77,16 @@ y = variable value
 > Type is inferred automatically
 
 Examples:
-`x : int = 5`
+`x int = 5`
     OR
 `x = 5`
 
 
-`y : string = "hello"`
+`y string = "hello"`
     OR
 `y = "hello"`
 
-`b : bool = true`
+`b bool = true`
     OR
 `b = true`
 
@@ -180,7 +180,7 @@ concatStringAndInt (s1, i1) {
 
 Declaration:
 
-`a : [T] = [v1, v2, v3]`
+`a arr = [v1, v2, v3]`
 
 where
 
@@ -190,7 +190,7 @@ a = array name
 
 Examples:
 ```
-values : [string] = ["one", "two", "three"]
+values arr = ["one", "two", "three"]
 ```
 ## Function calls
 
@@ -211,7 +211,7 @@ Examples:
 `area = calculateArea 9 10`
     OR
 > With explicit type
-`area : int = calculateArea 9 10`
+`area int = calculateArea 9 10`
 
 
 ## Property/Method Access

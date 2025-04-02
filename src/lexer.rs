@@ -25,6 +25,8 @@ impl Display for DataTypeKwd {
             DataTypeKwd::Float => "float",
             DataTypeKwd::Int => "int",
             DataTypeKwd::String => "string",
+            DataTypeKwd::Dict => "dict",
+            DataTypeKwd::Arr => "arr",
             DataTypeKwd::Void => "void",
         };
         f.write_str(representation)
@@ -100,7 +102,6 @@ impl Display for Symbol {
             Symbol::EscapeApos => "\\\'",
             Symbol::Comment(c) => c,
             Symbol::MultilineComment(c) => c,
-            Symbol::Array => "[]",
             Symbol::Math(s) => &s.to_string(),
             Symbol::Range => "..",
             Symbol::RangeEq => "..=",
@@ -204,7 +205,6 @@ pub enum Symbol {
     Bang,
     Newline,
     // 2 char symbols
-    Array,
     PlusAssign,
     MinusAssign,
     MultiplyAssign,
@@ -229,6 +229,8 @@ pub enum DataTypeKwd {
     Int,
     String,
     Void,
+    Dict,
+    Arr,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -462,6 +464,8 @@ fn map_datatype_kwd(s: &str) -> Option<DataTypeKwd> {
         "char" => Some(DataTypeKwd::Char),
         "float" => Some(DataTypeKwd::Float),
         "string" => Some(DataTypeKwd::String),
+        "dict" => Some(DataTypeKwd::Dict),
+        "arr" => Some(DataTypeKwd::Arr),
         _ => None,
     }
 }
@@ -477,9 +481,10 @@ impl Iterator for Lexer {
             let token = match c {
                 '(' => Token::Symbol(Symbol::ParenOpen),
                 ')' => Token::Symbol(Symbol::ParenClose),
-                ']' => Token::Symbol(Symbol::AngClose),
                 '{' => Token::Symbol(Symbol::BraceOpen),
                 '}' => Token::Symbol(Symbol::BraceClose),
+                '[' => Token::Symbol(Symbol::AngOpen),
+                ']' => Token::Symbol(Symbol::AngClose),
                 '%' => Token::Symbol(Symbol::Modulus),
                 '\'' => Token::Symbol(Symbol::Apstr),
                 ',' => Token::Symbol(Symbol::Comma),
@@ -506,7 +511,6 @@ impl Iterator for Lexer {
                     |lexer| peek_symbol(lexer, '=', Symbol::RangeEq, Symbol::Range),
                     Token::Symbol(Symbol::Period),
                 ),
-                '[' => peek_symbol(self, ']', Symbol::Array, Symbol::AngOpen),
                 '<' => peek_symbol(
                     self,
                     '=',
@@ -827,7 +831,6 @@ add (x, y) {
             "<=",
             vec![Token::Symbol(Symbol::Evaluation(EvaluationSymbol::LzEq))],
         );
-        test("[]", vec![Token::Symbol(Symbol::Array)]);
         test("..", vec![Token::Symbol(Symbol::Range)]);
     }
 
