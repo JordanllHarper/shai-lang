@@ -34,7 +34,6 @@ impl ParseState {
         let next = self.tokens.get(self.position).cloned();
         let new_position = self.position + 1;
         let new_state = ParseState::new(self.tokens, new_position);
-        println!("Parser state next: {:?}", next);
 
         (next, new_state)
     }
