@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::*;
 
@@ -100,11 +100,6 @@ impl PartialEq for ValueLiteral {
             _ => false,
         }
     }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
-    }
-    // add code here
 }
 
 impl Eq for ValueLiteral {}
@@ -396,6 +391,31 @@ impl ValueLiteral {
         }
     }
 }
+
+impl Display for ValueLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ValueLiteral::Char(c) => c.to_string(),
+            ValueLiteral::Int(i) => i.to_string(),
+            ValueLiteral::String(s) => s.to_string(),
+            ValueLiteral::Float(f) => f.to_string(),
+            ValueLiteral::Bool(b) => b.to_string(),
+            ValueLiteral::Array(arr) => vec_expression_to_string(arr),
+            ValueLiteral::Dictionary(dict) => dict_expression_to_string(dict),
+            ValueLiteral::Function => "Function".to_string(),
+        };
+        f.write_str(&s)
+    }
+}
+
+pub fn dict_expression_to_string(dict: &HashMap<DictionaryKey, Expression>) -> String {
+    todo!();
+}
+
+pub fn vec_expression_to_string(arr: &Vec<Expression>) -> String {
+    todo!();
+}
+
 impl NativeType {
     pub fn from_datatype_kwd(kwd: &DataTypeKwd) -> Self {
         match kwd {

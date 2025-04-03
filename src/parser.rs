@@ -63,6 +63,7 @@ fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ParseResu
     match peek {
         Some(Token::Symbol(Symbol::Newline)) => return Ok((args.to_vec(), state.advance())),
         Some(Token::Symbol(Symbol::BraceClose)) => return Ok((args.to_vec(), state)),
+        None => return Ok((args.to_vec(), state.advance())),
         _ => (),
     }
 
@@ -382,8 +383,6 @@ fn on_assignment(
 // y = *x* + 3
 //      |- here is usage
 fn on_identifier(state: ParseState, ident: &str) -> ParseResult<ExpressionState> {
-    // TODO: Expression (empty statement) e.g. x + y
-    // TODO: Variable Usage e.g. y = x + 3
     let t = state.peek();
 
     match t {
@@ -408,7 +407,11 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<ExpressionState>
 
         // Operations
         // Function call if value literal or string
-        Some(Token::Literal(l)) => Ok(on_function_call(state, ident, &l)?),
+        Some(Token::Literal(l)) => Ok(on_function_call(
+            state,
+            ident,
+            Expression::new_from_literal(&l),
+        )?),
         Some(Token::Symbol(Symbol::Range)) => {
             Ok(on_range(state, Expression::new_identifier(ident), false)?)
         }
@@ -416,6 +419,7 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<ExpressionState>
             Ok(on_range(state, Expression::new_identifier(ident), true)?)
         }
         Some(Token::Symbol(Symbol::ParenOpen)) => Ok(on_function(state, ident)?),
+        Some(Token::Ident(i)) => on_function_call(state, ident, Expression::new_identifier(&i)),
         Some(Token::Kwd(Kwd::DataType(d))) => Ok(on_variable_type_assertion(state, ident, d)?),
         _ => Ok((Expression::new_identifier(ident), state)),
     }
@@ -441,9 +445,9 @@ fn on_variable_type_assertion(
 fn on_function_call(
     state: ParseState,
     ident: &str,
-    first_arg: &Literal,
+    first_arg: Expression,
 ) -> ParseResult<ExpressionState> {
-    let (args, state) = on_arguments(state, Expression::new_from_literal(first_arg))?;
+    let (args, state) = on_arguments(state, first_arg)?;
     Ok((
         Expression::FunctionCall(FunctionCall {
             identifier: ident.to_string(),
@@ -516,6 +520,10 @@ fn on_range(state: ParseState, lhs: Expression, inclusive: bool) -> ParseResult<
     Ok((Expression::new_range(lhs, rhs, inclusive), state))
 }
 
+fn on_sub_expression(state: ParseState) -> ParseResult<ExpressionState> {
+    todo!()
+}
+
 fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
     let (next, state) = state.next();
 
@@ -524,6 +532,7 @@ fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
         Token::Kwd(k) => on_keyword(state, &k)?,
         Token::Literal(l) => (Expression::new_from_literal(&l), state),
         Token::Symbol(Symbol::BraceOpen) => on_body(state)?,
+        Token::Symbol(Symbol::ParenOpen) => on_sub_expression(state)?,
         Token::Symbol(Symbol::Newline) => on_expression(state)?,
 
         t => {
