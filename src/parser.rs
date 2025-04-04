@@ -74,6 +74,7 @@ fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ParseResu
         state
     };
 
+    let (next, state) = state.next();
     match next {
         Some(Token::Literal(l)) => args.push(Expression::new_from_literal(&l)),
         Some(Token::Ident(i)) => args.push(Expression::new_identifier(&i)),
