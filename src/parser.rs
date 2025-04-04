@@ -1,14 +1,11 @@
-use std::{collections::HashMap, os::macos::raw::stat};
+use std::collections::HashMap;
 
 use pretty_assertions::assert_eq;
 use For;
 use FunctionCall;
 use Statement;
 
-use crate::{
-    language::{self, *},
-    lexer::*,
-};
+use crate::{language::*, lexer::*};
 
 type ExpressionState = (Expression, ParseState);
 
@@ -404,6 +401,10 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<ExpressionState>
                 Expression::new_identifier(ident),
             )?)
         }
+        Some(Token::Symbol(Symbol::BraceOpen)) => {
+            let (sub_expression, state) = on_body(state)?;
+            on_function_call(state, ident, sub_expression)
+        }
 
         // Operations
         // Function call if value literal or string
@@ -520,10 +521,6 @@ fn on_range(state: ParseState, lhs: Expression, inclusive: bool) -> ParseResult<
     Ok((Expression::new_range(lhs, rhs, inclusive), state))
 }
 
-fn on_sub_expression(state: ParseState) -> ParseResult<ExpressionState> {
-    todo!()
-}
-
 fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
     let (next, state) = state.next();
 
@@ -532,7 +529,6 @@ fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
         Token::Kwd(k) => on_keyword(state, &k)?,
         Token::Literal(l) => (Expression::new_from_literal(&l), state),
         Token::Symbol(Symbol::BraceOpen) => on_body(state)?,
-        Token::Symbol(Symbol::ParenOpen) => on_sub_expression(state)?,
         Token::Symbol(Symbol::Newline) => on_expression(state)?,
 
         t => {
@@ -1497,17 +1493,10 @@ mod tests {
 
     #[test]
     fn function_call_no_values() {
-        // print "Hello"
+        // print <- produces identifier. Cannot make assumption about what this is
         test(
-            vec![
-                Token::Ident("print".to_string()),
-                Token::Literal(Literal::String("Hello".to_string())),
-                Token::Symbol(Symbol::Newline),
-            ],
-            Expression::FunctionCall(FunctionCall {
-                identifier: "print".to_string(),
-                args: vec![Expression::new_string("Hello")],
-            }),
+            vec![Token::Ident("print".to_string())],
+            Expression::Identifier("print".to_string()),
         );
     }
 
@@ -1558,6 +1547,28 @@ mod tests {
                 identifier: "print".to_string(),
                 args: vec![
                     Expression::new_string("Hello"),
+                    Expression::new_identifier("x"),
+                ],
+            }),
+        );
+    }
+
+    #[test]
+    fn function_call_multiple_values_with_body() {
+        // print "Hello" x
+        test(
+            vec![
+                Token::Ident("print".to_string()),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Literal(Literal::String("Hello".to_string())),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Newline),
+            ],
+            Expression::FunctionCall(FunctionCall {
+                identifier: "print".to_string(),
+                args: vec![
+                    Expression::new_body(vec![Expression::new_string("Hello")]),
                     Expression::new_identifier("x"),
                 ],
             }),
