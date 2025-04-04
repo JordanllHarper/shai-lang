@@ -28,9 +28,9 @@ fn main() {
         let tokens = Lexer::new(&line);
         let ast = parser::parse(tokens).unwrap();
         println!("AST: {:?}", ast);
-        let (new_state, error) = evaluator::evaluate(state, ast);
+        let (new_state, error, _) = evaluator::evaluate(state, ast);
         if let Some(e) = error {
-            println!("{:?}", e);
+            eprintln!("{:?}", e);
             break;
         }
         state = new_state;

@@ -1,8 +1,7 @@
 use crate::{
-    environment::{EnvironmentBinding, EnvironmentState, EnvironmentSymbol, Value},
+    environment::{EnvironmentBinding, EnvironmentState, Value},
     language::{
         Expression, Function, FunctionArguments, FunctionCall, Statement, StatementOperator,
-        ValueLiteral,
     },
     std_lib::Stdlib,
 };
@@ -17,14 +16,14 @@ pub enum EvaluatorError {
 
 pub fn evaluate(state: EnvironmentState, ast: Expression) -> EvaluatorState {
     match ast {
-        Expression::ValueLiteral(_) => (state, None),
+        Expression::ValueLiteral(v) => (state, None, Value::ValueLiteral(v)),
         Expression::Identifier(ident) => evaluate_identifier(state, &ident),
-        Expression::MultipleValues(_) => (state, None),
+        Expression::MultipleValues(_) => (state, None, todo!()),
         Expression::Statement(s) => evaluate_statement(state, s),
-        Expression::MathOperation(_) => (state, None),
+        Expression::MathOperation(_) => (state, None, todo!()),
         Expression::Evaluation(_) => todo!(),
         Expression::Function(f) => {
-            add_binding_or_error(state, f.ident.clone(), EnvironmentBinding::Function(f))
+            add_binding_or_error(state, &f.ident.clone(), EnvironmentBinding::Function(f))
         }
         Expression::If(_) => todo!(),
         Expression::While(_) => todo!(),
@@ -36,10 +35,28 @@ pub fn evaluate(state: EnvironmentState, ast: Expression) -> EvaluatorState {
     }
 }
 
-fn evaluate_assignment_expression(expr: Expression) -> Result<EnvironmentBinding, EvaluatorError> {
+fn get_identifier_binding(
+    state: &EnvironmentState,
+    symbol: &str,
+) -> Result<EnvironmentBinding, EvaluatorError> {
+    state
+        .local_symbols
+        .get(symbol)
+        .map_or(Err(EvaluatorError::NoSuchIdentifier), |binding| {
+            Ok(binding.clone())
+        })
+}
+
+fn evaluate_assignment_expression(
+    state: &EnvironmentState,
+    expr: Expression,
+) -> Result<EnvironmentBinding, EvaluatorError> {
     match expr {
         Expression::ValueLiteral(v) => Ok(EnvironmentBinding::Value(Value::ValueLiteral(v))),
-        Expression::Identifier(i) => Ok(EnvironmentBinding::Value(Value::Identifier(i))),
+        Expression::Identifier(i) => {
+            let binding = get_identifier_binding(&state, &i)?;
+            Ok(binding)
+        }
         Expression::MultipleValues(_) => todo!(),
         Expression::Statement(_) => todo!(),
         Expression::MathOperation(_) => todo!(),
@@ -56,38 +73,44 @@ fn evaluate_assignment_expression(expr: Expression) -> Result<EnvironmentBinding
 }
 
 fn evaluate_assignment(state: EnvironmentState, a: crate::language::Assignment) -> EvaluatorState {
-    match evaluate_assignment_expression(*a.rhs) {
-        Ok(binding) => add_binding_or_error(state, a.identifier, binding),
-        Err(e) => (state, Some(e)),
+    match evaluate_assignment_expression(&state, *a.rhs) {
+        Ok(binding) => add_binding_or_error(state, &a.identifier, binding),
+        Err(e) => (state, Some(e), Value::Void),
     }
 }
 
-fn evaluate_function(state: &EnvironmentState, f: &Function) -> EvaluatorState {
+fn evaluate_function(state: EnvironmentState, f: &Function) -> EvaluatorState {
     todo!()
 }
 
-fn evaluate_value(state: &EnvironmentState, v: &Value) -> EvaluatorState {
+fn evaluate_value(state: EnvironmentState, v: &Value) -> EvaluatorState {
     todo!();
 }
 
-type EvaluatorState = (EnvironmentState, Option<EvaluatorError>);
+type EvaluatorState = (EnvironmentState, Option<EvaluatorError>, Value);
 fn evaluate_identifier(state: EnvironmentState, ident: &str) -> EvaluatorState {
     let maybe_std_fn = state.std_lib_symbols.get(ident);
     if let Some(std) = maybe_std_fn {
         let result = handle_std_lib_arg(&state, std, vec![]);
         return match result {
-            Ok(_) => (state, None),
-            Err(e) => (state, Some(EvaluatorError::InvalidFunctionCall)),
+            Ok(_) => (state, None, Value::Void),
+            Err(e) => (
+                state,
+                Some(EvaluatorError::InvalidFunctionCall),
+                Value::Void,
+            ),
         };
     }
 
-    let symbol = state.local_symbols.get(ident);
+    let symbol = state.get_local_binding(ident);
+
     match symbol {
         Some(v) => match v {
-            EnvironmentBinding::Value(v) => evaluate_value(&state, v),
-            EnvironmentBinding::Function(f) => evaluate_function(&state, f),
+            EnvironmentBinding::Value(v) => evaluate_value(state, &v),
+            EnvironmentBinding::Function(f) => evaluate_function(state, &f),
+            EnvironmentBinding::Identifier(i) => evaluate_identifier(state, &i),
         },
-        None => (state, Some(EvaluatorError::NoSuchIdentifier)),
+        None => (state, Some(EvaluatorError::NoSuchIdentifier), Value::Void),
     }
 }
 
@@ -98,10 +121,6 @@ fn evaluate_statement(state: EnvironmentState, s: Statement) -> EvaluatorState {
         StatementOperator::Return => todo!(),
         StatementOperator::Include => todo!(),
     }
-}
-
-fn handle_function(f: &Function, args: FunctionArguments) -> EvaluatorState {
-    todo!();
 }
 
 #[derive(Debug)]
@@ -116,14 +135,15 @@ fn resolve_binding_to_string(
 ) -> Result<String, StringArgumentsError> {
     match binding {
         EnvironmentBinding::Value(v) => match v {
-            crate::environment::Value::ValueLiteral(vl) => Ok(vl.to_string()),
-            crate::environment::Value::Identifier(i) => match state.local_symbols.get(i) {
-                Some(binding) => resolve_binding_to_string(state, binding),
-                None => Err(StringArgumentsError::InvalidIdentifier),
-            },
-            crate::environment::Value::Range(_) => todo!(),
+            Value::ValueLiteral(vl) => Ok(vl.to_string()),
+            Value::Range(_) => todo!(),
+            Value::Void => Ok("".to_string()),
         },
         EnvironmentBinding::Function(f) => todo!(),
+        EnvironmentBinding::Identifier(i) => match state.local_symbols.get(i) {
+            Some(binding) => resolve_binding_to_string(state, binding),
+            None => Err(StringArgumentsError::InvalidIdentifier),
+        },
     }
 }
 
@@ -186,28 +206,42 @@ fn evaluate_function_call(state: EnvironmentState, fc: FunctionCall) -> Evaluato
                 Ok(_) => None,
                 Err(e) => Some(e),
             },
+            Value::Void,
         );
     }
 
     if let Some(f) = state.local_symbols.get(&fc.identifier) {
         match f {
-            EnvironmentBinding::Value(v) => (state, Some(EvaluatorError::InvalidFunctionCall)),
-            EnvironmentBinding::Function(f) => handle_function(f, fc.args),
+            EnvironmentBinding::Value(v) => (
+                state,
+                Some(EvaluatorError::InvalidFunctionCall),
+                Value::Void,
+            ),
+            EnvironmentBinding::Function(f) => todo!(),
+            EnvironmentBinding::Identifier(_) => todo!(),
         }
     } else {
-        (state, Some(EvaluatorError::InvalidFunctionCall))
+        (
+            state,
+            Some(EvaluatorError::InvalidFunctionCall),
+            Value::Void,
+        )
     }
 }
 
 fn add_binding_or_error(
     state: EnvironmentState,
-    symbol: EnvironmentSymbol,
+    symbol: &str,
     binding: EnvironmentBinding,
 ) -> EvaluatorState {
     let (state, binding) = state.add_local_symbols(symbol, binding);
     match binding {
-        Some(e) => (state, Some(EvaluatorError::InvalidRedeclaration)),
-        None => (state, None),
+        Some(e) => (
+            state,
+            Some(EvaluatorError::InvalidRedeclaration),
+            Value::Void,
+        ),
+        None => (state, None, Value::Void),
     }
 }
 
@@ -216,7 +250,7 @@ mod test {
     use std::collections::HashMap;
 
     use crate::{
-        environment::{EnvironmentBinding, EnvironmentState, EnvironmentSymbol, Value},
+        environment::{EnvironmentBinding, EnvironmentState, Value},
         evaluator::evaluate,
         language::{Expression, ValueLiteral},
     };
@@ -225,7 +259,7 @@ mod test {
     fn assignment() {
         let ast = Expression::new_assignment("x", Expression::new_int(5), None, None, false);
         let state = EnvironmentState::new(HashMap::new());
-        let (state, error) = evaluate(state, ast);
+        let (state, error, return_value) = evaluate(state, ast);
 
         assert_eq!(
             state.local_symbols.get("x"),

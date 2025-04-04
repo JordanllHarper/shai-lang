@@ -12,8 +12,8 @@ use crate::{
 /// the production of a new EnvironmentState.
 #[derive(Debug)]
 pub struct EnvironmentState {
-    pub local_symbols: HashMap<EnvironmentSymbol, EnvironmentBinding>,
-    pub std_lib_symbols: HashMap<EnvironmentSymbol, Stdlib>,
+    pub local_symbols: HashMap<String, EnvironmentBinding>,
+    pub std_lib_symbols: HashMap<String, Stdlib>,
 }
 
 #[derive(Debug, Clone)]
@@ -21,16 +21,6 @@ pub struct InvalidRedeclaration;
 
 #[derive(Debug, Clone)]
 pub struct NoSuchBinding;
-
-/// A simple type alias for handling symbols.
-///
-/// To give context, a symbol can be a variable or function.
-///
-/// Example:
-///
-/// `x = 5` produces a symbol "x"
-/// `square (num) = num * num ` produces a symbol "square".
-pub type EnvironmentSymbol = String;
 
 /// A binding in the Environment. This represents all possible values a symbol can resolve to.
 ///
@@ -43,6 +33,7 @@ pub type EnvironmentSymbol = String;
 pub enum EnvironmentBinding {
     Value(Value),
     Function(Function),
+    Identifier(String),
 }
 
 /// The variations an Environment binding value can be.
@@ -51,30 +42,33 @@ pub enum EnvironmentBinding {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     ValueLiteral(ValueLiteral),
-    Identifier(String),
     Range(Range),
+    Void,
 }
 
 impl EnvironmentState {
-    pub fn new(local_symbols: HashMap<EnvironmentSymbol, EnvironmentBinding>) -> Self {
+    pub fn new(local_symbols: HashMap<String, EnvironmentBinding>) -> Self {
         Self {
             local_symbols,
             std_lib_symbols: HashMap::from([("print".to_string(), Stdlib::Print(std_print))]),
         }
     }
 
+    pub fn get_local_binding(&self, symbol: &str) -> Option<EnvironmentBinding> {
+        self.local_symbols.get(symbol).cloned()
+    }
     pub fn add_local_symbols(
         mut self,
-        symbol: EnvironmentSymbol,
+        symbol: &str,
         binding: EnvironmentBinding,
     ) -> (EnvironmentState, Option<InvalidRedeclaration>) {
-        let already_contained = self.local_symbols.contains_key(&symbol);
+        let already_contained = self.local_symbols.contains_key(symbol);
         if let EnvironmentBinding::Function(_) = binding {
             if already_contained {
                 return (self, Some(InvalidRedeclaration));
             }
         }
-        self.local_symbols.insert(symbol, binding);
+        self.local_symbols.insert(symbol.to_string(), binding);
         (self, None)
     }
 }
