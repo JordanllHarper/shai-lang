@@ -84,7 +84,7 @@ fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ParseResu
                 token_context: t,
             })
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => return Ok((args.to_vec(), state)),
     };
     parse_arguments(state, args)
 }
