@@ -65,19 +65,20 @@ fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ParseResu
     }
 
     let (next, state) = state.next();
-
-    let state = if is_new_body(next.as_ref()) {
-        let (body, state) = on_body(state)?;
-        args.push(body);
-        state
-    } else {
-        state
-    };
-
-    let (next, state) = state.next();
-    match next {
-        Some(Token::Literal(l)) => args.push(Expression::new_from_literal(&l)),
-        Some(Token::Ident(i)) => args.push(Expression::new_identifier(&i)),
+    let state = match next {
+        Some(Token::Literal(l)) => {
+            args.push(Expression::new_from_literal(&l));
+            state
+        }
+        Some(Token::Ident(i)) => {
+            args.push(Expression::new_identifier(&i));
+            state
+        }
+        Some(Token::Symbol(Symbol::BraceOpen)) => {
+            let (body, state) = on_body(state)?;
+            args.push(body);
+            state
+        }
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected parameter notation".to_string(),

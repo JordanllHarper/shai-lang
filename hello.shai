@@ -1,2 +1,3 @@
-x = "Hello, Linnie!"
-print x
+x = "Hello, Jules!"
+y = "Hello, Jordan!"
+print x y { "How are you?"} {"I am okay!"} {"What about you?"} "This is a standalone string"

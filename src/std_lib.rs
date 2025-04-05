@@ -1,9 +1,9 @@
 #[derive(Debug, Clone)]
-pub enum Stdlib {
+pub enum RustBinding {
     Print(Print),
 }
 
 pub type Print = fn(Vec<String>);
-pub fn std_print(s: Vec<String>) {
-    println!("{}", s.join(""))
+pub fn std_rust_print(s: Vec<String>) {
+    println!("{}", s.join(" "))
 }

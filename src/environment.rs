@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     language::{Function, Range, ValueLiteral},
-    std_lib::{std_print, Stdlib},
+    std_lib::{std_rust_print, RustBinding},
 };
 
 /// Represents the current Environment State of the program. This is for resolving symbols that a user will reference in their program,
@@ -13,7 +13,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct EnvironmentState {
     pub local_symbols: HashMap<String, EnvironmentBinding>,
-    pub std_lib_symbols: HashMap<String, Stdlib>,
+    pub std_lib_symbols: HashMap<String, RustBinding>,
 }
 
 #[derive(Debug, Clone)]
@@ -48,7 +48,10 @@ impl EnvironmentState {
     pub fn new(local_symbols: HashMap<String, EnvironmentBinding>) -> Self {
         Self {
             local_symbols,
-            std_lib_symbols: HashMap::from([("print".to_string(), Stdlib::Print(std_print))]),
+            std_lib_symbols: HashMap::from([(
+                "print".to_string(),
+                RustBinding::Print(std_rust_print),
+            )]),
         }
     }
 

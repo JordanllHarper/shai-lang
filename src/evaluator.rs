@@ -3,7 +3,7 @@ use crate::{
     language::{
         Expression, Function, FunctionArguments, FunctionCall, Statement, StatementOperator,
     },
-    std_lib::Stdlib,
+    std_lib::RustBinding,
 };
 
 #[derive(Debug, PartialEq)]
@@ -92,7 +92,7 @@ type EvaluatorState = (EnvironmentState, Option<EvaluatorError>, Value);
 fn evaluate_identifier(state: EnvironmentState, ident: &str) -> EvaluatorState {
     let maybe_std_fn = state.std_lib_symbols.get(ident).cloned();
     if let Some(std) = maybe_std_fn {
-        let (state, error) = handle_std_lib_arg(state, &std, vec![]);
+        let (state, error) = handle_rust_binding_with_args(state, &std, vec![]);
         return match error {
             Some(e) => (state, Some(e), Value::Void),
             None => (state, None, Value::Void),
@@ -139,13 +139,13 @@ fn resolve_binding_to_string(
     }
 }
 
-pub fn handle_std_lib_arg(
+pub fn handle_rust_binding_with_args(
     state: EnvironmentState,
-    std: &Stdlib,
+    std: &RustBinding,
     args: FunctionArguments,
 ) -> (EnvironmentState, Option<EvaluatorError>) {
     match std {
-        Stdlib::Print(std_print) => {
+        RustBinding::Print(std_print) => {
             let (state, result) = resolve_function_arguments_to_string(state, args);
             match result {
                 Ok(v) => {
@@ -225,7 +225,7 @@ fn evaluate_function_call(state: EnvironmentState, fc: FunctionCall) -> Evaluato
     let maybe_std_fn = state.std_lib_symbols.get(&fc.identifier).cloned();
 
     if let Some(std) = maybe_std_fn {
-        let (state, error) = handle_std_lib_arg(state, &std, fc.args);
+        let (state, error) = handle_rust_binding_with_args(state, &std, fc.args);
 
         return (state, error, Value::Void);
     }
