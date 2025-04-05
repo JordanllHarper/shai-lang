@@ -34,6 +34,11 @@ pub fn should_evaluate(
             EvaluationNumericAndString::Eq => lhs.eq(&rhs),
             EvaluationNumericAndString::Neq => lhs.ne(&rhs),
         },
+        (
+            EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(_))),
+            Some(EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(_)))),
+            EvaluationOperator::BooleanTruthy,
+        ) => return (state, Err(EvaluatorError::NotABooleanValue)),
 
         _ => false,
     };

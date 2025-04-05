@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, ops::Add};
 
 use lexer::{DataTypeKwd, EvaluationSymbol, Literal, MathSymbol};
 
@@ -78,7 +78,26 @@ pub enum ValueLiteral {
 #[derive(Debug, Clone, PartialOrd)]
 pub enum NumericLiteral {
     Int(i32),
-    Float(f32),
+    Float(f64),
+}
+
+impl Add for NumericLiteral {
+    type Output = NumericLiteral;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (NumericLiteral::Int(i1), NumericLiteral::Int(i2)) => NumericLiteral::Int(i1 + i2),
+            (NumericLiteral::Float(f1), NumericLiteral::Float(f2)) => {
+                NumericLiteral::Float(f1 + f2)
+            }
+            (NumericLiteral::Int(i1), NumericLiteral::Float(f1)) => {
+                NumericLiteral::Float(i1 as f64 + f1)
+            }
+            (NumericLiteral::Float(f1), NumericLiteral::Int(i1)) => {
+                NumericLiteral::Float(f1 + i1 as f64)
+            }
+        }
+    }
 }
 
 impl PartialEq for NumericLiteral {
@@ -517,7 +536,7 @@ impl Expression {
         Self::ValueLiteral(ValueLiteral::Bool(b))
     }
 
-    pub fn new_float(f: f32) -> Self {
+    pub fn new_float(f: f64) -> Self {
         Self::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Float(f)))
     }
 

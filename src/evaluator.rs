@@ -2,8 +2,8 @@ use crate::{
     condition_evaluation::should_evaluate,
     environment::{EnvironmentBinding, EnvironmentState, Value},
     language::{
-        Assignment, Body, Expression, Function, FunctionArguments, FunctionCall, Statement,
-        StatementOperator, ValueLiteral,
+        Assignment, Body, Expression, Function, FunctionArguments, FunctionCall, Math,
+        MathOperation, Statement, StatementOperator, ValueLiteral,
     },
     lexer::{EvaluationSymbol, Literal},
     std_lib::RustBinding,
@@ -17,6 +17,7 @@ pub enum EvaluatorError {
     InvalidFunctionCallArgument,
     EmptyBody,
     InvalidEvaluation,
+    NotABooleanValue,
 }
 
 pub fn evaluate(
@@ -147,7 +148,7 @@ fn evaluate_assignment_expression(
         Expression::Identifier(i) => Ok(get_identifier_binding(state, &i)?),
         Expression::MultipleValues(_) => todo!(),
         Expression::Statement(_) => todo!(),
-        Expression::MathOperation(_) => todo!(),
+        Expression::MathOperation(m) => evaluate_math_operation(state, m),
         Expression::Evaluation(_) => todo!(),
         Expression::Function(_) => todo!(),
         Expression::If(_) => todo!(),
@@ -157,6 +158,27 @@ fn evaluate_assignment_expression(
         Expression::Range(_) => todo!(),
         Expression::Assignment(_) => todo!(),
         Expression::FunctionCall(_) => todo!(),
+    }
+}
+
+fn evaluate_math_operation(
+    state: &EnvironmentState,
+    m: MathOperation,
+) -> Result<EnvironmentBinding, EvaluatorError> {
+    match (*m.lhs, *m.rhs) {
+        (
+            Expression::ValueLiteral(ValueLiteral::Numeric(n1)),
+            Expression::ValueLiteral(ValueLiteral::Numeric(n2)),
+        ) => {
+            match m.operation {
+                Math::Add => todo!(),
+                Math::Subtract => todo!(),
+                Math::Multiply => todo!(),
+                Math::Divide => todo!(),
+            }
+            todo!()
+        }
+        _ => todo!(),
     }
 }
 

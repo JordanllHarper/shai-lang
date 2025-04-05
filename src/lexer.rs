@@ -151,7 +151,7 @@ impl Display for Literal {
 pub enum Literal {
     Bool(bool),
     Int(i32),
-    Float(f32),
+    Float(f64),
     String(String),
 }
 
@@ -404,7 +404,7 @@ where
 fn parse_literal_or_identifier(s: &str) -> Token {
     if let Ok(r) = str::parse::<i32>(s) {
         Token::Literal(Literal::Int(r))
-    } else if let Ok(r) = str::parse::<f32>(s) {
+    } else if let Ok(r) = str::parse::<f64>(s) {
         Token::Literal(Literal::Float(r))
     } else {
         Token::Ident(s.to_string())

@@ -572,7 +572,6 @@ fn on_expression(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 
 fn on_literal(state: ParseState, l: Literal) -> ParseResult<(Expression, ParseState)> {
     let peek = state.peek().cloned();
-    println!("This runs");
     match peek {
         Some(Token::Symbol(Symbol::Math(m))) => {
             let (_, state) = state.next();
