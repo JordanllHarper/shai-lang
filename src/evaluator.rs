@@ -6,7 +6,7 @@ use crate::{
         MathOperation, Statement, StatementOperator, ValueLiteral,
     },
     lexer::{EvaluationSymbol, Literal},
-    std_lib::RustBinding,
+    rust_bindings::RustBinding,
 };
 
 #[derive(Debug, PartialEq)]

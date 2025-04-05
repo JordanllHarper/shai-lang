@@ -1,12 +1,9 @@
-use std::cmp::Ordering;
-
 use crate::{
     environment::{EnvironmentBinding, EnvironmentState, Value},
     evaluator::EvaluatorError,
     language::{
         EvaluationNumericAndString, EvaluationNumericOnly, EvaluationOperator, ValueLiteral,
     },
-    lexer::Literal,
 };
 
 pub fn should_evaluate(

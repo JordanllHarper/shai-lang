@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    language::{Function, Range, ValueLiteral},
-    std_lib::{std_rust_print, RustBinding},
+    language::{Function, NumericLiteral, Range, ValueLiteral},
+    rust_bindings::{std_rust_print, RustBinding},
 };
 
 /// Represents the current Environment State of the program. This is for resolving symbols that a user will reference in their program,
@@ -35,6 +35,15 @@ pub enum EnvironmentBinding {
     Function(Function),
     Identifier(String),
     Range(Range),
+}
+
+impl EnvironmentBinding {
+    pub fn new_string(s: &str) -> EnvironmentBinding {
+        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::String(s.to_string())))
+    }
+    pub fn new_numeric(n: NumericLiteral) -> EnvironmentBinding {
+        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(n)))
+    }
 }
 
 /// The variations an Environment binding value can be.

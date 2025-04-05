@@ -3,8 +3,9 @@ pub mod environment;
 pub mod evaluator;
 pub mod language;
 pub mod lexer;
+pub mod math;
 pub mod parser;
-pub mod std_lib;
+pub mod rust_bindings;
 
 use std::{collections::HashMap, env, fs::read_to_string};
 

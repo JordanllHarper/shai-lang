@@ -54,16 +54,19 @@ pub fn parse<I>(tokens: I) -> ParseResult<Expression>
 where
     I: std::iter::IntoIterator<Item = Token>,
 {
-    let tokens = tokens
+    let tokens: Vec<Token> = tokens
         .into_iter()
         .filter(|each| each != &Token::whitespace())
-        .collect::<Vec<Token>>();
-    let len = tokens.len();
-    let tokens = if tokens.last() == Some(&Token::Symbol(Symbol::Newline)) {
-        tokens.into_iter().take(len - 1).collect()
-    } else {
-        tokens
-    };
+        .collect();
+
+    let tokens: Vec<Token> = tokens
+        .into_iter()
+        .rev()
+        .skip_while(|t| t == &Token::Symbol(Symbol::Newline))
+        .collect();
+
+    let tokens = tokens.into_iter().rev().collect::<Vec<Token>>();
+
     let mut top_level_body: Body = vec![];
     let mut parse_state = ParseState::new(tokens, 0);
     while !parse_state.end() {

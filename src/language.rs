@@ -81,25 +81,6 @@ pub enum NumericLiteral {
     Float(f64),
 }
 
-impl Add for NumericLiteral {
-    type Output = NumericLiteral;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (NumericLiteral::Int(i1), NumericLiteral::Int(i2)) => NumericLiteral::Int(i1 + i2),
-            (NumericLiteral::Float(f1), NumericLiteral::Float(f2)) => {
-                NumericLiteral::Float(f1 + f2)
-            }
-            (NumericLiteral::Int(i1), NumericLiteral::Float(f1)) => {
-                NumericLiteral::Float(i1 as f64 + f1)
-            }
-            (NumericLiteral::Float(f1), NumericLiteral::Int(i1)) => {
-                NumericLiteral::Float(f1 + i1 as f64)
-            }
-        }
-    }
-}
-
 impl PartialEq for NumericLiteral {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
