@@ -12,6 +12,7 @@ pub enum EvaluatorError {
     NoSuchIdentifier,
     InvalidFunctionCall,
     InvalidFunctionCallArgument,
+    EmptyBody,
 }
 
 pub fn evaluate(state: EnvironmentState, ast: Expression) -> EvaluatorState {
@@ -89,16 +90,12 @@ fn evaluate_value(state: EnvironmentState, v: &Value) -> EvaluatorState {
 
 type EvaluatorState = (EnvironmentState, Option<EvaluatorError>, Value);
 fn evaluate_identifier(state: EnvironmentState, ident: &str) -> EvaluatorState {
-    let maybe_std_fn = state.std_lib_symbols.get(ident);
+    let maybe_std_fn = state.std_lib_symbols.get(ident).cloned();
     if let Some(std) = maybe_std_fn {
-        let result = handle_std_lib_arg(&state, std, vec![]);
-        return match result {
-            Ok(_) => (state, None, Value::Void),
-            Err(e) => (
-                state,
-                Some(EvaluatorError::InvalidFunctionCall),
-                Value::Void,
-            ),
+        let (state, error) = handle_std_lib_arg(state, &std, vec![]);
+        return match error {
+            Some(e) => (state, Some(e), Value::Void),
+            None => (state, None, Value::Void),
         };
     }
 
@@ -109,6 +106,7 @@ fn evaluate_identifier(state: EnvironmentState, ident: &str) -> EvaluatorState {
             EnvironmentBinding::Value(v) => evaluate_value(state, &v),
             EnvironmentBinding::Function(f) => evaluate_function(state, &f),
             EnvironmentBinding::Identifier(i) => evaluate_identifier(state, &i),
+            EnvironmentBinding::Range(_) => todo!(),
         },
         None => (state, Some(EvaluatorError::NoSuchIdentifier), Value::Void),
     }
@@ -123,55 +121,58 @@ fn evaluate_statement(state: EnvironmentState, s: Statement) -> EvaluatorState {
     }
 }
 
-#[derive(Debug)]
-pub enum StringArgumentsError {
-    InvalidArgument,
-    InvalidIdentifier,
-}
-
 fn resolve_binding_to_string(
     state: &EnvironmentState,
     binding: &EnvironmentBinding,
-) -> Result<String, StringArgumentsError> {
+) -> Result<String, EvaluatorError> {
     match binding {
         EnvironmentBinding::Value(v) => match v {
             Value::ValueLiteral(vl) => Ok(vl.to_string()),
-            Value::Range(_) => todo!(),
             Value::Void => Ok("".to_string()),
         },
         EnvironmentBinding::Function(f) => todo!(),
         EnvironmentBinding::Identifier(i) => match state.local_symbols.get(i) {
             Some(binding) => resolve_binding_to_string(state, binding),
-            None => Err(StringArgumentsError::InvalidIdentifier),
+            None => Err(EvaluatorError::NoSuchIdentifier),
         },
+        EnvironmentBinding::Range(_) => todo!(),
     }
 }
 
 pub fn handle_std_lib_arg(
-    state: &EnvironmentState,
+    state: EnvironmentState,
     std: &Stdlib,
     args: FunctionArguments,
-) -> Result<(), StringArgumentsError> {
+) -> (EnvironmentState, Option<EvaluatorError>) {
     match std {
         Stdlib::Print(std_print) => {
-            let s = resolve_function_arguments_to_string(state, args)?;
-            std_print(s);
-            Ok(())
+            let (state, result) = resolve_function_arguments_to_string(state, args);
+            match result {
+                Ok(v) => {
+                    std_print(v);
+                    (state, None)
+                }
+                Err(v) => (state, Some(v)),
+            }
         }
     }
 }
 
 fn resolve_function_arguments_to_string(
-    state: &EnvironmentState,
+    state: EnvironmentState,
     args: FunctionArguments,
-) -> Result<Vec<String>, StringArgumentsError> {
+) -> (EnvironmentState, Result<Vec<String>, EvaluatorError>) {
+    let mut new_state = state.clone();
     let mut s_args: Vec<String> = vec![];
     for arg in args {
         let s = match arg {
             Expression::ValueLiteral(v) => v.to_string(),
-            Expression::Identifier(i) => match state.local_symbols.get(&i) {
-                Some(binding) => resolve_binding_to_string(state, binding)?,
-                None => return Err(StringArgumentsError::InvalidIdentifier),
+            Expression::Identifier(i) => match new_state.local_symbols.get(&i) {
+                Some(binding) => match resolve_binding_to_string(&new_state, binding) {
+                    Ok(v) => v,
+                    Err(e) => return (state, Err(e)),
+                },
+                None => return (state, Err(EvaluatorError::NoSuchIdentifier)),
             },
             Expression::MultipleValues(_) => todo!(),
             Expression::Statement(_) => todo!(),
@@ -181,33 +182,52 @@ fn resolve_function_arguments_to_string(
             Expression::If(_) => todo!(),
             Expression::While(_) => todo!(),
             Expression::For(_) => todo!(),
-            Expression::Body(_) => todo!(),
+            Expression::Body(b) => {
+                let (state, _, value) = resolve_body_string_value(new_state, b);
+                if let Some(s) = value {
+                    new_state = state;
+                    s
+                } else {
+                    return (state, Err(EvaluatorError::NoSuchIdentifier));
+                }
+            }
             Expression::Range(_) => todo!(),
             Expression::Assignment(_) => todo!(),
             Expression::FunctionCall(_) => todo!(),
         };
         s_args.push(s);
     }
-    Ok(s_args)
+    (new_state, Ok(s_args))
+}
+
+fn resolve_body_string_value(
+    state: EnvironmentState,
+    b: Vec<Expression>,
+) -> (EnvironmentState, Option<EvaluatorError>, Option<String>) {
+    let first = b.first().cloned();
+    if let Some(e) = first {
+        let (state, error, return_value) = evaluate(state, e);
+        if error.is_some() {
+            return (state, error, None);
+        }
+        let s = match return_value {
+            Value::ValueLiteral(v) => v.to_string(),
+            Value::Void => "".to_string(),
+        };
+
+        (state, None, Some(s))
+    } else {
+        (state, Some(EvaluatorError::EmptyBody), None)
+    }
 }
 
 fn evaluate_function_call(state: EnvironmentState, fc: FunctionCall) -> EvaluatorState {
-    let maybe_std_fn = state.std_lib_symbols.get(&fc.identifier);
+    let maybe_std_fn = state.std_lib_symbols.get(&fc.identifier).cloned();
 
     if let Some(std) = maybe_std_fn {
-        let result = handle_std_lib_arg(&state, std, fc.args).map_err(|e| match e {
-            StringArgumentsError::InvalidArgument => EvaluatorError::InvalidFunctionCallArgument,
-            StringArgumentsError::InvalidIdentifier => EvaluatorError::NoSuchIdentifier,
-        });
+        let (state, error) = handle_std_lib_arg(state, &std, fc.args);
 
-        return (
-            state,
-            match result {
-                Ok(_) => None,
-                Err(e) => Some(e),
-            },
-            Value::Void,
-        );
+        return (state, error, Value::Void);
     }
 
     if let Some(f) = state.local_symbols.get(&fc.identifier) {
@@ -219,6 +239,7 @@ fn evaluate_function_call(state: EnvironmentState, fc: FunctionCall) -> Evaluato
             ),
             EnvironmentBinding::Function(f) => todo!(),
             EnvironmentBinding::Identifier(_) => todo!(),
+            EnvironmentBinding::Range(_) => todo!(),
         }
     } else {
         (

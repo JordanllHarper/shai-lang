@@ -10,7 +10,7 @@ use crate::{
 ///
 /// An EnvironmentState is immutable, so adding or removing symbols from the current state requires
 /// the production of a new EnvironmentState.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EnvironmentState {
     pub local_symbols: HashMap<String, EnvironmentBinding>,
     pub std_lib_symbols: HashMap<String, Stdlib>,
@@ -34,15 +34,13 @@ pub enum EnvironmentBinding {
     Value(Value),
     Function(Function),
     Identifier(String),
+    Range(Range),
 }
 
 /// The variations an Environment binding value can be.
-///
-/// Note that ranges are also considered first class in the language.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     ValueLiteral(ValueLiteral),
-    Range(Range),
     Void,
 }
 
