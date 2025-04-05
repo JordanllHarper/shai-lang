@@ -1,5 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 
+use lexer::{DataTypeKwd, EvaluationSymbol, Literal, MathSymbol};
+
 use crate::*;
 
 type MultipleValues = Vec<Expression>;

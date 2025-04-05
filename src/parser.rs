@@ -11,7 +11,7 @@ type ExpressionState = (Expression, ParseState);
 
 type ParseResult<T> = Result<T, ParseError>;
 
-use crate::Token;
+use crate::lexer::Token;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseState {

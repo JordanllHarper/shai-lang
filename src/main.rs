@@ -8,13 +8,11 @@ pub mod std_lib;
 use std::{collections::HashMap, fs::read_to_string};
 
 use environment::EnvironmentState;
-
-use crate::lexer::*;
+use lexer::Lexer;
 
 fn read_from_file(path: &str) -> Vec<String> {
     read_to_string(path)
-        .unwrap()
-        .split_terminator('\n')
+        .into_iter()
         .map(|s| s.to_string())
         .collect::<Vec<String>>()
 }

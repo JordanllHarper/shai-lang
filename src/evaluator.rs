@@ -128,7 +128,7 @@ fn resolve_binding_to_string(
     match binding {
         EnvironmentBinding::Value(v) => match v {
             Value::ValueLiteral(vl) => Ok(vl.to_string()),
-            Value::Void => Ok("".to_string()),
+            Value::Void => Ok(String::new()),
         },
         EnvironmentBinding::Function(f) => todo!(),
         EnvironmentBinding::Identifier(i) => match state.local_symbols.get(i) {

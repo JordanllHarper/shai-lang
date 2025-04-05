@@ -257,6 +257,7 @@ pub enum Kwd {
 /// let tokens = token_iterator.collect::<Vec<Token>>();
 ///
 /// ```
+#[derive(Clone)]
 pub struct Lexer {
     position: usize,
     input: Vec<char>,
