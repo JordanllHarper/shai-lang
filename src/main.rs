@@ -1,3 +1,4 @@
+pub mod condition_evaluation;
 pub mod environment;
 pub mod evaluator;
 pub mod language;
@@ -24,15 +25,30 @@ fn main() {
         println!("{}", input);
     }
     let tokens = Lexer::new(&input);
-    let ast = parser::parse(tokens).unwrap();
+    let ast = match parser::parse(tokens) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("Parse error! {:?}", e);
+            return;
+        }
+    };
+
     if debug_mode {
         println!("AST: {:?}", ast);
     }
+
     let (new_state, result) = evaluator::evaluate(state, ast);
     if debug_mode {
         println!("{:?}", new_state);
     }
-    if let Err(e) = result {
-        eprintln!("{:?}", e);
+    match result {
+        Err(e) => {
+            eprintln!("{:?}", e);
+        }
+        Ok(v) => {
+            if debug_mode {
+                println!("Return value{:?}", v)
+            }
+        }
     }
 }

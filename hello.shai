@@ -8,6 +8,31 @@ age = 21
 
 print "Your age is" age
 
-if age == 18 {
-    print "You are 18"
+if age == 21 {
+    print "You are 21"
 }
+
+age = 18
+print "Changed age to" age
+
+if age != 21 {
+    print "You are not 21"
+}
+
+if age >= 18 {
+    print "You are an adult!"
+}
+
+num = 4
+if num > 3 {
+    print 4 "is in fact greater than" 3
+}
+
+if 3 > 4 {
+    print "Eek that doesn't seem right"
+} else {
+    print "That's more like it"
+}
+
+myaddition = 3 + 4
+print myaddition

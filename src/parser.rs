@@ -7,8 +7,6 @@ use Statement;
 
 use crate::{language::*, lexer::*};
 
-type ExpressionState = (Expression, ParseState);
-
 type ParseResult<T> = Result<T, ParseError>;
 
 use crate::lexer::Token;
@@ -165,7 +163,7 @@ fn on_parameters(state: ParseState) -> ParseResult<ParametersState> {
     parse_parameters(state, &mut vec![])
 }
 
-fn on_function(state: ParseState, ident: &str) -> ParseResult<ExpressionState> {
+fn on_function(state: ParseState, ident: &str) -> ParseResult<(Expression, ParseState)> {
     let (params, state) = on_parameters(state)?;
     let (return_type, state) = on_return_type(state)?;
 
@@ -227,7 +225,7 @@ fn parse_body(state: ParseState, body: &mut Body) -> ParseResult<BodyState> {
     parse_body(state, body)
 }
 
-fn on_body(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_body(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (body, state) = parse_body(state, &mut vec![])?;
     Ok((Expression::Body(body), state))
 }
@@ -235,7 +233,7 @@ fn on_body(state: ParseState) -> ParseResult<ExpressionState> {
 fn parse_array_literal(
     state: ParseState,
     array: &mut Vec<Expression>,
-) -> ParseResult<ExpressionState> {
+) -> ParseResult<(Expression, ParseState)> {
     let t = state.peek();
     match t {
         Some(Token::Symbol(Symbol::AngClose)) => {
@@ -263,7 +261,7 @@ fn parse_array_literal(
     }
 }
 
-fn on_array_literal(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_array_literal(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     parse_array_literal(state, &mut vec![])
 }
 
@@ -281,7 +279,7 @@ fn parse_dict_key(literal: Literal) -> ParseResult<DictionaryKey> {
 fn parse_dict_literal(
     state: ParseState,
     dict: &mut HashMap<DictionaryKey, Expression>,
-) -> ParseResult<ExpressionState> {
+) -> ParseResult<(Expression, ParseState)> {
     let (t, state) = state.next();
 
     match t {
@@ -351,7 +349,7 @@ fn parse_dict_literal(
     }
 }
 
-fn on_dict_literal(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_dict_literal(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     parse_dict_literal(state, &mut HashMap::new())
 }
 
@@ -359,13 +357,13 @@ fn on_assignment(
     state: ParseState,
     ident: &str,
     type_assertion: Option<NativeType>,
-) -> ParseResult<ExpressionState> {
+) -> ParseResult<(Expression, ParseState)> {
     let (t, state) = state.next();
     match t {
         Some(Token::Literal(l)) => {
-            let sv = Expression::new_from_literal(&l);
+            let (vl, state) = on_literal(state, l)?;
             Ok((
-                Expression::new_assignment(ident, sv, None, type_assertion, false),
+                Expression::new_assignment(ident, vl, None, type_assertion, false),
                 state,
             ))
         }
@@ -404,7 +402,7 @@ fn on_assignment(
 // Variable usage
 // y = *x* + 3
 //      |- here is usage
-fn on_identifier(state: ParseState, ident: &str) -> ParseResult<ExpressionState> {
+fn on_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, ParseState)> {
     let t = state.peek();
 
     match t {
@@ -455,7 +453,7 @@ fn on_variable_type_assertion(
     state: ParseState,
     ident: &str,
     d: DataTypeKwd,
-) -> ParseResult<ExpressionState> {
+) -> ParseResult<(Expression, ParseState)> {
     let kwd = NativeType::from_datatype_kwd(&d);
     let (next, state) = state.next();
     match next {
@@ -472,7 +470,7 @@ fn on_function_call(
     state: ParseState,
     ident: &str,
     first_arg: Expression,
-) -> ParseResult<ExpressionState> {
+) -> ParseResult<(Expression, ParseState)> {
     let (args, state) = on_arguments(state, first_arg)?;
     Ok((
         Expression::FunctionCall(FunctionCall {
@@ -487,12 +485,12 @@ fn on_math_expression(
     state: ParseState,
     operation: Math,
     lhs: Expression,
-) -> ParseResult<ExpressionState> {
+) -> ParseResult<(Expression, ParseState)> {
     let (rhs, state) = on_expression(state)?;
     Ok((Expression::new_math_expression(lhs, rhs, operation), state))
 }
 
-fn on_single_value(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_single_value(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
     let single_value = match next {
         Some(Token::Literal(l)) => Expression::new_from_literal(&l),
@@ -508,7 +506,7 @@ fn on_single_value(state: ParseState) -> ParseResult<ExpressionState> {
     Ok((single_value, state))
 }
 
-fn on_evaluation(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_evaluation(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (lhs, state) = on_single_value(state)?;
 
     let peek = state.peek();
@@ -541,18 +539,22 @@ fn on_evaluation(state: ParseState) -> ParseResult<ExpressionState> {
     ))
 }
 
-fn on_range(state: ParseState, lhs: Expression, inclusive: bool) -> ParseResult<ExpressionState> {
+fn on_range(
+    state: ParseState,
+    lhs: Expression,
+    inclusive: bool,
+) -> ParseResult<(Expression, ParseState)> {
     let (rhs, state) = on_single_value(state)?;
     Ok((Expression::new_range(lhs, rhs, inclusive), state))
 }
 
-fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_expression(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
 
     let expr = match next {
         Some(Token::Ident(ident)) => on_identifier(state, &ident)?,
         Some(Token::Kwd(k)) => on_keyword(state, &k)?,
-        Some(Token::Literal(l)) => (Expression::new_from_literal(&l), state),
+        Some(Token::Literal(l)) => on_literal(state, l)?,
         Some(Token::Symbol(Symbol::BraceOpen)) => on_body(state)?,
         Some(Token::Symbol(Symbol::Newline)) => on_expression(state)?,
 
@@ -568,7 +570,23 @@ fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
     Ok(expr)
 }
 
-fn on_include(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_literal(state: ParseState, l: Literal) -> ParseResult<(Expression, ParseState)> {
+    let peek = state.peek().cloned();
+    println!("This runs");
+    match peek {
+        Some(Token::Symbol(Symbol::Math(m))) => {
+            let (_, state) = state.next();
+            on_math_expression(
+                state,
+                Math::from_token(&m),
+                Expression::new_from_literal(&l),
+            )
+        }
+        _ => Ok((Expression::new_from_literal(&l), state)),
+    }
+}
+
+fn on_include(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (package, state) = state.next();
     match package {
         Some(Token::Literal(Literal::String(s))) => Ok((
@@ -583,7 +601,7 @@ fn on_include(state: ParseState) -> ParseResult<ExpressionState> {
     }
 }
 
-fn on_keyword(state: ParseState, k: &Kwd) -> ParseResult<ExpressionState> {
+fn on_keyword(state: ParseState, k: &Kwd) -> ParseResult<(Expression, ParseState)> {
     let expr = match k {
         Kwd::Return => on_return(state)?,
         Kwd::While => on_while(state)?,
@@ -610,7 +628,7 @@ fn on_keyword(state: ParseState, k: &Kwd) -> ParseResult<ExpressionState> {
     Ok(expr)
 }
 
-fn on_const(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_const(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
     let identifier = match next {
         Some(Token::Ident(ident)) => ident,
@@ -650,7 +668,7 @@ fn on_const(state: ParseState) -> ParseResult<ExpressionState> {
     ))
 }
 
-fn on_while(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_while(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let peeked = state.peek();
 
     if is_new_body(peeked) {
@@ -683,7 +701,7 @@ fn on_while(state: ParseState) -> ParseResult<ExpressionState> {
     Ok((while_expr, state))
 }
 
-fn on_iterable(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_iterable(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (lhs, state) = on_single_value(state)?;
     let peek = state.peek();
     if is_new_body(peek) {
@@ -703,7 +721,7 @@ fn on_iterable(state: ParseState) -> ParseResult<ExpressionState> {
     }
 }
 
-fn on_for(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_for(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (scoped_variable, state) = on_single_value(state)?;
     let (next, state) = state.next();
 
@@ -742,7 +760,7 @@ fn on_for(state: ParseState) -> ParseResult<ExpressionState> {
     ))
 }
 
-fn on_else(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_else(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
     match next {
         Some(Token::Symbol(Symbol::BraceOpen)) => on_body(state),
@@ -755,7 +773,7 @@ fn on_else(state: ParseState) -> ParseResult<ExpressionState> {
     }
 }
 
-fn on_if(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (evaluation, state) = on_evaluation(state)?;
     let (next, state) = state.next();
 
@@ -784,7 +802,7 @@ fn on_if(state: ParseState) -> ParseResult<ExpressionState> {
     ))
 }
 
-fn on_return(state: ParseState) -> ParseResult<ExpressionState> {
+fn on_return(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (e, state) = on_expression(state)?;
     Ok((
         Expression::new_statement(Some(e), StatementOperator::Return),

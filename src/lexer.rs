@@ -516,13 +516,13 @@ impl Iterator for Lexer {
                     self,
                     '=',
                     Symbol::Evaluation(EvaluationSymbol::LzEq),
-                    Symbol::ChevOpen,
+                    Symbol::Evaluation(EvaluationSymbol::Lz),
                 ),
                 '>' => peek_symbol(
                     self,
                     '=',
                     Symbol::Evaluation(EvaluationSymbol::GzEq),
-                    Symbol::ChevClose,
+                    Symbol::Evaluation(EvaluationSymbol::Gz),
                 ),
                 '+' => peek_symbol(
                     self,
@@ -738,8 +738,8 @@ hello
         test_char('_', Token::Symbol(Symbol::Underscore));
         test_char('\n', Token::Symbol(Symbol::Newline));
         test_char(' ', Token::Symbol(Symbol::Whitespace));
-        test_char('<', Token::Symbol(Symbol::ChevOpen));
-        test_char('>', Token::Symbol(Symbol::ChevClose));
+        test_char('<', Token::Symbol(Symbol::Evaluation(EvaluationSymbol::Lz)));
+        test_char('>', Token::Symbol(Symbol::Evaluation(EvaluationSymbol::Gz)));
         test_char('+', Token::Symbol(Symbol::Math(MathSymbol::Plus)));
         test_char('-', Token::Symbol(Symbol::Math(MathSymbol::Minus)));
         test_char('*', Token::Symbol(Symbol::Math(MathSymbol::Asterisk)));

@@ -1,4 +1,5 @@
 use crate::{
+    condition_evaluation::should_evaluate,
     environment::{EnvironmentBinding, EnvironmentState, Value},
     language::{
         Assignment, Body, Expression, Function, FunctionArguments, FunctionCall, Statement,
@@ -77,29 +78,7 @@ fn evaluate_evaluation(
             None
         };
 
-        let should_evaluate = match (lhs_binding, rhs_binding) {
-            (
-                EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Int(i1))),
-                Some(EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Int(i2)))),
-            ) => match e.evaluation_op {
-                crate::language::EvaluationOperator::NumericOnly(eval) => match eval {
-                    crate::language::EvaluationNumericOnly::Lz => i1 < i2,
-                    crate::language::EvaluationNumericOnly::Gz => i1 > i2,
-                    crate::language::EvaluationNumericOnly::LzEq => i1 <= i2,
-                    crate::language::EvaluationNumericOnly::GzEq => i1 >= i2,
-                },
-                crate::language::EvaluationOperator::NumericAndString(eval) => match eval {
-                    crate::language::EvaluationNumericAndString::Eq => i1 == i2,
-                    crate::language::EvaluationNumericAndString::Neq => i1 != i2,
-                },
-                crate::language::EvaluationOperator::BooleanTruthy => {
-                    return (state, Err(EvaluatorError::InvalidEvaluation))
-                }
-            },
-            _ => false,
-        };
-
-        (state, Ok(should_evaluate))
+        should_evaluate(state, lhs_binding, rhs_binding, e.evaluation_op)
     } else {
         (state, Err(EvaluatorError::InvalidEvaluation))
     }
@@ -396,7 +375,7 @@ mod test {
     use crate::{
         environment::{EnvironmentBinding, EnvironmentState, Value},
         evaluator::evaluate,
-        language::{Expression, ValueLiteral},
+        language::{Expression, NumericLiteral, ValueLiteral},
     };
 
     #[test]
@@ -408,7 +387,7 @@ mod test {
         assert_eq!(
             state.local_symbols.get("x"),
             Some(&EnvironmentBinding::Value(Value::ValueLiteral(
-                ValueLiteral::Int(5)
+                ValueLiteral::Numeric(NumericLiteral::Int(5))
             )))
         );
         assert!(result.is_err());

@@ -63,12 +63,11 @@ pub enum DictionaryKey {
 ///
 /// x = 'c'
 ///      |- the value literal 'c', with a native type of 'char'
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq)]
 pub enum ValueLiteral {
     Char(char),
-    Int(i32),
+    Numeric(NumericLiteral),
     String(String),
-    Float(f32),
     Bool(bool),
     // These recurse - we can have a Array of Arrays of Integers
     Array(Vec<Expression>),
@@ -76,13 +75,30 @@ pub enum ValueLiteral {
     Function,
 }
 
+#[derive(Debug, Clone, PartialOrd)]
+pub enum NumericLiteral {
+    Int(i32),
+    Float(f32),
+}
+
+impl PartialEq for NumericLiteral {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Int(l0), Self::Int(r0)) => l0 == r0,
+            (Self::Float(l0), Self::Float(r0)) => l0 == r0,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for NumericLiteral {}
+
 impl PartialEq for ValueLiteral {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (ValueLiteral::Char(c1), ValueLiteral::Char(c2)) => c1 == c2,
-            (ValueLiteral::Int(i1), ValueLiteral::Int(i2)) => i1 == i2,
+            (ValueLiteral::Numeric(n1), ValueLiteral::Numeric(n2)) => n1 == n2,
             (ValueLiteral::String(s1), ValueLiteral::String(s2)) => s1 == s2,
-            (ValueLiteral::Float(f1), ValueLiteral::Float(f2)) => f1 == f2,
             (ValueLiteral::Bool(b1), ValueLiteral::Bool(b2)) => b1 == b2,
             (ValueLiteral::Array(a1), ValueLiteral::Array(a2)) => a1 == a2,
             (ValueLiteral::Dictionary(d1), ValueLiteral::Dictionary(d2)) => {
@@ -103,8 +119,6 @@ impl PartialEq for ValueLiteral {
         }
     }
 }
-
-impl Eq for ValueLiteral {}
 
 /// Represents a program 'body'. That is, a collection of expressions in a row.
 ///
@@ -399,8 +413,8 @@ impl ValueLiteral {
     pub fn from_literal(literal: &Literal) -> Self {
         match literal {
             Literal::Bool(b) => Self::Bool(*b),
-            Literal::Int(i) => Self::Int(*i),
-            Literal::Float(f) => Self::Float(*f),
+            Literal::Int(i) => Self::Numeric(NumericLiteral::Int(*i)),
+            Literal::Float(f) => Self::Numeric(NumericLiteral::Float(*f)),
             Literal::String(s) => Self::String(s.to_string()),
         }
     }
@@ -410,9 +424,8 @@ impl Display for ValueLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             ValueLiteral::Char(c) => c.to_string(),
-            ValueLiteral::Int(i) => i.to_string(),
+            ValueLiteral::Numeric(n) => n.to_string(),
             ValueLiteral::String(s) => s.to_string(),
-            ValueLiteral::Float(f) => f.to_string(),
             ValueLiteral::Bool(b) => b.to_string(),
             ValueLiteral::Array(arr) => vec_expression_to_string(arr),
             ValueLiteral::Dictionary(dict) => dict_expression_to_string(dict),
@@ -420,6 +433,17 @@ impl Display for ValueLiteral {
         };
         f.write_str(&s)
     }
+}
+
+impl Display for NumericLiteral {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            NumericLiteral::Int(i) => &i.to_string(),
+            NumericLiteral::Float(f) => &f.to_string(),
+        };
+        f.write_str(s)
+    }
+    // add code here
 }
 
 pub fn dict_expression_to_string(dict: &HashMap<DictionaryKey, Expression>) -> String {
@@ -486,7 +510,7 @@ impl Expression {
     }
 
     pub fn new_int(i: i32) -> Self {
-        Self::ValueLiteral(ValueLiteral::Int(i))
+        Self::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i)))
     }
 
     pub fn new_bool(b: bool) -> Self {
@@ -494,7 +518,7 @@ impl Expression {
     }
 
     pub fn new_float(f: f32) -> Self {
-        Self::ValueLiteral(ValueLiteral::Float(f))
+        Self::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Float(f)))
     }
 
     pub fn new_array(arr: Vec<Expression>) -> Self {
