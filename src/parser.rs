@@ -884,7 +884,7 @@ mod tests {
                     Expression::new_evaluation(
                         Expression::new_identifier("i"),
                         Some(Expression::new_int(0)),
-                        EvaluationOperator::Lz,
+                        EvaluationOperator::NumericOnly(EvaluationNumericOnly::Lz),
                     ),
                     Expression::new_body(vec![Expression::new_statement(
                         None,
@@ -941,7 +941,7 @@ mod tests {
                 Expression::new_evaluation(
                     Expression::new_int(3),
                     Some(Expression::new_int(3)),
-                    EvaluationOperator::Eq,
+                    EvaluationOperator::NumericAndString(EvaluationNumericAndString::Eq),
                 ),
                 Expression::new_body(vec![Expression::new_function_call(
                     "print",
@@ -1040,7 +1040,7 @@ mod tests {
                 Expression::new_evaluation(
                     Expression::new_int(3),
                     Some(Expression::new_int(3)),
-                    EvaluationOperator::Eq,
+                    EvaluationOperator::NumericAndString(EvaluationNumericAndString::Eq),
                 ),
                 Expression::new_body(vec![Expression::new_function_call(
                     "print",
@@ -1160,7 +1160,7 @@ mod tests {
                 Some(Expression::new_evaluation(
                     Expression::new_int(3),
                     Some(Expression::new_int(3)),
-                    EvaluationOperator::Eq,
+                    EvaluationOperator::NumericAndString(EvaluationNumericAndString::Eq),
                 )),
                 Expression::Body(vec![Expression::new_function_call(
                     "print",

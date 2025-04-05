@@ -28,11 +28,11 @@ fn main() {
     if debug_mode {
         println!("AST: {:?}", ast);
     }
-    let (new_state, error, v) = evaluator::evaluate(state, ast);
+    let (new_state, result) = evaluator::evaluate(state, ast);
     if debug_mode {
         println!("{:?}", new_state);
     }
-    if let Some(e) = error {
+    if let Err(e) = result {
         eprintln!("{:?}", e);
     }
 }

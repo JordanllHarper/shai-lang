@@ -1,3 +1,13 @@
-x = "Hello, Jules!"
-y = "Hello, Jordan!"
-print x y { "How are you?"} {"I am okay!"} {"What about you?"} "This is a standalone string"
+print "Hello, World"
+
+name = "Jordan"
+
+print "Hello" name
+
+age = 21
+
+print "Your age is" age
+
+if age == 18 {
+    print "You are 18"
+}

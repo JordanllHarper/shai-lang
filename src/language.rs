@@ -284,13 +284,23 @@ pub struct Assignment {
 /// Various methods of evaluating 2 expressions
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum EvaluationOperator {
+    NumericOnly(EvaluationNumericOnly),
+    NumericAndString(EvaluationNumericAndString),
+    BooleanTruthy, // if true { ... }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum EvaluationNumericOnly {
     Lz,
     Gz,
     LzEq,
     GzEq,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum EvaluationNumericAndString {
     Eq,
     Neq,
-    BooleanTruthy, // if true { ... }
 }
 
 /// Defines a method of comparison between 2 expressions.
@@ -306,9 +316,9 @@ pub enum EvaluationOperator {
 /// if true == true { ... }
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Evaluation {
-    lhs: Box<Expression>,
-    rhs: Option<Box<Expression>>,
-    evaluation_op: EvaluationOperator,
+    pub lhs: Box<Expression>,
+    pub rhs: Option<Box<Expression>>,
+    pub evaluation_op: EvaluationOperator,
 }
 
 impl Evaluation {
@@ -324,12 +334,14 @@ impl Evaluation {
 impl EvaluationOperator {
     pub fn from_evaluation_symbol(evaluation_symbol: &EvaluationSymbol) -> Self {
         match evaluation_symbol {
-            EvaluationSymbol::Equality => Self::Eq,
-            EvaluationSymbol::NotEquality => Self::Neq,
-            EvaluationSymbol::LzEq => Self::LzEq,
-            EvaluationSymbol::GzEq => Self::GzEq,
-            EvaluationSymbol::Lz => Self::Lz,
-            EvaluationSymbol::Gz => Self::Gz,
+            EvaluationSymbol::Equality => Self::NumericAndString(EvaluationNumericAndString::Eq),
+            EvaluationSymbol::NotEquality => {
+                Self::NumericAndString(EvaluationNumericAndString::Neq)
+            }
+            EvaluationSymbol::LzEq => Self::NumericOnly(EvaluationNumericOnly::LzEq),
+            EvaluationSymbol::GzEq => Self::NumericOnly(EvaluationNumericOnly::GzEq),
+            EvaluationSymbol::Lz => Self::NumericOnly(EvaluationNumericOnly::Lz),
+            EvaluationSymbol::Gz => Self::NumericOnly(EvaluationNumericOnly::Gz),
         }
     }
 }
