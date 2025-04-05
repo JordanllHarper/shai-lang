@@ -1,7 +1,8 @@
 use crate::{
     environment::{EnvironmentBinding, EnvironmentState, Value},
     language::{
-        Expression, Function, FunctionArguments, FunctionCall, Statement, StatementOperator,
+        Assignment, Body, Expression, Function, FunctionArguments, FunctionCall, Statement,
+        StatementOperator,
     },
     std_lib::RustBinding,
 };
@@ -29,11 +30,26 @@ pub fn evaluate(state: EnvironmentState, ast: Expression) -> EvaluatorState {
         Expression::If(_) => todo!(),
         Expression::While(_) => todo!(),
         Expression::For(_) => todo!(),
-        Expression::Body(_) => todo!(),
+        Expression::Body(b) => evaluate_body(state, b),
         Expression::Range(_) => todo!(),
         Expression::Assignment(a) => evaluate_assignment(state, a),
         Expression::FunctionCall(f) => evaluate_function_call(state, f),
     }
+}
+
+fn evaluate_body(state: EnvironmentState, body: Body) -> EvaluatorState {
+    let mut next_state = state.clone();
+    let mut next_value = Value::Void;
+    for expr in body {
+        let (maybe_state, error, maybe_value) = evaluate(next_state, expr);
+        if error.is_some() {
+            return (state, error, Value::Void);
+        }
+
+        next_state = maybe_state;
+        next_value = maybe_value;
+    }
+    (next_state, None, next_value)
 }
 
 fn get_identifier_binding(
@@ -54,10 +70,7 @@ fn evaluate_assignment_expression(
 ) -> Result<EnvironmentBinding, EvaluatorError> {
     match expr {
         Expression::ValueLiteral(v) => Ok(EnvironmentBinding::Value(Value::ValueLiteral(v))),
-        Expression::Identifier(i) => {
-            let binding = get_identifier_binding(&state, &i)?;
-            Ok(binding)
-        }
+        Expression::Identifier(i) => Ok(get_identifier_binding(state, &i)?),
         Expression::MultipleValues(_) => todo!(),
         Expression::Statement(_) => todo!(),
         Expression::MathOperation(_) => todo!(),
@@ -73,7 +86,7 @@ fn evaluate_assignment_expression(
     }
 }
 
-fn evaluate_assignment(state: EnvironmentState, a: crate::language::Assignment) -> EvaluatorState {
+fn evaluate_assignment(state: EnvironmentState, a: Assignment) -> EvaluatorState {
     match evaluate_assignment_expression(&state, *a.rhs) {
         Ok(binding) => add_binding_or_error(state, &a.identifier, binding),
         Err(e) => (state, Some(e), Value::Void),
@@ -90,20 +103,21 @@ fn evaluate_value(state: EnvironmentState, v: &Value) -> EvaluatorState {
 
 type EvaluatorState = (EnvironmentState, Option<EvaluatorError>, Value);
 fn evaluate_identifier(state: EnvironmentState, ident: &str) -> EvaluatorState {
-    let maybe_std_fn = state.std_lib_symbols.get(ident).cloned();
-    if let Some(std) = maybe_std_fn {
+    let maybe_rust_binding = state.std_lib_symbols.get(ident).cloned();
+    if let Some(std) = maybe_rust_binding {
         let (state, error) = handle_rust_binding_with_args(state, &std, vec![]);
-        return match error {
-            Some(e) => (state, Some(e), Value::Void),
-            None => (state, None, Value::Void),
+        return if error.is_some() {
+            (state, error, Value::Void)
+        } else {
+            (state, None, Value::Void)
         };
     }
 
     let symbol = state.get_local_binding(ident);
 
     match symbol {
-        Some(v) => match v {
-            EnvironmentBinding::Value(v) => evaluate_value(state, &v),
+        Some(binding) => match binding {
+            EnvironmentBinding::Value(v) => (state, None, v),
             EnvironmentBinding::Function(f) => evaluate_function(state, &f),
             EnvironmentBinding::Identifier(i) => evaluate_identifier(state, &i),
             EnvironmentBinding::Range(_) => todo!(),
@@ -204,21 +218,21 @@ fn resolve_body_string_value(
     state: EnvironmentState,
     b: Vec<Expression>,
 ) -> (EnvironmentState, Option<EvaluatorError>, Option<String>) {
-    let first = b.first().cloned();
-    if let Some(e) = first {
-        let (state, error, return_value) = evaluate(state, e);
+    let mut new_state = state.clone();
+    let mut s = String::new();
+    for expr in b {
+        let (maybe_state, error, return_value) = evaluate(new_state, expr);
         if error.is_some() {
             return (state, error, None);
         }
-        let s = match return_value {
+        s = match return_value {
             Value::ValueLiteral(v) => v.to_string(),
             Value::Void => "".to_string(),
         };
-
-        (state, None, Some(s))
-    } else {
-        (state, Some(EvaluatorError::EmptyBody), None)
+        new_state = maybe_state;
     }
+
+    (new_state, None, Some(s))
 }
 
 fn evaluate_function_call(state: EnvironmentState, fc: FunctionCall) -> EvaluatorState {
