@@ -38,6 +38,9 @@ impl ParseState {
     pub fn new(tokens: Vec<Token>, position: usize) -> Self {
         Self { tokens, position }
     }
+    pub fn end(&self) -> bool {
+        self.peek().is_none()
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -47,6 +50,31 @@ pub enum ParseError {
         token_context: Token,
     },
     NoMoreTokens,
+}
+
+pub fn parse<I>(tokens: I) -> ParseResult<Expression>
+where
+    I: std::iter::IntoIterator<Item = Token>,
+{
+    let tokens = tokens
+        .into_iter()
+        .filter(|each| each != &Token::whitespace())
+        .collect::<Vec<Token>>();
+    let len = tokens.len();
+    let tokens = if tokens.last() == Some(&Token::Symbol(Symbol::Newline)) {
+        tokens.into_iter().take(len - 1).collect()
+    } else {
+        tokens
+    };
+    let mut top_level_body: Body = vec![];
+    let mut parse_state = ParseState::new(tokens, 0);
+    while !parse_state.end() {
+        let (expr, new_state) = on_expression(parse_state)?;
+        top_level_body.push(expr);
+        parse_state = new_state;
+    }
+
+    Ok(Expression::Body(top_level_body))
 }
 
 fn is_new_body(t: Option<&Token>) -> bool {
@@ -148,11 +176,6 @@ fn on_function(state: ParseState, ident: &str) -> ParseResult<ExpressionState> {
             let (body, state) = on_body(state)?;
             let f = Expression::new_function(ident, params, return_type, body);
             Ok((f, state))
-        }
-        Some(Token::Symbol(Symbol::Equals)) => {
-            let (body, state) = on_expression(state)?;
-            let function = Expression::new_function(ident, params, return_type, body);
-            Ok((function, state))
         }
         Some(t) => Err(ParseError::InvalidSyntax {
             message: "Expected a function body or expression".to_string(),
@@ -257,7 +280,7 @@ fn parse_dict_key(literal: Literal) -> ParseResult<DictionaryKey> {
 }
 fn parse_dict_literal(
     state: ParseState,
-    map: &mut HashMap<DictionaryKey, Expression>,
+    dict: &mut HashMap<DictionaryKey, Expression>,
 ) -> ParseResult<ExpressionState> {
     let (t, state) = state.next();
 
@@ -268,11 +291,11 @@ fn parse_dict_literal(
                 Some(Token::Symbol(Symbol::Colon)) => {
                     let (rhs, state) = on_expression(state)?;
 
-                    map.insert(DictionaryKey::Identifier(i), rhs);
+                    dict.insert(DictionaryKey::Identifier(i), rhs);
 
                     let (t, state) = state.next();
                     match t {
-                        Some(Token::Symbol(Symbol::Comma)) => parse_dict_literal(state, map),
+                        Some(Token::Symbol(Symbol::Comma)) => parse_dict_literal(state, dict),
                         Some(t) => Err(ParseError::InvalidSyntax {
                             message: "Expected a comma".to_string(),
                             token_context: t,
@@ -294,12 +317,12 @@ fn parse_dict_literal(
             match t {
                 Some(Token::Symbol(Symbol::Colon)) => {
                     let (rhs, state) = on_expression(state)?;
-                    map.insert(key, rhs);
-                    let t = state.peek();
+                    dict.insert(key, rhs);
+                    let (t, state) = state.next();
                     match t {
-                        Some(Token::Symbol(Symbol::Comma)) => parse_dict_literal(state, map),
+                        Some(Token::Symbol(Symbol::Comma)) => parse_dict_literal(state, dict),
                         Some(Token::Symbol(Symbol::BraceClose)) => {
-                            Ok((Expression::new_dict(map.to_owned()), state))
+                            Ok((Expression::new_dict(dict.to_owned()), state))
                         }
 
                         Some(t) => Err(ParseError::InvalidSyntax {
@@ -317,7 +340,7 @@ fn parse_dict_literal(
             }
         }
         Some(Token::Symbol(Symbol::BraceClose)) => {
-            Ok((Expression::new_dict(map.to_owned()), state))
+            Ok((Expression::new_dict(dict.to_owned()), state))
         }
 
         Some(t) => Err(ParseError::InvalidSyntax {
@@ -526,20 +549,21 @@ fn on_range(state: ParseState, lhs: Expression, inclusive: bool) -> ParseResult<
 fn on_expression(state: ParseState) -> ParseResult<ExpressionState> {
     let (next, state) = state.next();
 
-    let expr = match next.ok_or::<ParseError>(ParseError::NoMoreTokens)? {
-        Token::Ident(ident) => on_identifier(state, &ident)?,
-        Token::Kwd(k) => on_keyword(state, &k)?,
-        Token::Literal(l) => (Expression::new_from_literal(&l), state),
-        Token::Symbol(Symbol::BraceOpen) => on_body(state)?,
-        Token::Symbol(Symbol::Newline) => on_expression(state)?,
+    let expr = match next {
+        Some(Token::Ident(ident)) => on_identifier(state, &ident)?,
+        Some(Token::Kwd(k)) => on_keyword(state, &k)?,
+        Some(Token::Literal(l)) => (Expression::new_from_literal(&l), state),
+        Some(Token::Symbol(Symbol::BraceOpen)) => on_body(state)?,
+        Some(Token::Symbol(Symbol::Newline)) => on_expression(state)?,
 
-        t => {
+        Some(t) => {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected an identifier, keyword, literal, body open or newline"
                     .to_string(),
                 token_context: t,
             })
         }
+        None => return Err(ParseError::NoMoreTokens),
     };
     Ok(expr)
 }
@@ -768,29 +792,17 @@ fn on_return(state: ParseState) -> ParseResult<ExpressionState> {
     ))
 }
 
-pub fn parse<I>(tokens: I) -> ParseResult<Expression>
-where
-    I: std::iter::IntoIterator<Item = Token>,
-{
-    let tokens = tokens
-        .into_iter()
-        .filter(|each| each != &Token::whitespace())
-        .collect::<Vec<Token>>();
-    let parse_state = ParseState::new(tokens, 0);
-    let (expr, _) = on_expression(parse_state)?;
-    Ok(expr)
-}
-
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashMap;
+    use std::{collections::HashMap, vec};
 
     use super::*;
 
     use pretty_assertions::assert_eq;
 
-    fn test(input: Vec<Token>, expected: Expression) {
+    fn test(label: &str, input: Vec<Token>, expected: Expression) {
+        println!("{}", label);
         let actual = parse(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -803,8 +815,12 @@ mod tests {
     fn break_statements() {
         // break
         test(
+            "Break by itself",
             vec![Token::Kwd(Kwd::Break)],
-            Expression::new_statement(None, StatementOperator::Break),
+            Expression::new_body(vec![Expression::new_statement(
+                None,
+                StatementOperator::Break,
+            )]),
         );
 
         // for i in numbers  {
@@ -812,6 +828,7 @@ mod tests {
         // }
 
         test(
+            "Break in a for loop",
             vec![
                 Token::Kwd(Kwd::For),
                 Token::Ident("i".to_string()),
@@ -821,14 +838,14 @@ mod tests {
                 Token::Kwd(Kwd::Break),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_for(
+            Expression::new_body(vec![Expression::new_for(
                 Expression::new_identifier("i"),
                 Expression::new_identifier("numbers"),
                 Expression::new_body(vec![Expression::new_statement(
                     None,
                     StatementOperator::Break,
                 )]),
-            ),
+            )]),
         );
 
         // for i in numbers  {
@@ -839,6 +856,7 @@ mod tests {
         //     }
         // }
         test(
+            "Break in a for look with an if statement",
             vec![
                 Token::Kwd(Kwd::For),
                 Token::Ident("i".to_string()),
@@ -859,7 +877,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_for(
+            Expression::new_body(vec![Expression::new_for(
                 Expression::new_identifier("i"),
                 Expression::new_identifier("numbers"),
                 Expression::Body(vec![Expression::new_if(
@@ -877,7 +895,7 @@ mod tests {
                         vec![Expression::new_string("hi")],
                     )])),
                 )]),
-            ),
+            )]),
         );
     }
 
@@ -885,13 +903,14 @@ mod tests {
     fn if_expression() {
         // if true { }
         test(
+            "if expression with empty body",
             vec![
                 Token::Kwd(Kwd::If),
                 Token::Literal(Literal::Bool(true)),
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_if(
+            Expression::new_body(vec![Expression::new_if(
                 Expression::new_evaluation(
                     Expression::new_bool(true),
                     None,
@@ -901,9 +920,10 @@ mod tests {
                     // empty body
                 ]),
                 None,
-            ),
+            )]),
         );
         test(
+            "if statement with comparison and body content",
             // if 3 == 3 {
             //     print "Hello"
             // }
@@ -917,7 +937,7 @@ mod tests {
                 Token::Literal(Literal::String("Hello".to_string())),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_if(
+            Expression::new_body(vec![Expression::new_if(
                 Expression::new_evaluation(
                     Expression::new_int(3),
                     Some(Expression::new_int(3)),
@@ -928,13 +948,14 @@ mod tests {
                     vec![Expression::new_string("Hello")],
                 )]),
                 None,
-            ),
+            )]),
         );
         // where x might be true or false
         // if x {
         //     print "Hello"
         // }
         test(
+            "if expression with identifier comparison",
             vec![
                 Token::Kwd(Kwd::If),
                 Token::Ident("x".to_string()),
@@ -945,7 +966,7 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_if(
+            Expression::new_body(vec![Expression::new_if(
                 Expression::new_evaluation(
                     Expression::new_identifier("x"),
                     None,
@@ -956,7 +977,7 @@ mod tests {
                     vec![Expression::new_string("Hello")],
                 )]),
                 None,
-            ),
+            )]),
         );
     }
 
@@ -968,6 +989,7 @@ mod tests {
         // empty body
         // }
         test(
+            "if else boolean statement",
             vec![
                 Token::Kwd(Kwd::If),
                 Token::Literal(Literal::Bool(true)),
@@ -977,7 +999,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_if(
+            Expression::new_body(vec![Expression::new_if(
                 Expression::new_evaluation(
                     Expression::new_bool(true),
                     None,
@@ -987,7 +1009,7 @@ mod tests {
                     // empty body
                 ]),
                 Some(Expression::Body(vec![])),
-            ),
+            )]),
         );
 
         // if 3 == 3 {
@@ -996,6 +1018,7 @@ mod tests {
         //     print "Goodbye"
         // }
         test(
+            "if else with literal comparison",
             vec![
                 Token::Kwd(Kwd::If),
                 Token::Literal(Literal::Int(3)),
@@ -1013,7 +1036,7 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_if(
+            Expression::new_body(vec![Expression::new_if(
                 Expression::new_evaluation(
                     Expression::new_int(3),
                     Some(Expression::new_int(3)),
@@ -1027,9 +1050,17 @@ mod tests {
                     "print",
                     vec![Expression::new_string("Goodbye")],
                 )])),
-            ),
+            )]),
         );
+        /*
+         * if x {
+         *   print "Hello"
+         * } else {
+         *   print "Goodbye"
+         * }
+         * */
         test(
+            "if else with identifier boolean comparison",
             vec![
                 Token::Kwd(Kwd::If),
                 Token::Ident("x".to_string()),
@@ -1045,7 +1076,7 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_if(
+            Expression::new_body(vec![Expression::new_if(
                 Expression::new_evaluation(
                     Expression::new_identifier("x"),
                     None,
@@ -1059,7 +1090,7 @@ mod tests {
                     "print",
                     vec![Expression::new_string("Goodbye")],
                 )])),
-            ),
+            )]),
         )
     }
 
@@ -1069,6 +1100,7 @@ mod tests {
         //
         // }
         test(
+            "infinite while loop",
             vec![
                 Token::Kwd(Kwd::While),
                 Token::Symbol(Symbol::BraceOpen),
@@ -1076,13 +1108,17 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_while(None, Expression::new_body(vec![])),
+            Expression::new_body(vec![Expression::new_while(
+                None,
+                Expression::new_body(vec![]),
+            )]),
         );
         // With function call:
         // while {
         //    print "Hello"
         // }
         test(
+            "infinite while loop with body",
             vec![
                 Token::Kwd(Kwd::While),
                 Token::Symbol(Symbol::BraceOpen),
@@ -1092,17 +1128,22 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_while(
+            Expression::new_body(vec![Expression::new_while(
                 None,
                 Expression::new_body(vec![Expression::new_function_call(
                     "print",
                     vec![Expression::new_string("Hello")],
                 )]),
-            ),
+            )]),
         );
 
         // With condition
+        //
+        // while 3 == 3 {
+        //     print "Hello"
+        // }
         test(
+            "while loop with condition",
             vec![
                 Token::Kwd(Kwd::While),
                 Token::Literal(Literal::Int(3)),
@@ -1115,7 +1156,7 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_while(
+            Expression::new_body(vec![Expression::new_while(
                 Some(Expression::new_evaluation(
                     Expression::new_int(3),
                     Some(Expression::new_int(3)),
@@ -1125,10 +1166,14 @@ mod tests {
                     "print",
                     vec![Expression::new_string("Hello")],
                 )]),
-            ),
+            )]),
         );
 
+        // while x {
+        //     print "Hello"
+        // }
         test(
+            "while loop with identifier condition",
             vec![
                 Token::Kwd(Kwd::While),
                 Token::Ident("x".to_string()),
@@ -1139,7 +1184,7 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_while(
+            Expression::new_body(vec![Expression::new_while(
                 Some(Expression::new_evaluation(
                     Expression::new_identifier("x"),
                     None,
@@ -1149,7 +1194,7 @@ mod tests {
                     "print",
                     vec![Expression::new_string("Hello")],
                 )]),
-            ),
+            )]),
         );
     }
 
@@ -1159,6 +1204,7 @@ mod tests {
         //
         // }
         test(
+            "For loop with range exclusive",
             vec![
                 Token::Kwd(Kwd::For),
                 Token::Ident("x".to_string()),
@@ -1169,16 +1215,17 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_for(
+            Expression::new_body(vec![Expression::new_for(
                 Expression::new_identifier("x"),
                 Expression::new_range(Expression::new_int(0), Expression::new_int(5), false),
                 Expression::Body(Body::new()),
-            ),
+            )]),
         );
         // for x in y..z {
         //
         // }
         test(
+            "For loop with identifiers",
             vec![
                 Token::Kwd(Kwd::For),
                 Token::Ident("x".to_string()),
@@ -1189,7 +1236,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_for(
+            Expression::new_body(vec![Expression::new_for(
                 Expression::new_identifier("x"),
                 Expression::new_range(
                     Expression::new_identifier("y"),
@@ -1197,7 +1244,7 @@ mod tests {
                     false,
                 ),
                 Expression::Body(Body::new()),
-            ),
+            )]),
         );
     }
 
@@ -1205,12 +1252,19 @@ mod tests {
     fn variable_assignment_with_another_variable() {
         // y = x
         test(
+            "variable assignment with another variable",
             vec![
                 Token::Ident("y".to_string()),
                 Token::Symbol(Symbol::Equals),
                 Token::Ident("x".to_string()),
             ],
-            Expression::new_assignment("y", Expression::new_identifier("x"), None, None, false),
+            Expression::new_body(vec![Expression::new_assignment(
+                "y",
+                Expression::new_identifier("x"),
+                None,
+                None,
+                false,
+            )]),
         )
     }
 
@@ -1218,6 +1272,7 @@ mod tests {
     fn variable_usage_in_expressions() {
         // y = x + 3
         test(
+            "varible usage in an expression",
             vec![
                 Token::Ident("y".to_string()),
                 Token::Symbol(Symbol::Equals),
@@ -1225,7 +1280,7 @@ mod tests {
                 Token::Symbol(Symbol::Math(MathSymbol::Plus)),
                 Token::Literal(Literal::Int(3)),
             ],
-            Expression::new_assignment(
+            Expression::new_body(vec![Expression::new_assignment(
                 "y",
                 Expression::MathOperation(MathOperation {
                     lhs: Box::new(Expression::new_identifier("x")),
@@ -1235,10 +1290,12 @@ mod tests {
                 None,
                 None,
                 false,
-            ),
+            )]),
         );
 
+        // y int = x + 3
         test(
+            "Variable usage with data type kwds in expression",
             vec![
                 Token::Ident("y".to_string()),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
@@ -1247,7 +1304,7 @@ mod tests {
                 Token::Symbol(Symbol::Math(MathSymbol::Plus)),
                 Token::Literal(Literal::Int(3)),
             ],
-            Expression::new_assignment(
+            Expression::new_body(vec![Expression::new_assignment(
                 "y",
                 Expression::MathOperation(MathOperation {
                     lhs: Box::new(Expression::new_identifier("x")),
@@ -1257,7 +1314,7 @@ mod tests {
                 None,
                 Some(NativeType::Int),
                 false,
-            ),
+            )]),
         );
     }
 
@@ -1267,6 +1324,7 @@ mod tests {
         // \n
         // }\n
         test(
+            "Function declaration with empty body",
             vec![
                 // Signature
                 Token::Ident("do_nothing".to_string()),
@@ -1280,7 +1338,12 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::new_function("do_nothing", vec![], None, Expression::Body(vec![])),
+            Expression::new_body(vec![Expression::new_function(
+                "do_nothing",
+                vec![],
+                None,
+                Expression::Body(vec![]),
+            )]),
         );
     }
 
@@ -1290,6 +1353,7 @@ mod tests {
         // \n
         // }\n
         test(
+            "Function declaration empty body with return type",
             vec![
                 // Signature
                 Token::Ident("do_nothing".to_string()),
@@ -1307,12 +1371,12 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::new_function(
+            Expression::new_body(vec![Expression::new_function(
                 "do_nothing",
                 vec![],
                 Some(NativeType::Int),
                 Expression::Body(vec![]),
-            ),
+            )]),
         );
         // with body
     }
@@ -1323,6 +1387,7 @@ mod tests {
         // \n
         // }\n
         test(
+            "Function declaration empty body with parameters",
             vec![
                 // Signature
                 Token::Ident("do_nothing".to_string()),
@@ -1339,7 +1404,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::new_function(
+            Expression::new_body(vec![Expression::new_function(
                 "do_nothing",
                 vec![
                     Parameter::new("numOne", None),
@@ -1347,10 +1412,11 @@ mod tests {
                 ],
                 None,
                 Expression::Body(vec![]),
-            ),
+            )]),
         );
         // typed arguments
         test(
+            "Function declaration empty body with parameters typed",
             vec![
                 // Signature
                 Token::Ident("do_nothing".to_string()),
@@ -1369,7 +1435,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::new_function(
+            Expression::new_body(vec![Expression::new_function(
                 "do_nothing",
                 vec![
                     Parameter::new("numOne", Some(NativeType::Int)),
@@ -1377,7 +1443,7 @@ mod tests {
                 ],
                 None,
                 Expression::Body(vec![]),
-            ),
+            )]),
         )
     }
 
@@ -1387,6 +1453,7 @@ mod tests {
         // \n
         // }\n
         test(
+            "Function declaration parameters with return type",
             vec![
                 // Signature
                 Token::Ident("do_nothing".to_string()),
@@ -1407,7 +1474,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::new_function(
+            Expression::new_body(vec![Expression::new_function(
                 "do_nothing",
                 vec![
                     Parameter::new("numOne", None),
@@ -1415,10 +1482,11 @@ mod tests {
                 ],
                 Some(NativeType::Int),
                 Expression::Body(vec![]),
-            ),
+            )]),
         );
         // Typed Parameters
         test(
+            "Function declaration parameters with return type and parameter types",
             vec![
                 // Signature
                 Token::Ident("do_nothing".to_string()),
@@ -1441,7 +1509,7 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::new_function(
+            Expression::new_body(vec![Expression::new_function(
                 "do_nothing",
                 vec![
                     Parameter::new("numOne", Some(NativeType::Int)),
@@ -1449,56 +1517,17 @@ mod tests {
                 ],
                 Some(NativeType::Int),
                 Expression::Body(vec![]),
-            ),
+            )]),
         )
-    }
-
-    #[test]
-    fn function_expression_params_no_return() {
-        // No specified types
-        // add (numOne, numTwo) = num_one + num_two\n
-        test(
-            vec![
-                // Signature
-                Token::Ident("add".to_string()),
-                // Args
-                Token::Symbol(Symbol::ParenOpen),
-                Token::Ident("numOne".to_string()),
-                Token::Symbol(Symbol::Comma),
-                Token::Ident("numTwo".to_string()),
-                Token::Symbol(Symbol::ParenClose),
-                // End of args
-                Token::Symbol(Symbol::Equals),
-                // End of return type
-                // body (assume 4 spaces)
-                Token::Ident("numOne".to_string()),
-                Token::Symbol(Symbol::Math(MathSymbol::Plus)),
-                Token::Ident("numTwo".to_string()),
-                Token::Symbol(Symbol::Newline),
-                // end
-            ],
-            Expression::new_function(
-                "add",
-                vec![
-                    Parameter::new("numOne", None),
-                    Parameter::new("numTwo", None),
-                ],
-                None,
-                Expression::new_math_expression(
-                    Expression::new_identifier("numOne"),
-                    Expression::new_identifier("numTwo"),
-                    Math::Add,
-                ),
-            ),
-        );
     }
 
     #[test]
     fn function_call_no_values() {
         // print <- produces identifier. Cannot make assumption about what this is
         test(
+            "Function call with no values produces identifier",
             vec![Token::Ident("print".to_string())],
-            Expression::Identifier("print".to_string()),
+            Expression::new_body(vec![Expression::Identifier("print".to_string())]),
         );
     }
 
@@ -1506,59 +1535,69 @@ mod tests {
     fn floating_point_nums_in_assignment() {
         // x=3.5\n
         test(
+            "Floating point numbers in assignment",
             vec![
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Equals),
                 Token::Literal(Literal::Float(3.5)),
             ],
-            Expression::new_assignment("x", Expression::new_float(3.5), None, None, false),
+            Expression::new_body(vec![Expression::new_assignment(
+                "x",
+                Expression::new_float(3.5),
+                None,
+                None,
+                false,
+            )]),
         );
     }
 
     #[test]
-    fn function_call_multiple_values() {
+    fn function_call_multiple_arguments() {
         // print "Hello" "World"
         test(
+            "Function call with multiple arguments",
             vec![
                 Token::Ident("print".to_string()),
                 Token::Literal(Literal::String("Hello".to_string())),
                 Token::Literal(Literal::String("World".to_string())),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::new_function_call(
+            Expression::new_body(vec![Expression::new_function_call(
                 "print",
                 vec![
                     Expression::new_string("Hello"),
                     Expression::new_string("World"),
                 ],
-            ),
+            )]),
         );
     }
 
     #[test]
-    fn function_call_multiple_values_with_identifier() {
+    fn function_call_multiple_arguments_with_identifier() {
         // print "Hello" x
         test(
+            "Function call multiple arguments using identifier",
             vec![
                 Token::Ident("print".to_string()),
                 Token::Literal(Literal::String("Hello".to_string())),
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::FunctionCall(FunctionCall {
+            Expression::new_body(vec![Expression::FunctionCall(FunctionCall {
                 identifier: "print".to_string(),
                 args: vec![
                     Expression::new_string("Hello"),
                     Expression::new_identifier("x"),
                 ],
-            }),
+            })]),
         );
     }
 
     #[test]
     fn function_call_multiple_values_with_body() {
-        // print "Hello" x
+        // print {"Hello"} x
         test(
+            "Function call multiple arguments with body",
             vec![
                 Token::Ident("print".to_string()),
                 Token::Symbol(Symbol::BraceOpen),
@@ -1567,13 +1606,13 @@ mod tests {
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::FunctionCall(FunctionCall {
+            Expression::new_body(vec![Expression::FunctionCall(FunctionCall {
                 identifier: "print".to_string(),
                 args: vec![
                     Expression::new_body(vec![Expression::new_string("Hello")]),
                     Expression::new_identifier("x"),
                 ],
-            }),
+            })]),
         );
     }
 
@@ -1581,24 +1620,32 @@ mod tests {
     fn function_call_multiple_values_with_literal() {
         // print "Hello" true
         test(
+            "Function call multiple arguments with literals",
             vec![
                 Token::Ident("print".to_string()),
                 Token::Literal(Literal::String("Hello".to_string())),
                 Token::Literal(Literal::Bool(true)),
                 Token::Symbol(Symbol::Newline),
             ],
-            Expression::new_function_call(
+            Expression::new_body(vec![Expression::new_function_call(
                 "print",
                 vec![Expression::new_string("Hello"), Expression::new_bool(true)],
-            ),
+            )]),
         );
     }
 
     #[test]
     fn literal_assignment() {
-        // "x=5"
-        let expected = Expression::new_assignment("x", Expression::new_int(5), None, None, false);
+        // x=5
+        let expected = Expression::new_body(vec![Expression::new_assignment(
+            "x",
+            Expression::new_int(5),
+            None,
+            None,
+            false,
+        )]);
         test(
+            "Literal assignment",
             vec![
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Equals),
@@ -1608,19 +1655,11 @@ mod tests {
         );
 
         // Whitespace handling
-        // "x = 5"
+        // x = 5
+        // NOTE: shouldn't matter
+        // since we filter it anyway
         test(
-            vec![
-                Token::Ident("x".to_string()),
-                Token::Symbol(Symbol::Equals),
-                Token::Literal(Literal::Int(5)),
-            ],
-            expected.clone(),
-        );
-
-        // Whitespace handling
-        // "x = 5"
-        test(
+            "Literal assigment with whitespace explicitly added",
             vec![
                 Token::Ident("x".to_string()),
                 Token::whitespace(),
@@ -1631,55 +1670,46 @@ mod tests {
             expected.clone(),
         );
 
-        // Uneven whitespace handling (unlike swift)
-        // "x= 5"
-
-        test(
-            vec![
-                Token::Ident("x".to_string()),
-                Token::Symbol(Symbol::Equals),
-                Token::Literal(Literal::Int(5)),
-            ],
-            expected,
-        );
-
-        let expected = Expression::new_assignment(
+        // literal assignment with types
+        let expected = Expression::new_body(vec![Expression::new_assignment(
             "x",
             Expression::new_int(5),
             None,
             Some(NativeType::Int),
             false,
-        );
+        )]);
         test(
+            "Literal assigment with int type kwd",
             vec![
                 Token::Ident("x".to_string()),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
-                Token::Symbol(Symbol::Equals),
-                Token::Literal(Literal::Int(5)),
-            ],
-            expected,
-        );
-        // const x = 5
-        let expected = Expression::new_assignment("x", Expression::new_int(5), None, None, true);
-        test(
-            vec![
-                Token::Kwd(Kwd::Const),
-                Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Equals),
                 Token::Literal(Literal::Int(5)),
             ],
             expected,
         );
 
-        // const x Int = 5
-        let expected = Expression::new_assignment(
-            "x",
-            Expression::new_int(5),
-            None,
-            Some(NativeType::Int),
-            true,
-        );
+        // const x = 5
         test(
+            "Literal assignment with const keyword",
+            vec![
+                Token::Kwd(Kwd::Const),
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Equals),
+                Token::Literal(Literal::Int(5)),
+            ],
+            Expression::new_body(vec![Expression::new_assignment(
+                "x",
+                Expression::new_int(5),
+                None,
+                None,
+                true,
+            )]),
+        );
+
+        // const x Int = 5
+        test(
+            "Literal assignment with const and data type kwd",
             vec![
                 Token::Kwd(Kwd::Const),
                 Token::Ident("x".to_string()),
@@ -1687,27 +1717,35 @@ mod tests {
                 Token::Symbol(Symbol::Equals),
                 Token::Literal(Literal::Int(5)),
             ],
-            expected,
+            Expression::new_body(vec![Expression::new_assignment(
+                "x",
+                Expression::new_int(5),
+                None,
+                Some(NativeType::Int),
+                true,
+            )]),
         );
     }
     #[test]
     fn include_kwd() {
         // include "my_package"
         test(
+            "Include kwd",
             vec![
                 Token::Kwd(Kwd::Include),
                 Token::Literal(Literal::String("my_package".to_string())),
             ],
-            Expression::new_statement(
+            Expression::new_body(vec![Expression::new_statement(
                 Some(Expression::new_string("my_package")),
                 StatementOperator::Include,
-            ),
+            )]),
         )
     }
 
     #[test]
     fn array_literals() {
         test(
+            "Array literals empty",
             vec![
                 Token::Ident("x".to_string()),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Arr)),
@@ -1715,17 +1753,18 @@ mod tests {
                 Token::Symbol(Symbol::AngOpen),
                 Token::Symbol(Symbol::AngClose),
             ],
-            Expression::new_assignment(
+            Expression::new_body(vec![Expression::new_assignment(
                 "x",
                 Expression::new_array(vec![]),
                 None,
                 Some(NativeType::Array),
                 false,
-            ),
+            )]),
         );
 
         // x = [3]
         test(
+            "Array literals with single value",
             vec![
                 Token::Ident("x".to_string()),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Arr)),
@@ -1734,17 +1773,18 @@ mod tests {
                 Token::Literal(Literal::Int(3)),
                 Token::Symbol(Symbol::AngClose),
             ],
-            Expression::new_assignment(
+            Expression::new_body(vec![Expression::new_assignment(
                 "x",
                 Expression::new_array(vec![Expression::new_from_literal(&Literal::Int(3))]),
                 None,
                 Some(NativeType::Array),
                 false,
-            ),
+            )]),
         );
 
         // x = [3, 4]
         test(
+            "Array literals with multiple values initialized",
             vec![
                 Token::Ident("x".to_string()),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Arr)),
@@ -1755,7 +1795,7 @@ mod tests {
                 Token::Literal(Literal::Int(4)),
                 Token::Symbol(Symbol::AngClose),
             ],
-            Expression::new_assignment(
+            Expression::new_body(vec![Expression::new_assignment(
                 "x",
                 Expression::new_array(vec![
                     Expression::new_from_literal(&Literal::Int(3)),
@@ -1764,11 +1804,12 @@ mod tests {
                 None,
                 Some(NativeType::Array),
                 false,
-            ),
+            )]),
         );
 
         // x = [3, 4,]
         test(
+            "Array literals with multiple values initialized, leading comma",
             vec![
                 Token::Ident("x".to_string()),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Arr)),
@@ -1780,7 +1821,7 @@ mod tests {
                 Token::Symbol(Symbol::Comma),
                 Token::Symbol(Symbol::AngClose),
             ],
-            Expression::new_assignment(
+            Expression::new_body(vec![Expression::new_assignment(
                 "x",
                 Expression::new_array(vec![
                     Expression::new_from_literal(&Literal::Int(3)),
@@ -1789,7 +1830,7 @@ mod tests {
                 None,
                 Some(NativeType::Array),
                 false,
-            ),
+            )]),
         );
 
         // x = [3,,4,] == invalid
@@ -1817,6 +1858,7 @@ mod tests {
     fn dictionary_literals() {
         // x dict = {}
         test(
+            "Assigment empty dict with type",
             vec![
                 Token::Ident("x".to_string()),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Dict)),
@@ -1824,19 +1866,20 @@ mod tests {
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_assignment(
+            Expression::new_body(vec![Expression::new_assignment(
                 "x",
                 Expression::new_dict(HashMap::new()),
                 None,
                 Some(NativeType::Dictionary),
                 false,
-            ),
+            )]),
         );
 
         // x dict = {
         //  "hello": "world"
         // }
         test(
+            "Assigment populated dict with type",
             vec![
                 Token::Ident("x".to_string()),
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Dict)),
@@ -1847,7 +1890,7 @@ mod tests {
                 Token::Literal(Literal::String("world".to_string())),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_assignment(
+            Expression::new_body(vec![Expression::new_assignment(
                 "x",
                 Expression::new_dict(HashMap::from([(
                     DictionaryKey::String("hello".to_string()),
@@ -1856,9 +1899,10 @@ mod tests {
                 None,
                 Some(NativeType::Dictionary),
                 false,
-            ),
+            )]),
         );
         // x = {"hello": "world",,}
+        println!("Error");
         test_err(
             vec![
                 Token::Ident("x".to_string()),
