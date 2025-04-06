@@ -1,10 +1,7 @@
 use std::fmt::Display;
 
+use super::NumericLiteral;
 use super::*;
-use super::{
-    language_impls::{dict_expression_to_string, vec_expression_to_string},
-    NumericLiteral,
-};
 
 impl PartialEq for NumericLiteral {
     fn eq(&self, other: &Self) -> bool {
@@ -66,8 +63,8 @@ impl Display for ValueLiteral {
             ValueLiteral::CharacterBased(c) => c.to_string(),
             ValueLiteral::Numeric(n) => n.to_string(),
             ValueLiteral::Bool(b) => b.to_string(),
-            ValueLiteral::Array(arr) => vec_expression_to_string(arr),
-            ValueLiteral::Dictionary(dict) => dict_expression_to_string(dict),
+            ValueLiteral::Array(arr) => todo!(),
+            ValueLiteral::Dictionary(dict) => todo!(),
             ValueLiteral::Function => "Function".to_string(),
         };
         f.write_str(&s)

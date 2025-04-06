@@ -1,16 +1,12 @@
-pub mod condition_evaluation;
-pub mod environment;
 pub mod evaluator;
-pub mod evaluator_math;
 pub mod language;
 pub mod lexer;
 pub mod parser;
-pub mod rust_bindings;
 
 use std::{collections::HashMap, env, fs::read_to_string};
 
-use environment::EnvironmentState;
-use lexer::{token::Token, Lexer};
+use evaluator::environment::EnvironmentState;
+use lexer::Lexer;
 
 fn read_from_file(path: &str) -> String {
     read_to_string(path).unwrap()

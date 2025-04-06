@@ -1,10 +1,6 @@
-use crate::{
-    environment::{EnvironmentBinding, EnvironmentState, Value},
-    evaluator::{get_identifier_binding, EvaluatorError},
-    language::{
-        EvaluationNumericAndString, EvaluationNumericOnly, EvaluationOperator, ValueLiteral,
-    },
-};
+use super::environment::*;
+use crate::evaluator::*;
+use crate::language::*;
 
 pub fn should_evaluate(
     state: EnvironmentState,
@@ -45,7 +41,14 @@ pub fn should_evaluate(
                         _ => return (state, Err(EvaluatorError::NotABooleanValue)),
                     },
                     EnvironmentBinding::Function(_) => todo!(),
-                    EnvironmentBinding::Identifier(i) => todo!(),
+                    EnvironmentBinding::Identifier(i) => {
+                        let result = get_identifier_binding_recursively(&state, &i);
+                        match result {
+                            Ok(Value::ValueLiteral(ValueLiteral::Bool(b))) => b,
+                            Ok(_) => return (state, Err(EvaluatorError::NotABooleanValue)),
+                            Err(e) => return (state, Err(e)),
+                        }
+                    }
                     EnvironmentBinding::Range(_) => todo!(),
                 },
                 Err(_) => todo!(),

@@ -1,8 +1,6 @@
-use crate::{
-    environment::{EnvironmentBinding, EnvironmentState},
-    evaluator::EvaluatorError,
-    language::{Expression, Math, MathOperation, ValueLiteral},
-};
+use super::environment::*;
+use crate::evaluator::*;
+use crate::language::*;
 
 pub fn evaluate_math_operation(
     state: EnvironmentState,

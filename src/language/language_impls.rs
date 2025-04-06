@@ -4,14 +4,6 @@ use token::*;
 
 use crate::{language::*, lexer::*};
 
-pub fn dict_expression_to_string(dict: &HashMap<DictionaryKey, Expression>) -> String {
-    todo!();
-}
-
-pub fn vec_expression_to_string(arr: &Vec<Expression>) -> String {
-    todo!();
-}
-
 impl Evaluation {
     fn new(lhs: Expression, rhs: Option<Expression>, evaluation_op: EvaluationOperator) -> Self {
         Self {

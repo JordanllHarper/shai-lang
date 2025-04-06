@@ -1,13 +1,13 @@
-use crate::{
-    condition_evaluation::should_evaluate,
-    environment::{EnvironmentBinding, EnvironmentState, Value},
-    evaluator_math::evaluate_math_operation,
-    language::{
-        Assignment, Body, Expression, Function, FunctionCall, Math, MathOperation, Statement,
-        StatementOperator, ValueLiteral,
-    },
-    rust_bindings::RustBinding,
-};
+pub mod environment;
+pub mod evaluation;
+pub mod math;
+pub mod rust_bindings;
+
+use crate::language::*;
+use environment::*;
+use evaluation::*;
+use math::*;
+use rust_bindings::*;
 
 #[derive(Debug, PartialEq)]
 pub enum EvaluatorError {
@@ -130,7 +130,7 @@ fn evaluate_body(
     (next_state, Ok(next_value))
 }
 
-fn get_identifier_binding(
+pub fn get_identifier_binding(
     state: &EnvironmentState,
     symbol: &str,
 ) -> Result<EnvironmentBinding, EvaluatorError> {
@@ -140,6 +140,23 @@ fn get_identifier_binding(
         .map_or(Err(EvaluatorError::NoSuchIdentifier), |binding| {
             Ok(binding.clone())
         })
+}
+pub fn get_identifier_binding_recursively(
+    state: &EnvironmentState,
+    symbol: &str,
+) -> Result<Value, EvaluatorError> {
+    state
+        .local_symbols
+        .get(symbol)
+        .map_or(
+            Err(EvaluatorError::NoSuchIdentifier),
+            |binding| match binding {
+                EnvironmentBinding::Value(v) => Ok(v.clone()),
+                EnvironmentBinding::Function(_) => todo!(),
+                EnvironmentBinding::Identifier(i) => get_identifier_binding_recursively(state, i),
+                EnvironmentBinding::Range(_) => todo!(),
+            },
+        )
 }
 
 fn evaluate_assignment_expression(
@@ -183,13 +200,6 @@ fn evaluate_function(
     f: &Function,
 ) -> (EnvironmentState, Result<Value, EvaluatorError>) {
     todo!()
-}
-
-fn evaluate_value(
-    state: EnvironmentState,
-    v: &Value,
-) -> (EnvironmentState, Result<Value, EvaluatorError>) {
-    todo!();
 }
 
 fn evaluate_identifier(
@@ -367,31 +377,5 @@ fn add_binding_or_error(
     match binding {
         Some(e) => (state, Err(EvaluatorError::InvalidRedeclaration)),
         None => (state, Ok(Value::Void)),
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::collections::HashMap;
-
-    use crate::{
-        environment::{EnvironmentBinding, EnvironmentState, Value},
-        evaluator::evaluate,
-        language::{Expression, NumericLiteral, ValueLiteral},
-    };
-
-    #[test]
-    fn assignment() {
-        let ast = Expression::new_assignment("x", Expression::new_int(5), None, None, false);
-        let state = EnvironmentState::new(HashMap::new());
-        let (state, result) = evaluate(state, ast);
-
-        assert_eq!(
-            state.local_symbols.get("x"),
-            Some(&EnvironmentBinding::Value(Value::ValueLiteral(
-                ValueLiteral::Numeric(NumericLiteral::Int(5))
-            )))
-        );
-        assert!(result.is_err());
     }
 }

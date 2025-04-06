@@ -44,6 +44,12 @@ if false {
     print "Condition was false"
 }
 
+my_condition = true
+
+if my_condition {
+    print "This should print"
+}
+
 
 math_1 = 1 + 2
 print math_1
