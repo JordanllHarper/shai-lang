@@ -26,6 +26,9 @@ fn main() {
         println!("{}", input);
     }
     let tokens = Lexer::new(&input);
+    if debug_mode {
+        println!("{:?}", tokens);
+    }
     let ast = match parser::parse(tokens) {
         Ok(v) => v,
         Err(e) => {

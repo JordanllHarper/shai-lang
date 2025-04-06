@@ -31,8 +31,14 @@ if num > 3 {
 if 3 > 4 {
     print "Eek that doesn't seem right"
 } else {
-    print "That's more like it"
+    print "4 is > 3... that's more like it!"
 }
 
-num2 = 1 * 2
-print num2
+math2 = 1 - 2
+print math2
+
+math3 = 1 * 2
+print math3
+
+math4 = 1 / 2
+print math4
