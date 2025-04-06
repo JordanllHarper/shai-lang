@@ -64,6 +64,10 @@ impl EnvironmentBinding {
             NumericLiteral::Float(f),
         )))
     }
+
+    pub fn new_bool(b: bool) -> EnvironmentBinding {
+        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Bool(b)))
+    }
 }
 
 /// The variations an Environment binding value can be.

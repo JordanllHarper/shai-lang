@@ -385,7 +385,14 @@ fn on_assignment(
             ))
         }
         Some(Token::Ident(i)) => {
-            let (rhs, state) = on_identifier(state, &i)?;
+            let is_evaluation = matches!(state.peek(), Some(Token::Symbol(Symbol::Evaluation(e))));
+
+            let (rhs, state) = if is_evaluation {
+                on_evaluation(state, Expression::new_identifier(&i))?
+            } else {
+                on_identifier(state, &i)?
+            };
+
             Ok((
                 Expression::new_assignment(ident, rhs, None, type_assertion, false),
                 state,
@@ -400,11 +407,6 @@ fn on_assignment(
     }
 }
 
-// Identifier options
-//
-// Variable usage
-// y = *x* + 3
-//      |- here is usage
 fn on_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, ParseState)> {
     let t = state.peek();
 
@@ -509,9 +511,7 @@ fn on_single_value(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     Ok((single_value, state))
 }
 
-fn on_evaluation(state: ParseState) -> ParseResult<(Expression, ParseState)> {
-    let (lhs, state) = on_single_value(state)?;
-
+fn on_evaluation(state: ParseState, lhs: Expression) -> ParseResult<(Expression, ParseState)> {
     let peek = state.peek();
     // truthy value e.g. if x { ... }
     if is_new_body(peek) {
@@ -681,7 +681,8 @@ fn on_while(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         return Ok((Expression::new_while(None, body), state));
     }
 
-    let (evaluation, state) = on_evaluation(state)?;
+    let (expr, state) = on_expression(state)?;
+    let (evaluation, state) = on_evaluation(state, expr)?;
 
     let (next, state) = state.next();
 
@@ -776,7 +777,21 @@ fn on_else(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 }
 
 fn on_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
-    let (evaluation, state) = on_evaluation(state)?;
+    let (t, state) = state.next();
+    let (lhs, state) = match t {
+        Some(Token::Symbol(Symbol::BraceOpen)) => on_body(state)?,
+        Some(Token::Ident(i)) => (Expression::new_identifier(&i), state),
+        Some(Token::Literal(l)) => (Expression::new_from_literal(&l), state),
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected a symbol, ident or literal".to_string(),
+                token_context: t.to_owned(),
+            })
+        }
+        None => return Err(ParseError::NoMoreTokens),
+    };
+
+    let (evaluation, state) = on_evaluation(state, lhs)?;
     let (next, state) = state.next();
 
     match next {

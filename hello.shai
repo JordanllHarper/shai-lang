@@ -12,15 +12,20 @@ if age == 21 {
     print "You are 21"
 }
 
-age = 18
+age = 17
 print "Changed age to" age
 
 if age != 21 {
     print "You are not 21"
 }
 
-if age >= 18 {
-    print "You are an adult!"
+
+is_17 = age == 17
+
+if is_17 {
+    print "You are 17"
+} else {
+    print "You are not 17"
 }
 
 num = 4

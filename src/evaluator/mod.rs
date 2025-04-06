@@ -22,6 +22,7 @@ pub enum EvaluatorError {
     InvalidAddition,
     InvalidDivide,
     InvalidMultiplication,
+    NoSuchValue,
 }
 
 pub fn evaluate(
@@ -82,7 +83,7 @@ fn evaluate_evaluation(
             None
         };
 
-        should_evaluate(state, lhs_binding, rhs_binding, e.evaluation_op)
+        evaluate_bindings(state, lhs_binding, rhs_binding, e.evaluation_op)
     } else {
         (state, Err(EvaluatorError::InvalidEvaluation))
     }
@@ -172,8 +173,27 @@ fn evaluate_assignment_expression(
             (state, get_identifier_binding)
         }
         Expression::Statement(_) => todo!(),
-        Expression::MathOperation(m) => evaluate_math_operation(state, m),
-        Expression::Evaluation(_) => todo!(),
+        Expression::MathOperation(math_op) => evaluate_math_operation(state, math_op),
+        Expression::Evaluation(eval) => {
+            let lhs = match get_binding_from_expression(&state, *eval.lhs) {
+                Ok(v) => v,
+                Err(e) => return (state, Err(e)),
+            };
+            let rhs = match eval.rhs {
+                Some(s) => match get_binding_from_expression(&state, *s) {
+                    Ok(v) => Some(v),
+                    Err(error) => return (state, Err(error)),
+                },
+                None => None,
+            };
+
+            let (state, result) = evaluate_bindings(state, lhs, rhs, eval.evaluation_op);
+            let eval_result = match result {
+                Ok(b) => b,
+                Err(e) => return (state, Err(e)),
+            };
+            (state, Ok(EnvironmentBinding::new_bool(eval_result)))
+        }
         Expression::Function(_) => todo!(),
         Expression::If(_) => todo!(),
         Expression::While(_) => todo!(),

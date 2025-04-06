@@ -2,7 +2,7 @@ use super::environment::*;
 use crate::evaluator::*;
 use crate::language::*;
 
-pub fn should_evaluate(
+pub fn evaluate_bindings(
     state: EnvironmentState,
     left: EnvironmentBinding,
     right: Option<EnvironmentBinding>,
