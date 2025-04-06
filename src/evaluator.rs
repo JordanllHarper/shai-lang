@@ -19,6 +19,7 @@ pub enum EvaluatorError {
     InvalidEvaluation,
     NotABooleanValue,
     InvalidSubtract,
+    InvalidAddition,
 }
 
 pub fn evaluate(

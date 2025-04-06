@@ -34,11 +34,16 @@ if 3 > 4 {
     print "4 is > 3... that's more like it!"
 }
 
-math2 = 1 - 2
-print math2
 
-math3 = 1 * 2
-print math3
+math_1 = 1 + 2
+print math_1
 
-math4 = 1 / 2
-print math4
+math_2 = 1 - 2
+print math_2
+
+math_3 = 1 * 2
+print math_3
+
+math_4 = 1 / 2
+print math_4
+

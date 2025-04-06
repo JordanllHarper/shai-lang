@@ -168,7 +168,7 @@ fn parse_literal_or_identifier(s: &str) -> Token {
 }
 
 fn is_symbol_applicable(symbol: &char) -> bool {
-    let allowed_symbols = HashSet::from(['[', ']', '.']);
+    let allowed_symbols = HashSet::from(['[', ']', '.', '_']);
     allowed_symbols.contains(symbol)
 }
 
@@ -294,7 +294,6 @@ impl Iterator for Lexer {
                         Symbol::Math(MathSymbol::Minus),
                     );
                     if final_symbol != Token::Symbol(Symbol::MinusAssign) {
-                        self.step_back();
                         peek_symbol(self, '>', Symbol::Arrow, Symbol::Math(MathSymbol::Minus))
                     } else {
                         final_symbol
