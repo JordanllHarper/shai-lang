@@ -58,7 +58,7 @@ fn handle_multiply(
         (
             Expression::ValueLiteral(ValueLiteral::Numeric(n1)),
             Expression::ValueLiteral(ValueLiteral::Numeric(n2)),
-        ) => (state, Ok(EnvironmentBinding::new_numeric(n1 / n2))),
+        ) => (state, Ok(EnvironmentBinding::new_numeric(n1 * n2))),
         _ => (state, Err(EvaluatorError::InvalidSubtract)),
     }
 }
