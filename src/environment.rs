@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    language::{Function, NumericLiteral, Range, ValueLiteral},
+    language::{CharacterBasedLiteral, Function, NumericLiteral, Range, ValueLiteral},
     rust_bindings::{std_rust_print, RustBinding},
 };
 
@@ -39,10 +39,31 @@ pub enum EnvironmentBinding {
 
 impl EnvironmentBinding {
     pub fn new_string(s: &str) -> EnvironmentBinding {
-        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::String(s.to_string())))
+        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::CharacterBased(
+            CharacterBasedLiteral::String(s.to_string()),
+        )))
     }
+
+    pub fn new_char(c: &char) -> EnvironmentBinding {
+        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::CharacterBased(
+            CharacterBasedLiteral::Char(c.to_owned()),
+        )))
+    }
+
     pub fn new_numeric(n: NumericLiteral) -> EnvironmentBinding {
         EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(n)))
+    }
+
+    pub fn new_int(i: i32) -> EnvironmentBinding {
+        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(
+            NumericLiteral::Int(i),
+        )))
+    }
+
+    pub fn new_float(f: f64) -> EnvironmentBinding {
+        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(
+            NumericLiteral::Float(f),
+        )))
     }
 }
 

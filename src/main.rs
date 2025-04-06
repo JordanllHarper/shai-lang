@@ -1,9 +1,9 @@
 pub mod condition_evaluation;
 pub mod environment;
 pub mod evaluator;
+pub mod evaluator_math;
 pub mod language;
 pub mod lexer;
-pub mod math;
 pub mod parser;
 pub mod rust_bindings;
 

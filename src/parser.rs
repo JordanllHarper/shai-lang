@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use pretty_assertions::assert_eq;
+use token::*;
 use For;
 use FunctionCall;
 use Statement;
@@ -8,8 +9,6 @@ use Statement;
 use crate::{language::*, lexer::*};
 
 type ParseResult<T> = Result<T, ParseError>;
-
-use crate::lexer::Token;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParseState {
@@ -82,8 +81,8 @@ fn is_new_body(t: Option<&Token>) -> bool {
     t == Some(&Token::Symbol(Symbol::BraceOpen))
 }
 
-type ArgumentsState = (FunctionArguments, ParseState);
-fn parse_arguments(state: ParseState, args: &mut FunctionArguments) -> ParseResult<ArgumentsState> {
+type ArgumentsState = (Vec<Expression>, ParseState);
+fn parse_arguments(state: ParseState, args: &mut Vec<Expression>) -> ParseResult<ArgumentsState> {
     let peek = state.peek();
 
     match peek {
@@ -273,6 +272,7 @@ fn parse_dict_key(literal: Literal) -> ParseResult<DictionaryKey> {
         Literal::Bool(b) => Ok(DictionaryKey::Bool(b)),
         Literal::Int(i) => Ok(DictionaryKey::Int(i)),
         Literal::String(s) => Ok(DictionaryKey::String(s)),
+        Literal::Char(c) => Ok(DictionaryKey::Char(c)),
         Literal::Float(f) => Err(ParseError::InvalidSyntax {
             message: "Float cannot be used as key to Dictionary".to_string(),
             token_context: Token::Literal(Literal::Float(f)),

@@ -1,11 +1,11 @@
 use crate::{
     condition_evaluation::should_evaluate,
     environment::{EnvironmentBinding, EnvironmentState, Value},
+    evaluator_math::evaluate_math_operation,
     language::{
-        Assignment, Body, Expression, Function, FunctionArguments, FunctionCall, Math,
-        MathOperation, Statement, StatementOperator, ValueLiteral,
+        Assignment, Body, Expression, Function, FunctionCall, Math, MathOperation, Statement,
+        StatementOperator, ValueLiteral,
     },
-    lexer::{EvaluationSymbol, Literal},
     rust_bindings::RustBinding,
 };
 
@@ -18,6 +18,7 @@ pub enum EvaluatorError {
     EmptyBody,
     InvalidEvaluation,
     NotABooleanValue,
+    InvalidSubtract,
 }
 
 pub fn evaluate(
@@ -27,7 +28,6 @@ pub fn evaluate(
     match ast {
         Expression::ValueLiteral(v) => (state, Ok(Value::ValueLiteral(v))),
         Expression::Identifier(ident) => evaluate_identifier(state, &ident),
-        Expression::MultipleValues(_) => todo!(),
         Expression::Statement(s) => evaluate_statement(state, s),
         Expression::MathOperation(_) => todo!(),
         Expression::Evaluation(_) => todo!(),
@@ -140,13 +140,17 @@ fn get_identifier_binding(
 }
 
 fn evaluate_assignment_expression(
-    state: &EnvironmentState,
+    state: EnvironmentState,
     expr: Expression,
-) -> Result<EnvironmentBinding, EvaluatorError> {
+) -> (EnvironmentState, Result<EnvironmentBinding, EvaluatorError>) {
     match expr {
-        Expression::ValueLiteral(v) => Ok(EnvironmentBinding::Value(Value::ValueLiteral(v))),
-        Expression::Identifier(i) => Ok(get_identifier_binding(state, &i)?),
-        Expression::MultipleValues(_) => todo!(),
+        Expression::ValueLiteral(v) => {
+            (state, Ok(EnvironmentBinding::Value(Value::ValueLiteral(v))))
+        }
+        Expression::Identifier(i) => {
+            let get_identifier_binding = get_identifier_binding(&state, &i);
+            (state, get_identifier_binding)
+        }
         Expression::Statement(_) => todo!(),
         Expression::MathOperation(m) => evaluate_math_operation(state, m),
         Expression::Evaluation(_) => todo!(),
@@ -161,34 +165,13 @@ fn evaluate_assignment_expression(
     }
 }
 
-fn evaluate_math_operation(
-    state: &EnvironmentState,
-    m: MathOperation,
-) -> Result<EnvironmentBinding, EvaluatorError> {
-    match (*m.lhs, *m.rhs) {
-        (
-            Expression::ValueLiteral(ValueLiteral::Numeric(n1)),
-            Expression::ValueLiteral(ValueLiteral::Numeric(n2)),
-        ) => {
-            match m.operation {
-                Math::Add => todo!(),
-                Math::Subtract => todo!(),
-                Math::Multiply => todo!(),
-                Math::Divide => todo!(),
-            }
-            todo!()
-        }
-        _ => todo!(),
-    }
-}
-
 fn evaluate_assignment(
     state: EnvironmentState,
     a: Assignment,
 ) -> (EnvironmentState, Result<Value, EvaluatorError>) {
-    match evaluate_assignment_expression(&state, *a.rhs) {
-        Ok(binding) => add_binding_or_error(state, &a.identifier, binding),
-        Err(e) => (state, Err(e)),
+    match evaluate_assignment_expression(state, *a.rhs) {
+        (new_state, Ok(binding)) => add_binding_or_error(new_state, &a.identifier, binding),
+        (new_state, Err(e)) => (new_state, Err(e)),
     }
 }
 
@@ -212,11 +195,7 @@ fn evaluate_identifier(
 ) -> (EnvironmentState, Result<Value, EvaluatorError>) {
     let maybe_rust_binding = state.std_lib_symbols.get(ident).cloned();
     if let Some(std) = maybe_rust_binding {
-        let (state, result) = handle_rust_binding_with_args(state, &std, vec![]);
-        return match result {
-            Ok(v) => (state, Ok(v)),
-            Err(e) => (state, Err(e)),
-        };
+        return handle_rust_binding_with_args(state, &std, vec![]);
     }
 
     let symbol = state.get_local_binding(ident);
@@ -265,17 +244,17 @@ fn resolve_binding_to_string(
 pub fn handle_rust_binding_with_args(
     state: EnvironmentState,
     std: &RustBinding,
-    args: FunctionArguments,
+    args: Vec<Expression>,
 ) -> (EnvironmentState, Result<Value, EvaluatorError>) {
     match std {
         RustBinding::Print(std_print) => {
-            let (state, result) = resolve_function_arguments_to_string(state, args);
+            let result = resolve_function_arguments_to_string(state, args);
             match result {
-                Ok(v) => {
+                (state, Ok(v)) => {
                     std_print(v);
                     (state, Ok(Value::Void))
                 }
-                Err(v) => (state, Err(v)),
+                (state, Err(v)) => (state, Err(v)),
             }
         }
     }
@@ -283,7 +262,7 @@ pub fn handle_rust_binding_with_args(
 
 fn resolve_function_arguments_to_string(
     state: EnvironmentState,
-    args: FunctionArguments,
+    args: Vec<Expression>,
 ) -> (EnvironmentState, Result<Vec<String>, EvaluatorError>) {
     let mut new_state = state.clone();
     let mut s_args: Vec<String> = vec![];
@@ -297,7 +276,6 @@ fn resolve_function_arguments_to_string(
                 },
                 None => return (state, Err(EvaluatorError::NoSuchIdentifier)),
             },
-            Expression::MultipleValues(_) => todo!(),
             Expression::Statement(_) => todo!(),
             Expression::MathOperation(_) => todo!(),
             Expression::Evaluation(_) => todo!(),
@@ -306,13 +284,13 @@ fn resolve_function_arguments_to_string(
             Expression::While(_) => todo!(),
             Expression::For(_) => todo!(),
             Expression::Body(b) => {
-                let (state, result) = resolve_body_string_value(new_state, b);
+                let result = resolve_body_string_value(new_state, b);
                 match result {
-                    Ok(s) => {
+                    (state, Ok(s)) => {
                         new_state = state;
                         s
                     }
-                    Err(e) => {
+                    (state, Err(e)) => {
                         return (state, Err(e));
                     }
                 }
@@ -333,16 +311,15 @@ fn resolve_body_string_value(
     let mut new_state = state.clone();
     let mut s = String::new();
     for expr in b {
-        let (maybe_state, result) = evaluate(new_state, expr);
-        match result {
-            Ok(v) => {
+        match evaluate(new_state, expr) {
+            (st, Ok(v)) => {
                 s = match v {
                     Value::ValueLiteral(v) => v.to_string(),
                     Value::Void => "".to_string(),
                 };
-                new_state = maybe_state;
+                new_state = st
             }
-            Err(e) => return (state, Err(e)),
+            (state, Err(e)) => return (state, Err(e)),
         }
     }
 

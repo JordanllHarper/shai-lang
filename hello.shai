@@ -34,3 +34,5 @@ if 3 > 4 {
     print "That's more like it"
 }
 
+num2 = 1 * 2
+print num2
