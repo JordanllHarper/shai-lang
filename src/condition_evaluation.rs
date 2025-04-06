@@ -37,6 +37,12 @@ pub fn should_evaluate(
             EvaluationOperator::BooleanTruthy,
         ) => return (state, Err(EvaluatorError::NotABooleanValue)),
 
+        (
+            EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Bool(lhs))),
+            None,
+            EvaluationOperator::BooleanTruthy,
+        ) => lhs,
+
         _ => false,
     };
     (state, Ok(result))

@@ -20,6 +20,8 @@ pub enum EvaluatorError {
     NotABooleanValue,
     InvalidSubtract,
     InvalidAddition,
+    InvalidDivide,
+    InvalidMultiplication,
 }
 
 pub fn evaluate(
