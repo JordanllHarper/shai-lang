@@ -30,7 +30,7 @@ pub enum Expression {
     ValueLiteral(ValueLiteral),
     Identifier(String),
     Statement(Statement),
-    MathOperation(MathOperation),
+    MathOperation(Operations),
     Evaluation(Evaluation),
     Function(Function),
     If(If),
@@ -214,7 +214,7 @@ pub struct Parameter {
 /// Example: (...) -> int/string/char/etc
 pub type ReturnType = NativeType;
 
-/// Represents doing math operations in the language.
+/// Represents doing operations in the language.
 ///
 /// Example: 3 + 4
 /// In this case:
@@ -222,10 +222,10 @@ pub type ReturnType = NativeType;
 ///     - 4 is the rhs
 ///     - The operation is add
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct MathOperation {
+pub struct Operations {
     pub lhs: Box<Expression>,
     pub rhs: Box<Expression>,
-    pub operation: Math,
+    pub operation: Operator,
 }
 
 /// Represents a function call with arguments.
@@ -276,14 +276,18 @@ pub struct If {
     pub on_false_evaluation: Option<Box<Expression>>,
 }
 
-/// Defines the 4 basic math operations supported
+/// Defines the 4 operators.
+///
+/// NOTE: Add has a multiple use case of adding strings together.
 ///
 /// Examples:
 ///
 /// 4 + 5
+/// 4 + "hi" // = "4hi"
+///
 /// 9 * 10
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Math {
+pub enum Operator {
     Add,
     Subtract,
     Multiply,
@@ -306,7 +310,7 @@ pub enum StatementOperator {
 pub struct Assignment {
     pub identifier: String,
     pub rhs: Box<Expression>,
-    pub math_operation: Option<Math>,
+    pub math_operation: Option<Operator>,
     pub type_assertion: Option<NativeType>,
     pub is_constant: bool,
 }

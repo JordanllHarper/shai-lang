@@ -99,7 +99,7 @@ impl Display for Symbol {
             Symbol::EscapeApos => "\\\'",
             Symbol::Comment(c) => c,
             Symbol::MultilineComment(c) => c,
-            Symbol::Math(s) => &s.to_string(),
+            Symbol::Op(s) => &s.to_string(),
             Symbol::Range => "..",
             Symbol::RangeEq => "..=",
         };
@@ -107,13 +107,13 @@ impl Display for Symbol {
     }
 }
 
-impl Display for MathSymbol {
+impl Display for OpSymbol {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let str = match self {
-            MathSymbol::Minus => "-",
-            MathSymbol::Plus => "+",
-            MathSymbol::Asterisk => "*",
-            MathSymbol::FwdSlash => "/",
+            OpSymbol::Minus => "-",
+            OpSymbol::Plus => "+",
+            OpSymbol::Asterisk => "*",
+            OpSymbol::FwdSlash => "/",
         };
 
         f.write_str(str)
@@ -155,7 +155,7 @@ pub enum Literal {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum MathSymbol {
+pub enum OpSymbol {
     Minus,
     Plus,
     Asterisk,
@@ -188,8 +188,8 @@ pub enum Symbol {
     Apstr,
     Comma,
     Period,
-    // math symbols
-    Math(MathSymbol),
+    // operation symbols
+    Op(OpSymbol),
     //
     // comparison
     Evaluation(EvaluationSymbol),

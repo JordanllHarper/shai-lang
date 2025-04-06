@@ -1,12 +1,12 @@
 pub mod environment;
 pub mod evaluation;
-pub mod math;
+pub mod operation;
 pub mod rust_bindings;
 
 use crate::language::*;
 use environment::*;
 use evaluation::*;
-use math::*;
+use operation::*;
 use rust_bindings::*;
 
 #[derive(Debug, PartialEq)]
@@ -173,7 +173,7 @@ fn evaluate_assignment_expression(
             (state, get_identifier_binding)
         }
         Expression::Statement(_) => todo!(),
-        Expression::MathOperation(math_op) => evaluate_math_operation(state, math_op),
+        Expression::MathOperation(math_op) => evaluate_operation(state, math_op),
         Expression::Evaluation(eval) => {
             let lhs = match get_binding_from_expression(&state, *eval.lhs) {
                 Ok(v) => v,

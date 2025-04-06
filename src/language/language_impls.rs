@@ -175,8 +175,12 @@ impl Expression {
         Self::ValueLiteral(ValueLiteral::Dictionary(dict))
     }
 
-    pub fn new_math_expression(lhs: Expression, rhs: Expression, operation: Math) -> Expression {
-        Expression::MathOperation(MathOperation::new(lhs, rhs, operation))
+    pub fn new_math_expression(
+        lhs: Expression,
+        rhs: Expression,
+        operation: Operator,
+    ) -> Expression {
+        Expression::MathOperation(Operations::new(lhs, rhs, operation))
     }
     pub fn new_range(from: Expression, to: Expression, inclusive: bool) -> Expression {
         Expression::Range(Range::new(from, to, inclusive))
@@ -212,7 +216,7 @@ impl Expression {
     pub fn new_assignment(
         identifier: &str,
         rhs: Expression,
-        math_operation: Option<Math>,
+        math_operation: Option<Operator>,
         type_assertion: Option<NativeType>,
         is_constant: bool,
     ) -> Expression {
@@ -245,13 +249,13 @@ impl Expression {
     }
 }
 
-impl Math {
-    pub fn from_token(t: &MathSymbol) -> Self {
+impl Operator {
+    pub fn from_token(t: &OpSymbol) -> Self {
         match t {
-            MathSymbol::FwdSlash => Self::Divide,
-            MathSymbol::Asterisk => Self::Multiply,
-            MathSymbol::Plus => Self::Add,
-            MathSymbol::Minus => Self::Subtract,
+            OpSymbol::FwdSlash => Self::Divide,
+            OpSymbol::Asterisk => Self::Multiply,
+            OpSymbol::Plus => Self::Add,
+            OpSymbol::Minus => Self::Subtract,
         }
     }
 }
@@ -260,7 +264,7 @@ impl Assignment {
     fn new(
         identifier: &str,
         rhs: Expression,
-        math_operation: Option<Math>,
+        math_operation: Option<Operator>,
         type_assertion: Option<NativeType>,
         is_constant: bool,
     ) -> Self {
@@ -283,8 +287,8 @@ impl FunctionCall {
     }
 }
 
-impl MathOperation {
-    pub fn new(lhs: Expression, rhs: Expression, operation: Math) -> Self {
+impl Operations {
+    pub fn new(lhs: Expression, rhs: Expression, operation: Operator) -> Self {
         Self {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),

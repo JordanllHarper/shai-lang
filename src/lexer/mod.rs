@@ -280,21 +280,12 @@ impl Iterator for Lexer {
                     Symbol::Evaluation(EvaluationSymbol::GzEq),
                     Symbol::Evaluation(EvaluationSymbol::Gz),
                 ),
-                '+' => peek_symbol(
-                    self,
-                    '=',
-                    Symbol::PlusAssign,
-                    Symbol::Math(MathSymbol::Plus),
-                ),
+                '+' => peek_symbol(self, '=', Symbol::PlusAssign, Symbol::Op(OpSymbol::Plus)),
                 '-' => {
-                    let final_symbol = peek_symbol(
-                        self,
-                        '=',
-                        Symbol::MinusAssign,
-                        Symbol::Math(MathSymbol::Minus),
-                    );
+                    let final_symbol =
+                        peek_symbol(self, '=', Symbol::MinusAssign, Symbol::Op(OpSymbol::Minus));
                     if final_symbol != Token::Symbol(Symbol::MinusAssign) {
-                        peek_symbol(self, '>', Symbol::Arrow, Symbol::Math(MathSymbol::Minus))
+                        peek_symbol(self, '>', Symbol::Arrow, Symbol::Op(OpSymbol::Minus))
                     } else {
                         final_symbol
                     }
@@ -304,7 +295,7 @@ impl Iterator for Lexer {
                     self,
                     '=',
                     Symbol::MultiplyAssign,
-                    Symbol::Math(MathSymbol::Asterisk),
+                    Symbol::Op(OpSymbol::Asterisk),
                 ),
                 '/' => {
                     if let Some(c) = peek_if(self, '/', '\n', |characters| {
@@ -322,7 +313,7 @@ impl Iterator for Lexer {
                             self,
                             '=',
                             Symbol::DivideAssign,
-                            Symbol::Math(MathSymbol::FwdSlash),
+                            Symbol::Op(OpSymbol::FwdSlash),
                         )
                     }
                 }
@@ -495,10 +486,10 @@ hello
         test_char(' ', Token::Symbol(Symbol::Whitespace));
         test_char('<', Token::Symbol(Symbol::Evaluation(EvaluationSymbol::Lz)));
         test_char('>', Token::Symbol(Symbol::Evaluation(EvaluationSymbol::Gz)));
-        test_char('+', Token::Symbol(Symbol::Math(MathSymbol::Plus)));
-        test_char('-', Token::Symbol(Symbol::Math(MathSymbol::Minus)));
-        test_char('*', Token::Symbol(Symbol::Math(MathSymbol::Asterisk)));
-        test_char('/', Token::Symbol(Symbol::Math(MathSymbol::FwdSlash)));
+        test_char('+', Token::Symbol(Symbol::Op(OpSymbol::Plus)));
+        test_char('-', Token::Symbol(Symbol::Op(OpSymbol::Minus)));
+        test_char('*', Token::Symbol(Symbol::Op(OpSymbol::Asterisk)));
+        test_char('/', Token::Symbol(Symbol::Op(OpSymbol::FwdSlash)));
         test_char('=', Token::Symbol(Symbol::Equals));
         test_char('!', Token::Symbol(Symbol::Bang));
         test_char('&', Token::Symbol(Symbol::Ampsnd));
@@ -549,7 +540,7 @@ add (x, y) {
                 Token::Symbol(Symbol::Whitespace),
                 Token::Ident("x".to_string()),
                 Token::Symbol(Symbol::Whitespace),
-                Token::Symbol(Symbol::Math(MathSymbol::Plus)),
+                Token::Symbol(Symbol::Op(OpSymbol::Plus)),
                 Token::Symbol(Symbol::Whitespace),
                 Token::Ident("y".to_string()),
                 Token::Symbol(Symbol::Newline),

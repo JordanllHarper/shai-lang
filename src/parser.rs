@@ -421,8 +421,8 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, Par
         // Assignment
         Some(Token::Symbol(Symbol::Equals)) => Ok(on_assignment(state, ident, None)?),
 
-        Some(Token::Symbol(Symbol::Math(t))) => {
-            let operation = Math::from_token(&t);
+        Some(Token::Symbol(Symbol::Op(t))) => {
+            let operation = Operator::from_token(&t);
             Ok(on_math_expression(
                 state,
                 operation,
@@ -488,7 +488,7 @@ fn on_function_call(
 
 fn on_math_expression(
     state: ParseState,
-    operation: Math,
+    operation: Operator,
     lhs: Expression,
 ) -> ParseResult<(Expression, ParseState)> {
     let (rhs, state) = on_expression(state)?;
@@ -576,11 +576,11 @@ fn on_expression(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 fn on_literal(state: ParseState, l: Literal) -> ParseResult<(Expression, ParseState)> {
     let peek = state.peek().cloned();
     match peek {
-        Some(Token::Symbol(Symbol::Math(m))) => {
+        Some(Token::Symbol(Symbol::Op(m))) => {
             let (_, state) = state.next();
             on_math_expression(
                 state,
-                Math::from_token(&m),
+                Operator::from_token(&m),
                 Expression::new_from_literal(&l),
             )
         }
@@ -1312,15 +1312,15 @@ mod tests {
                 Token::Ident("y".to_string()),
                 Token::Symbol(Symbol::Equals),
                 Token::Ident("x".to_string()),
-                Token::Symbol(Symbol::Math(MathSymbol::Plus)),
+                Token::Symbol(Symbol::Op(OpSymbol::Plus)),
                 Token::Literal(Literal::Int(3)),
             ],
             Expression::new_body(vec![Expression::new_assignment(
                 "y",
-                Expression::MathOperation(MathOperation {
+                Expression::MathOperation(Operations {
                     lhs: Box::new(Expression::new_identifier("x")),
                     rhs: Box::new(Expression::new_int(3)),
-                    operation: Math::Add,
+                    operation: Operator::Add,
                 }),
                 None,
                 None,
@@ -1336,15 +1336,15 @@ mod tests {
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Int)),
                 Token::Symbol(Symbol::Equals),
                 Token::Ident("x".to_string()),
-                Token::Symbol(Symbol::Math(MathSymbol::Plus)),
+                Token::Symbol(Symbol::Op(OpSymbol::Plus)),
                 Token::Literal(Literal::Int(3)),
             ],
             Expression::new_body(vec![Expression::new_assignment(
                 "y",
-                Expression::MathOperation(MathOperation {
+                Expression::MathOperation(Operations {
                     lhs: Box::new(Expression::new_identifier("x")),
                     rhs: Box::new(Expression::new_int(3)),
-                    operation: Math::Add,
+                    operation: Operator::Add,
                 }),
                 None,
                 Some(NativeType::Int),
