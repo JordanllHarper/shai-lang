@@ -106,7 +106,7 @@ if division == 0.5 {
 
 // We can concatenate strings to other variables nicely
 concat = "1" + 2
-print "The string 1 concatted to number 2 is" concat
+print "The string 1 concated to number 2 is" concat
 
 
 // We can declare functions to give names to blocks of code.
@@ -121,3 +121,21 @@ say_hi "Jordan"
 
 say_hi "Jules"
 
+
+// variables can be scoped
+hold_my_number () {
+    inner_num = 3
+    print "Inside hold my number" inner_num
+}
+
+hold_my_number
+
+
+// print inner_num <- invalid!
+
+
+y = 0
+while {
+    y = y + 1
+    print y
+}

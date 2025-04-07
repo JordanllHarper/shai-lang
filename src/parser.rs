@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use pretty_assertions::assert_eq;
 use token::*;
 use For;
 use FunctionCall;
@@ -108,7 +107,7 @@ fn parse_arguments(state: ParseState, args: &mut Vec<Expression>) -> ParseResult
         }
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             let (body, state) = on_body(state)?;
-            args.push(body);
+            args.push(Expression::new_body(body));
             state
         }
         Some(t) => {
@@ -178,7 +177,8 @@ fn on_function(state: ParseState, ident: &str) -> ParseResult<(Expression, Parse
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             // Body
             let (body, state) = on_body(state)?;
-            let f = Expression::new_function(ident, params, return_type, body);
+            let f =
+                Expression::new_function(ident, params, return_type, Expression::new_body(body));
             Ok((f, state))
         }
         Some(t) => Err(ParseError::InvalidSyntax {
@@ -231,9 +231,8 @@ fn parse_body(state: ParseState, body: &mut Body) -> ParseResult<BodyState> {
     parse_body(state, body)
 }
 
-fn on_body(state: ParseState) -> ParseResult<(Expression, ParseState)> {
-    let (body, state) = parse_body(state, &mut vec![])?;
-    Ok((Expression::Body(body), state))
+fn on_body(state: ParseState) -> ParseResult<(Body, ParseState)> {
+    parse_body(state, &mut vec![])
 }
 
 fn parse_array_literal(
@@ -434,8 +433,8 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, Par
             )?)
         }
         Some(Token::Symbol(Symbol::BraceOpen)) => {
-            let (sub_expression, state) = on_body(state)?;
-            on_function_call(state, ident, sub_expression)
+            let (body, state) = on_body(state)?;
+            on_function_call(state, ident, Expression::new_body(body))
         }
 
         // Operations
@@ -562,7 +561,9 @@ fn on_expression(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         Some(Token::Ident(ident)) => on_identifier(state, &ident)?,
         Some(Token::Kwd(k)) => on_keyword(state, &k)?,
         Some(Token::Literal(l)) => on_literal(state, l)?,
-        Some(Token::Symbol(Symbol::BraceOpen)) => on_body(state)?,
+        Some(Token::Symbol(Symbol::BraceOpen)) => {
+            on_body(state).map(|(body, state)| (Expression::new_body(body), state))?
+        }
         Some(Token::Symbol(Symbol::Newline)) => on_expression(state)?,
 
         Some(t) => {
@@ -686,11 +687,9 @@ fn on_while(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     }
 
     let (expr, state) = on_expression(state)?;
-    let (evaluation, state) = on_evaluation(state, expr)?;
+    // let (evaluation, state) = on_evaluation(state, expr)?;
 
     let (next, state) = state.next();
-
-    assert_eq!(Some(Token::Symbol(Symbol::BraceOpen)), next);
 
     match next {
         Some(Token::Symbol(Symbol::BraceOpen)) => { /* Continue */ }
@@ -704,7 +703,7 @@ fn on_while(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     }
 
     let (body, state) = on_body(state)?;
-    let while_expr = Expression::new_while(Some(evaluation), body);
+    let while_expr = Expression::new_while(Some(expr), body);
     Ok((while_expr, state))
 }
 
@@ -755,7 +754,7 @@ fn on_for(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         }
         None => return Err(ParseError::NoMoreTokens),
     }
-    let (body, state) = on_body(state)?;
+    let (body, state) = on_body(state).map(|(body, state)| (Expression::new_body(body), state))?;
 
     Ok((
         Expression::For(For {
@@ -770,7 +769,9 @@ fn on_for(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 fn on_else(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
     match next {
-        Some(Token::Symbol(Symbol::BraceOpen)) => on_body(state),
+        Some(Token::Symbol(Symbol::BraceOpen)) => {
+            on_body(state).map(|(b, state)| (Expression::new_body(b), state))
+        }
         Some(Token::Kwd(Kwd::If)) => on_if(state),
         Some(t) => Err(ParseError::InvalidSyntax {
             message: "Expected a body or if else".to_string(),
@@ -783,7 +784,9 @@ fn on_else(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 fn on_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (t, state) = state.next();
     let (lhs, state) = match t {
-        Some(Token::Symbol(Symbol::BraceOpen)) => on_body(state)?,
+        Some(Token::Symbol(Symbol::BraceOpen)) => {
+            on_body(state).map(|(body, state)| (Expression::new_body(body), state))?
+        }
         Some(Token::Ident(i)) => (Expression::new_identifier(&i), state),
         Some(Token::Literal(l)) => (Expression::new_from_literal(&l), state),
         Some(t) => {
@@ -799,10 +802,11 @@ fn on_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
 
     match next {
-        Some(Token::Symbol(Symbol::BraceOpen)) => { /* Continue */ }
+        Some(Token::Symbol(Symbol::BraceOpen)) | Some(Token::Symbol(Symbol::Newline)) => { /* Continue */
+        }
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
-                message: "Expected an In keyword".to_string(),
+                message: "Expected an opening brace".to_string(),
                 token_context: t,
             });
         }
@@ -818,7 +822,11 @@ fn on_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         (None, state)
     };
     Ok((
-        Expression::new_if(evaluation, on_true_evaluation, on_false_evaluation),
+        Expression::new_if(
+            evaluation,
+            Expression::Body(on_true_evaluation),
+            on_false_evaluation,
+        ),
         state,
     ))
 }
@@ -1147,10 +1155,7 @@ mod tests {
                 Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
             ],
-            Expression::new_body(vec![Expression::new_while(
-                None,
-                Expression::new_body(vec![]),
-            )]),
+            Expression::new_body(vec![Expression::new_while(None, vec![])]),
         );
         // With function call:
         // while {
@@ -1169,10 +1174,10 @@ mod tests {
             ],
             Expression::new_body(vec![Expression::new_while(
                 None,
-                Expression::new_body(vec![Expression::new_function_call(
+                vec![Expression::new_function_call(
                     "print",
                     vec![Expression::new_string("Hello")],
-                )]),
+                )],
             )]),
         );
 
@@ -1201,10 +1206,10 @@ mod tests {
                     Some(Expression::new_int(3)),
                     EvaluationOperator::NumericAndString(EvaluationNumericAndString::Eq),
                 )),
-                Expression::Body(vec![Expression::new_function_call(
+                vec![Expression::new_function_call(
                     "print",
                     vec![Expression::new_string("Hello")],
-                )]),
+                )],
             )]),
         );
 
@@ -1229,10 +1234,10 @@ mod tests {
                     None,
                     EvaluationOperator::BooleanTruthy,
                 )),
-                Expression::new_body(vec![Expression::new_function_call(
+                vec![Expression::new_function_call(
                     "print",
                     vec![Expression::new_string("Hello")],
-                )]),
+                )],
             )]),
         );
     }

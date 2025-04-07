@@ -11,12 +11,15 @@ use super::{std_rust_print, RustBinding};
 /// the production of a new EnvironmentState.
 #[derive(Debug, Clone)]
 pub struct EnvironmentState {
-    pub local_symbols: HashMap<String, EnvironmentBinding>,
+    pub current_scope: Scope,
     pub std_lib_symbols: HashMap<String, RustBinding>,
 }
 
 #[derive(Debug, Clone)]
-pub struct InvalidRedeclaration;
+pub enum MutateBindingError {
+    InvalidRedeclaration,
+    NoIdentifier,
+}
 
 #[derive(Debug, Clone)]
 pub struct NoSuchBinding;
@@ -34,6 +37,13 @@ pub enum EnvironmentBinding {
     Function(Function),
     Identifier(String),
     Range(Range),
+}
+
+/// A Scoped set of variables.
+#[derive(Debug, Clone)]
+pub struct Scope {
+    pub local_symbols: HashMap<String, EnvironmentBinding>,
+    pub parent: Option<Box<Scope>>,
 }
 
 impl EnvironmentBinding {
@@ -77,10 +87,42 @@ pub enum Value {
     Void,
 }
 
+fn get_local_binding_recursive(symbol: &str, current_scope: &Scope) -> Option<EnvironmentBinding> {
+    let local_symbol = current_scope.local_symbols.get(symbol);
+
+    match local_symbol {
+        Some(v) => Some(v.clone()),
+        None => match &current_scope.parent {
+            Some(p) => get_local_binding_recursive(symbol, p),
+            None => None,
+        },
+    }
+}
+
+fn mutate_local_binding_recursive(
+    scope: &mut Scope,
+    symbol: &str,
+    binding: EnvironmentBinding,
+) -> Option<MutateBindingError> {
+    match scope.local_symbols.get(symbol) {
+        Some(EnvironmentBinding::Function(_)) => Some(MutateBindingError::InvalidRedeclaration),
+        _ => {
+            scope
+                .local_symbols
+                .insert(symbol.to_string(), binding.clone());
+            match &mut scope.parent {
+                Some(p) => mutate_local_binding_recursive(p, symbol, binding),
+                None => None,
+            };
+            None
+        }
+    }
+}
+
 impl EnvironmentState {
     pub fn new(local_symbols: HashMap<String, EnvironmentBinding>) -> Self {
         Self {
-            local_symbols,
+            current_scope: Scope::new(local_symbols, None),
             std_lib_symbols: HashMap::from([(
                 "print".to_string(),
                 RustBinding::Print(std_rust_print),
@@ -89,20 +131,23 @@ impl EnvironmentState {
     }
 
     pub fn get_local_binding(&self, symbol: &str) -> Option<EnvironmentBinding> {
-        self.local_symbols.get(symbol).cloned()
+        get_local_binding_recursive(symbol, &self.current_scope)
     }
+
     pub fn add_local_symbols(
-        mut self,
+        &mut self,
         symbol: &str,
         binding: EnvironmentBinding,
-    ) -> (EnvironmentState, Option<InvalidRedeclaration>) {
-        let already_contained = self.local_symbols.contains_key(symbol);
-        if let EnvironmentBinding::Function(_) = binding {
-            if already_contained {
-                return (self, Some(InvalidRedeclaration));
-            }
+    ) -> Option<MutateBindingError> {
+        mutate_local_binding_recursive(&mut self.current_scope, symbol, binding)
+    }
+}
+
+impl Scope {
+    pub fn new(local_symbols: HashMap<String, EnvironmentBinding>, parent: Option<Scope>) -> Self {
+        Self {
+            local_symbols,
+            parent: parent.map(Box::new),
         }
-        self.local_symbols.insert(symbol.to_string(), binding);
-        (self, None)
     }
 }

@@ -108,10 +108,10 @@ impl NativeType {
 }
 
 impl While {
-    fn new(condition: Option<Expression>, body: Expression) -> Self {
+    fn new(condition: Option<Expression>, body: Body) -> Self {
         Self {
             condition: condition.map(Box::new),
-            body: Box::new(body),
+            body,
         }
     }
 }
@@ -185,7 +185,7 @@ impl Expression {
     pub fn new_range(from: Expression, to: Expression, inclusive: bool) -> Expression {
         Expression::Range(Range::new(from, to, inclusive))
     }
-    pub fn new_while(condition: Option<Expression>, body: Expression) -> Expression {
+    pub fn new_while(condition: Option<Expression>, body: Body) -> Expression {
         Expression::While(While::new(condition, body))
     }
 

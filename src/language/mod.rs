@@ -126,7 +126,7 @@ pub type Body = Vec<Expression>;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct While {
     pub condition: Option<Box<Expression>>,
-    pub body: Box<Expression>,
+    pub body: Body,
 }
 
 /// Represents a series of values between two numbers. Commonly used in For loops. Exclusive by default.

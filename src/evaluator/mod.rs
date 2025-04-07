@@ -3,6 +3,8 @@ pub mod evaluation;
 pub mod operation;
 pub mod rust_bindings;
 
+use std::collections::HashMap;
+
 use crate::language::*;
 use environment::*;
 use evaluation::*;
@@ -28,6 +30,7 @@ pub enum EvaluatorError {
     NoSuchValue,
     InvalidNumberOfArguments,
     InvalidIdentifier,
+    InvalidOperationValue,
 }
 
 pub fn evaluate(
@@ -44,12 +47,43 @@ pub fn evaluate(
             add_binding_or_error(state, &f.ident.clone(), EnvironmentBinding::Function(f))
         }
         Expression::If(if_expression) => evaluate_if(state, if_expression),
-        Expression::While(_) => todo!(),
+        Expression::While(w) => evaluate_while(state, w),
         Expression::For(_) => todo!(),
         Expression::Body(b) => evaluate_body(state, b),
         Expression::Range(_) => todo!(),
         Expression::Assignment(a) => evaluate_assignment(state, a),
         Expression::FunctionCall(f) => evaluate_function_call(state, f),
+    }
+}
+
+fn evaluate_while(
+    state: EnvironmentState,
+    w: While,
+) -> (EnvironmentState, Result<Value, EvaluatorError>) {
+    let mut new_state = state.clone();
+    let while_scope = Scope::new(HashMap::new(), Some(state.current_scope.clone()));
+    new_state.current_scope = while_scope;
+
+    loop {
+        let (maybe_state, result) = match w.condition {
+            Some(ref v) => evaluate_evaluation(new_state, *v.clone()),
+            None => (new_state, Ok(true)),
+        };
+
+        match result {
+            Ok(b) => {
+                if b {
+                    let (maybe_state, result) = evaluate_body(maybe_state, w.body.clone());
+                    match result {
+                        Ok(v) => new_state = maybe_state,
+                        Err(e) => return (state, Err(e)),
+                    }
+                } else {
+                    return (state, Ok(Value::Void));
+                }
+            }
+            Err(e) => return (state, Err(e)),
+        }
     }
 }
 
@@ -91,6 +125,21 @@ fn evaluate_evaluation(
         evaluate_bindings(state, lhs_binding, rhs_binding, e.evaluation_op)
     } else {
         (state, Err(EvaluatorError::InvalidEvaluation))
+    }
+}
+
+fn get_values_from_binding(
+    state: EnvironmentState,
+    binding: EnvironmentBinding,
+) -> (EnvironmentState, Result<Value, EvaluatorError>) {
+    match binding {
+        EnvironmentBinding::Value(v) => (state, Ok(v)),
+        EnvironmentBinding::Function(f) => evaluate_function(state, f, vec![]),
+        EnvironmentBinding::Identifier(i) => {
+            let get_identifier_binding_recursively = get_identifier_binding_recursively(&state, &i);
+            (state, get_identifier_binding_recursively)
+        }
+        EnvironmentBinding::Range(_) => todo!(),
     }
 }
 
@@ -141,8 +190,7 @@ pub fn get_identifier_binding(
     symbol: &str,
 ) -> Result<EnvironmentBinding, EvaluatorError> {
     state
-        .local_symbols
-        .get(symbol)
+        .get_local_binding(symbol)
         .map_or(Err(EvaluatorError::NoSuchIdentifier), |binding| {
             Ok(binding.clone())
         })
@@ -152,14 +200,13 @@ pub fn get_identifier_binding_recursively(
     symbol: &str,
 ) -> Result<Value, EvaluatorError> {
     state
-        .local_symbols
-        .get(symbol)
+        .get_local_binding(symbol)
         .map_or(
             Err(EvaluatorError::NoSuchIdentifier),
             |binding| match binding {
                 EnvironmentBinding::Value(v) => Ok(v.clone()),
                 EnvironmentBinding::Function(_) => todo!(),
-                EnvironmentBinding::Identifier(i) => get_identifier_binding_recursively(state, i),
+                EnvironmentBinding::Identifier(i) => get_identifier_binding_recursively(state, &i),
                 EnvironmentBinding::Range(_) => todo!(),
             },
         )
@@ -228,16 +275,24 @@ fn evaluate_function(
     if args.len() != f.params.len() {
         return (state, Err(EvaluatorError::InvalidNumberOfArguments));
     }
+
     let mut new_state = state.clone();
 
     for (arg, parameter) in args.into_iter().zip(f.params) {
         let expr = get_binding_from_expression(&state, arg);
         match expr {
             Ok(b) => {
-                let (maybe_state, error) = new_state.add_local_symbols(&parameter.ident, b);
-                match error {
-                    Some(_) => return (state, Err(EvaluatorError::InvalidRedeclaration)),
-                    None => new_state = maybe_state,
+                let error = new_state.add_local_symbols(&parameter.ident, b);
+                if let Some(e) = error {
+                    return (
+                        state,
+                        Err(match e {
+                            MutateBindingError::InvalidRedeclaration => {
+                                EvaluatorError::InvalidRedeclaration
+                            }
+                            MutateBindingError::NoIdentifier => EvaluatorError::NoSuchIdentifier,
+                        }),
+                    );
                 }
             }
             Err(e) => return (state, Err(e)),
@@ -265,7 +320,6 @@ fn evaluate_identifier(
             EnvironmentBinding::Identifier(i) => evaluate_identifier(state, &i),
             EnvironmentBinding::Function(f) => evaluate_function(state, f, vec![]),
             EnvironmentBinding::Range(_) => todo!(),
-            _ => (state, Err(EvaluatorError::InvalidIdentifier)),
         },
         None => (state, Err(EvaluatorError::NoSuchIdentifier)),
     }
@@ -293,7 +347,7 @@ fn resolve_binding_to_string(
             Value::Void => Ok(String::new()),
         },
         EnvironmentBinding::Function(f) => todo!(),
-        EnvironmentBinding::Identifier(i) => match state.local_symbols.get(i) {
+        EnvironmentBinding::Identifier(i) => match state.current_scope.local_symbols.get(i) {
             Some(binding) => resolve_binding_to_string(state, binding),
             None => Err(EvaluatorError::NoSuchIdentifier),
         },
@@ -329,7 +383,7 @@ fn resolve_function_arguments_to_string(
     for arg in args {
         let s = match arg {
             Expression::ValueLiteral(v) => v.to_string(),
-            Expression::Identifier(i) => match new_state.local_symbols.get(&i) {
+            Expression::Identifier(i) => match new_state.current_scope.local_symbols.get(&i) {
                 Some(binding) => match resolve_binding_to_string(&new_state, binding) {
                     Ok(v) => v,
                     Err(e) => return (state, Err(e)),
@@ -403,7 +457,12 @@ fn evaluate_function_call(
         return (state, Ok(Value::Void));
     }
 
-    if let Some(f) = state.local_symbols.get(&fc.identifier).cloned() {
+    if let Some(f) = state
+        .current_scope
+        .local_symbols
+        .get(&fc.identifier)
+        .cloned()
+    {
         match f {
             EnvironmentBinding::Function(f) => evaluate_function(state, f, fc.args),
             _ => (state, Err(EvaluatorError::InvalidFunctionCall)),
@@ -418,9 +477,16 @@ fn add_binding_or_error(
     symbol: &str,
     binding: EnvironmentBinding,
 ) -> (EnvironmentState, Result<Value, EvaluatorError>) {
-    let (state, binding) = state.add_local_symbols(symbol, binding);
-    match binding {
-        Some(e) => (state, Err(EvaluatorError::InvalidRedeclaration)),
-        None => (state, Ok(Value::Void)),
+    let mut maybe_state = state.clone();
+    let error = maybe_state.add_local_symbols(symbol, binding);
+    match error {
+        Some(e) => (
+            state,
+            Err(match e {
+                MutateBindingError::InvalidRedeclaration => EvaluatorError::InvalidRedeclaration,
+                MutateBindingError::NoIdentifier => EvaluatorError::NoSuchIdentifier,
+            }),
+        ),
+        None => (maybe_state, Ok(Value::Void)),
     }
 }
