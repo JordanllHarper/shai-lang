@@ -8,6 +8,9 @@ use environment::*;
 use evaluation::*;
 use operation::*;
 use rust_bindings::*;
+//
+//
+// TODO: Think about scopes
 
 #[derive(Debug, PartialEq)]
 pub enum EvaluatorError {
@@ -23,6 +26,8 @@ pub enum EvaluatorError {
     InvalidDivide,
     InvalidMultiplication,
     NoSuchValue,
+    InvalidNumberOfArguments,
+    InvalidIdentifier,
 }
 
 pub fn evaluate(
@@ -217,9 +222,30 @@ fn evaluate_assignment(
 
 fn evaluate_function(
     state: EnvironmentState,
-    f: &Function,
+    f: Function,
+    args: Vec<Expression>,
 ) -> (EnvironmentState, Result<Value, EvaluatorError>) {
-    todo!()
+    if args.len() != f.params.len() {
+        return (state, Err(EvaluatorError::InvalidNumberOfArguments));
+    }
+    let mut new_state = state.clone();
+
+    for (arg, parameter) in args.into_iter().zip(f.params) {
+        let expr = get_binding_from_expression(&state, arg);
+        match expr {
+            Ok(b) => {
+                let (maybe_state, error) = new_state.add_local_symbols(&parameter.ident, b);
+                match error {
+                    Some(_) => return (state, Err(EvaluatorError::InvalidRedeclaration)),
+                    None => new_state = maybe_state,
+                }
+            }
+            Err(e) => return (state, Err(e)),
+        }
+    }
+    let (_, result) = evaluate(new_state, *f.body);
+
+    (state, result)
 }
 
 fn evaluate_identifier(
@@ -236,9 +262,10 @@ fn evaluate_identifier(
     match symbol {
         Some(binding) => match binding {
             EnvironmentBinding::Value(v) => (state, Ok(v)),
-            EnvironmentBinding::Function(f) => evaluate_function(state, &f),
             EnvironmentBinding::Identifier(i) => evaluate_identifier(state, &i),
+            EnvironmentBinding::Function(f) => evaluate_function(state, f, vec![]),
             EnvironmentBinding::Range(_) => todo!(),
+            _ => (state, Err(EvaluatorError::InvalidIdentifier)),
         },
         None => (state, Err(EvaluatorError::NoSuchIdentifier)),
     }
@@ -376,12 +403,10 @@ fn evaluate_function_call(
         return (state, Ok(Value::Void));
     }
 
-    if let Some(f) = state.local_symbols.get(&fc.identifier) {
+    if let Some(f) = state.local_symbols.get(&fc.identifier).cloned() {
         match f {
-            EnvironmentBinding::Value(v) => (state, Err(EvaluatorError::InvalidFunctionCall)),
-            EnvironmentBinding::Function(f) => todo!(),
-            EnvironmentBinding::Identifier(_) => todo!(),
-            EnvironmentBinding::Range(_) => todo!(),
+            EnvironmentBinding::Function(f) => evaluate_function(state, f, fc.args),
+            _ => (state, Err(EvaluatorError::InvalidFunctionCall)),
         }
     } else {
         (state, Err(EvaluatorError::InvalidFunctionCall))

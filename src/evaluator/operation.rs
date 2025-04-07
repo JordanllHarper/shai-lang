@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 use super::environment::*;
 use crate::evaluator::*;
 use crate::language::*;
@@ -15,6 +17,28 @@ pub fn evaluate_operation(
     }
 }
 
+fn handle_concatenation(
+    state: EnvironmentState,
+    c: CharacterBasedLiteral,
+    expr: Expression,
+    reverse: bool,
+) -> (EnvironmentState, Result<EnvironmentBinding, EvaluatorError>) {
+    let s = match get_binding_from_expression(&state, expr) {
+        Ok(b) => match resolve_binding_to_string(&state, &b) {
+            Ok(s) => s,
+            Err(e) => return (state, Err(e)),
+        },
+        Err(e) => return (state, Err(e)),
+    };
+
+    let format = if reverse {
+        format!("{}{}", c, s)
+    } else {
+        format!("{}{}", s, c)
+    };
+    (state, Ok(EnvironmentBinding::new_string(&(format))))
+}
+
 fn handle_add(
     state: EnvironmentState,
     sides: (Expression, Expression),
@@ -24,6 +48,12 @@ fn handle_add(
             Expression::ValueLiteral(ValueLiteral::Numeric(n1)),
             Expression::ValueLiteral(ValueLiteral::Numeric(n2)),
         ) => (state, Ok(EnvironmentBinding::new_numeric(n1 + n2))),
+        (Expression::ValueLiteral(ValueLiteral::CharacterBased(c)), other) => {
+            handle_concatenation(state, c, other, true)
+        }
+        (other, Expression::ValueLiteral(ValueLiteral::CharacterBased(c))) => {
+            handle_concatenation(state, c, other, false)
+        }
         _ => (state, Err(EvaluatorError::InvalidAddition)),
     }
 }
