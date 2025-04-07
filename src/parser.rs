@@ -56,6 +56,10 @@ where
     let tokens: Vec<Token> = tokens
         .into_iter()
         .filter(|each| each != &Token::whitespace())
+        .filter(|each| {
+            !matches!(each, Token::Symbol(Symbol::Comment(_)))
+                && !matches!(each, Token::Symbol(Symbol::MultilineComment(_)))
+        })
         .collect();
 
     let tokens: Vec<Token> = tokens
