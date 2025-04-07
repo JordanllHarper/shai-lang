@@ -1,70 +1,123 @@
-print "Hello, World"
+// Hello! This is Shai lang! This is a comment, which will be ignored.
 
+/*
+
+    We have multi line comments too
+    if you
+    like that kinda thing...
+
+*/
+
+// This is the basic print statement
+print "Hello, Shai!"
+// ommitting any arguments just outputs a new line
+print
+
+// You can store all data in variables like so
 name = "Jordan"
-
+// And then use them
 print "Hello" name
 
+// All native data types can be stored in variables
 age = 21
-
+// And coereced appropriately
 print "Your age is" age
 
+// Including floats...
+pi = 3.14
+print "Pi is:" pi
+
+// names can be shadowed to allow for reassignment
+age = 21
+
+// Shai supports if branches. Here we check if the age is 21. If this is true, run the code.
 if age == 21 {
     print "You are 21"
 }
 
+// more shadowing
 age = 17
 print "Changed age to" age
 
+// We can inverse the condition. This now checks if the age variable is not 21.
 if age != 21 {
     print "You are not 21"
 }
 
-
+// These conditions are stored as booleans, which can be stored in variables.
 is_17 = age == 17
 
+// Lets use it and also demonstrate else branches, which run if the testing condition is false.
 if is_17 {
     print "You are 17"
 } else {
     print "You are not 17"
 }
 
+// we can compare numbers, which will result in another boolean value
 num = 4
 if num > 3 {
     print 4 "is in fact greater than" 3
 }
 
+// even with literals
 if 3 > 4 {
     print "Eek that doesn't seem right"
 } else {
     print "4 is > 3... that's more like it!"
 }
 
+// Or boolean literals themselves
 if true {
     print "We ran!"
 }
 
 if false {
-    print "We didn't run..."
+    print "We ran..."
 } else {
     print "Condition was false"
 }
 
+// boolean literals are denoted as true or false
 my_condition = true
-
 if my_condition {
     print "This should print"
 }
 
+// we have basic math operations
 
-math_1 = 1 + 2
-print math_1
+addition = 1 + 2
+print addition
 
-math_2 = 1 - 2
-print math_2
+subtraction = 1 - 2
+print subtraction
 
-math_3 = 1 * 2
-print math_3
+multiplication = 1 * 2
+print multiplication
 
-math_4 = 1 / 2
-print math_4
+// divisions implicitly convert to floats
+division = 1 / 2
+print division
+
+// These are evaluated and stored so we can use them in other operations
+if division == 0.5 {
+    print "0.5 is cool"
+}
+
+// We can concatenate strings to other variables nicely
+concat = "1" + 2
+print "The string 1 concatted to number 2 is" concat
+
+
+// We can declare functions to give names to blocks of code.
+// These can take parameters and return values
+say_hi (name) {
+    print "Hi" name
+}
+
+say_hi "Jordan"
+
+// These can be repeatedly called
+
+say_hi "Jules"
 
