@@ -145,12 +145,17 @@ while y >= 0 {
 
 // NOTE: conditions in while loops must be either single values or identifiers
 /*
-    E.g. this is *currently* invalid!
+    E.g. this is *currently* invalid
     while {
         x = 4
         x
     } > 5 {
         print "Hello!"
     }
-
 */
+
+// arrays are supported
+names = ["Jordan", "Jules", "Sylvester"]
+print names
+
+

@@ -1,3 +1,6 @@
+use util::get_binding_from_expression;
+use util::value_literal_to_string;
+
 use super::environment::*;
 use crate::evaluator::*;
 use crate::language::*;
@@ -6,15 +9,16 @@ pub fn evaluate_operation(
     state: EnvironmentState,
     m: Operations,
 ) -> (EnvironmentState, Result<EnvironmentBinding, EvaluatorError>) {
-    let lh_binding = get_binding_from_expression(&state, *m.lhs);
-    let rh_binding = get_binding_from_expression(&state, *m.rhs);
+    let new_state = state.clone();
+    let (new_state, lh_binding) = get_binding_from_expression(new_state, *m.lhs);
+    let (new_state, rh_binding) = get_binding_from_expression(new_state, *m.rhs);
     let bindings = match (lh_binding, rh_binding) {
         (Ok(b1), Ok(b2)) => (b1, b2),
         (_, Err(e)) | (Err(e), _) => return (state, Err(e)),
     };
 
-    let (state, left_value) = get_values_from_binding(state, bindings.0);
-    let (state, right_value) = get_values_from_binding(state, bindings.1);
+    let (new_state, left_value) = get_values_from_binding(new_state, bindings.0);
+    let (new_state, right_value) = get_values_from_binding(new_state, bindings.1);
     let values = match (left_value, right_value) {
         (Ok(left_value), Ok(right_value)) => (left_value, right_value),
         (_, Err(e)) | (Err(e), _) => return (state, Err(e)),
@@ -27,10 +31,10 @@ pub fn evaluate_operation(
     };
 
     match m.operation {
-        Operator::Add => handle_add(state, value_literals),
-        Operator::Subtract => handle_subtract(state, value_literals),
-        Operator::Multiply => handle_multiply(state, value_literals),
-        Operator::Divide => handle_divide(state, value_literals),
+        Operator::Add => handle_add(new_state, value_literals),
+        Operator::Subtract => handle_subtract(new_state, value_literals),
+        Operator::Multiply => handle_multiply(new_state, value_literals),
+        Operator::Divide => handle_divide(new_state, value_literals),
     }
 }
 
@@ -40,14 +44,18 @@ fn handle_concatenation(
     other: ValueLiteral,
     in_reverse: bool,
 ) -> (EnvironmentState, Result<EnvironmentBinding, EvaluatorError>) {
-    let s = other.to_string();
+    let (new_state, result) = value_literal_to_string(state.clone(), &other);
+    let s = match result {
+        Ok(s) => s,
+        Err(e) => return (state, Err(e)),
+    };
 
     let format = if in_reverse {
         format!("{}{}", s, c)
     } else {
         format!("{}{}", c, s)
     };
-    (state, Ok(EnvironmentBinding::new_string(&(format))))
+    (new_state, Ok(EnvironmentBinding::new_string(&(format))))
 }
 
 fn handle_add(
