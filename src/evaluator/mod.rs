@@ -1,16 +1,14 @@
+pub mod bindings;
 pub mod environment;
 pub mod evaluation;
 pub mod operation;
-pub mod rust_bindings;
 pub mod util;
 
-use std::collections::HashMap;
-
 use crate::language::*;
+use bindings::*;
 use environment::*;
 use evaluation::*;
 use operation::*;
-use rust_bindings::*;
 use util::value_literal_to_string;
 //
 //
@@ -33,6 +31,7 @@ pub enum EvaluatorError {
     InvalidNumberOfArguments,
     InvalidIdentifier,
     InvalidOperationValue,
+    InvalidIterable,
 }
 
 pub fn evaluate(
@@ -66,46 +65,25 @@ fn evaluate_for(
     let for_scope = Scope::new(Some(state.current_scope.clone()));
     new_state.current_scope = for_scope;
 
-    todo!()
-}
-
-fn evaluate_iterable_len(
-    state: EnvironmentState,
-    iterable: EnvironmentBinding,
-) -> (EnvironmentState, Result<i32, EvaluatorError>) {
-    let new_state = state.clone();
-    match iterable {
-        EnvironmentBinding::Value(_) => todo!(),
-        EnvironmentBinding::Function(_) => todo!(),
-        EnvironmentBinding::Identifier(_) => todo!(),
-        EnvironmentBinding::Range(r) => {
-            let from_result = get_binding_from_expression(&new_state, *r.from);
-            let to_result = get_binding_from_expression(&new_state, *r.to);
-            let (from_binding, to_binding) = match (from_result, to_result) {
-                (Ok(b1), Ok(b2)) => (b1, b2),
-                (_, Err(e)) | (Err(e), _) => return (state, Err(e)),
-            };
-
-            let (new_state, from_value_result) = get_values_from_binding(new_state, from_binding);
-            let from_value = match from_value_result {
-                Ok(v) => v,
-                Err(e) => return (state, Err(e)),
-            };
-
-            let (new_state, to_value_result) = get_values_from_binding(new_state, to_binding);
-            let to_value = match to_value_result {
-                Ok(v) => v,
-                Err(e) => return (state, Err(e)),
-            };
-            match (from_value, to_value) {
-                (Value::ValueLiteral(vl1), Value::ValueLiteral(vl2)) => todo!(),
-                (Value::ValueLiteral(_), Value::Void) => todo!(),
-                (Value::Void, Value::ValueLiteral(_)) => todo!(),
-                (Value::Void, Value::Void) => todo!(),
-            }
-            todo!()
-        }
+    let iterable_binding = match get_binding_from_expression(&new_state, *f.iterable) {
+        Ok(b) => b,
+        Err(e) => return (state, Err(e)),
+    };
+    let (new_state, result) = get_values_from_binding(new_state, iterable_binding);
+    match result {
+        Ok(Value::ValueLiteral(vl)) => match vl {
+            ValueLiteral::CharacterBased(_) => todo!(),
+            ValueLiteral::Numeric(_) => todo!(),
+            ValueLiteral::Bool(_) => todo!(),
+            ValueLiteral::Array(_) => todo!(),
+            ValueLiteral::Dictionary(_) => todo!(),
+            ValueLiteral::Function => todo!(),
+        },
+        Ok(Value::Void) => return (new_state, Err(EvaluatorError::InvalidIterable)),
+        Err(e) => todo!(),
     }
+
+    todo!()
 }
 
 fn evaluate_while(
