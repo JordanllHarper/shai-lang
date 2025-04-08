@@ -156,7 +156,7 @@ while y >= 0 {
 
 // arrays are supported
 names = ["Jordan", "Jules", "Sylvester"]
-print names
+print "My names:" names
 
 // and we can iterate over them with for loops
 
@@ -166,4 +166,7 @@ for name in names {
     print name
 }
 
+for character in "Jordan" {
+    print character
+}
 

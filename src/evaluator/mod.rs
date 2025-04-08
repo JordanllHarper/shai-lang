@@ -75,14 +75,22 @@ fn evaluate_for(
     let (mut new_state, result) = get_values_from_binding(new_state, iterable_binding)?;
     match result {
         Value::ValueLiteral(ValueLiteral::Array(a)) => {
-            let (maybe_state, result) = iterate_array(new_state, a, f.scoped_variable, f.body)?;
+            let (maybe_state, _) = iterate_array(new_state, a, f.scoped_variable, f.body)?;
             new_state = maybe_state;
         }
         Value::ValueLiteral(ValueLiteral::Dictionary(d)) => {
             todo!()
         }
         Value::ValueLiteral(ValueLiteral::CharacterBased(CharacterBasedLiteral::String(s))) => {
-            todo!()
+            let (maybe_state, _) = iterate_array(
+                state,
+                s.chars()
+                    .map(|c| Expression::new_char(&c))
+                    .collect::<Vec<Expression>>(),
+                f.scoped_variable,
+                f.body,
+            )?;
+            new_state = maybe_state;
         }
         _ => return Err(EvaluatorError::InvalidIterable),
     }
