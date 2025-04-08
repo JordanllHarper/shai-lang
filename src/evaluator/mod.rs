@@ -12,26 +12,15 @@ use evaluation::*;
 use iterate::iterate_array;
 use operation::*;
 use util::value_to_string;
-//
-//
-// TODO: Think about scopes
 
 #[derive(Debug, PartialEq)]
 pub enum EvaluatorError {
     InvalidRedeclaration,
     NoSuchIdentifier,
     InvalidFunctionCall,
-    InvalidFunctionCallArgument,
-    EmptyBody,
     InvalidEvaluation,
     NotABooleanValue,
-    InvalidSubtract,
-    InvalidAddition,
-    InvalidDivide,
-    InvalidMultiplication,
-    NoSuchValue,
     InvalidNumberOfArguments,
-    InvalidIdentifier,
     InvalidOperationValue,
     InvalidIterable,
     InvalidForLoopIdentifier,
@@ -68,10 +57,7 @@ fn evaluate_for(
     let for_scope = Scope::new(Some(state.current_scope.clone()));
     new_state.current_scope = for_scope;
 
-    let iterable_binding = match get_binding_from_expression(&new_state, *f.iterable) {
-        Ok(b) => b,
-        Err(e) => return Err(e),
-    };
+    let iterable_binding = get_binding_from_expression(&new_state, *f.iterable)?;
     let (mut new_state, result) = get_values_from_binding(new_state, iterable_binding)?;
     match result {
         Value::ValueLiteral(ValueLiteral::Array(a)) => {
@@ -176,16 +162,11 @@ fn get_binding_from_expression(
 ) -> Result<EnvironmentBinding, EvaluatorError> {
     let binding = match expr {
         Expression::ValueLiteral(v) => EnvironmentBinding::Value(Value::ValueLiteral(v)),
-        Expression::Identifier(i) => {
-            let result = get_identifier_binding(state, &i);
-            match result {
-                Ok(v) => v,
-                Err(e) => return Err(e),
-            }
-        }
+        Expression::Identifier(i) => get_identifier_binding(state, &i)?,
         Expression::Evaluation(_) => todo!(),
         Expression::FunctionCall(_) => todo!(),
         Expression::Body(e) => todo!(),
+        Expression::Range(r) => todo!(),
         _ => return Err(EvaluatorError::InvalidEvaluation),
     };
     Ok(binding)
