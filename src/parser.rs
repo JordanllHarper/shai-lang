@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::Scope};
 
 use token::*;
 use For;
@@ -782,24 +782,53 @@ fn on_iterable(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     }
 }
 
-fn on_for(state: ParseState) -> ParseResult<(Expression, ParseState)> {
-    let (scoped_variable, state) = on_single_value(state)?;
+fn on_scoped_identifier(
+    state: ParseState,
+    previous: &mut Vec<String>,
+) -> ParseResult<(ScopedVariable, ParseState)> {
     let (next, state) = state.next();
-
-    match next {
-        Some(Token::Kwd(Kwd::In)) => { /* Continue */ }
+    let ident = match next {
+        Some(Token::Ident(i)) => i,
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
-                message: "Expected an In keyword".to_string(),
+                message: "Expected an identifier".to_string(),
                 token_context: t,
             });
         }
         None => {
             return Err(ParseError::NoMoreTokens {
-                context: "on_for".to_string(),
+                context: "on_scoped_identifier".to_string(),
             })
         }
+    };
+
+    let (next, state) = state.next();
+
+    match next {
+        Some(Token::Kwd(Kwd::In)) => {
+            if previous.is_empty() {
+                Ok((ScopedVariable::new_single(&ident), state))
+            } else {
+                previous.push(ident);
+                Ok((ScopedVariable::new_multiple(previous.to_vec()), state))
+            }
+        }
+        Some(Token::Symbol(Symbol::Comma)) => {
+            previous.push(ident);
+            on_scoped_identifier(state, previous)
+        }
+        Some(t) => Err(ParseError::InvalidSyntax {
+            message: "Expected In keyword".to_string(),
+            token_context: t,
+        }),
+        None => Err(ParseError::NoMoreTokens {
+            context: "on_scoped_identifier".to_string(),
+        }),
     }
+}
+
+fn on_for(state: ParseState) -> ParseResult<(Expression, ParseState)> {
+    let (scoped_variable, state) = on_scoped_identifier(state, &mut vec![])?;
 
     let (iterable, state) = on_iterable(state)?;
     let (next, state) = state.next();
@@ -817,13 +846,13 @@ fn on_for(state: ParseState) -> ParseResult<(Expression, ParseState)> {
             })
         }
     }
-    let (body, state) = on_body(state).map(|(body, state)| (Expression::new_body(body), state))?;
+    let (body, state) = on_body(state)?;
 
     Ok((
         Expression::For(For {
-            scoped_variable: Box::new(scoped_variable),
+            scoped_variable,
             iterable: Box::new(iterable),
-            body: Box::new(body),
+            body,
         }),
         state,
     ))
@@ -959,12 +988,9 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
             ],
             Expression::new_body(vec![Expression::new_for(
-                Expression::new_identifier("i"),
+                ScopedVariable::Single("i".to_string()),
                 Expression::new_identifier("numbers"),
-                Expression::new_body(vec![Expression::new_statement(
-                    None,
-                    StatementOperator::Break,
-                )]),
+                vec![Expression::new_statement(None, StatementOperator::Break)],
             )]),
         );
 
@@ -998,9 +1024,9 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
             ],
             Expression::new_body(vec![Expression::new_for(
-                Expression::new_identifier("i"),
+                ScopedVariable::new_single("i"),
                 Expression::new_identifier("numbers"),
-                Expression::Body(vec![Expression::new_if(
+                vec![Expression::new_if(
                     Expression::new_evaluation(
                         Expression::new_identifier("i"),
                         Some(Expression::new_int(0)),
@@ -1014,7 +1040,7 @@ mod tests {
                         "print",
                         vec![Expression::new_string("hi")],
                     )])),
-                )]),
+                )],
             )]),
         );
     }
@@ -1373,9 +1399,9 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
             ],
             Expression::new_body(vec![Expression::new_for(
-                Expression::new_identifier("x"),
+                ScopedVariable::new_single("x"),
                 Expression::new_range(Expression::new_int(0), Expression::new_int(5), false),
-                Expression::Body(Body::new()),
+                Body::new(),
             )]),
         );
         // for x in y..z {
@@ -1394,13 +1420,13 @@ mod tests {
                 Token::Symbol(Symbol::BraceClose),
             ],
             Expression::new_body(vec![Expression::new_for(
-                Expression::new_identifier("x"),
+                ScopedVariable::new_single("x"),
                 Expression::new_range(
                     Expression::new_identifier("y"),
                     Expression::new_identifier("z"),
                     false,
                 ),
-                Expression::Body(Body::new()),
+                Body::new(),
             )]),
         );
     }

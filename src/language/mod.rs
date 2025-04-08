@@ -145,6 +145,12 @@ pub struct Range {
     pub inclusive: bool,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ScopedVariable {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
 /// For loop construct. Executes a body while not at the end of an iterable.
 ///
 /// e.g.
@@ -156,9 +162,9 @@ pub struct Range {
 /// ```
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct For {
-    pub scoped_variable: Box<Expression>,
+    pub scoped_variable: ScopedVariable,
     pub iterable: Box<Expression>,
-    pub body: Box<Expression>,
+    pub body: Body,
 }
 
 /// Function construct. Give a name, some parameters and optionally some return type to a body.

@@ -1,6 +1,7 @@
 pub mod bindings;
 pub mod environment;
 pub mod evaluation;
+pub mod iterate;
 pub mod operation;
 pub mod util;
 
@@ -8,6 +9,7 @@ use crate::language::*;
 use bindings::*;
 use environment::*;
 use evaluation::*;
+use iterate::iterate_array;
 use operation::*;
 use util::value_literal_to_string;
 //
@@ -32,6 +34,7 @@ pub enum EvaluatorError {
     InvalidIdentifier,
     InvalidOperationValue,
     InvalidIterable,
+    InvalidForLoopIdentifier,
 }
 
 pub fn evaluate(
@@ -69,21 +72,26 @@ fn evaluate_for(
         Ok(b) => b,
         Err(e) => return (state, Err(e)),
     };
-    let (new_state, result) = get_values_from_binding(new_state, iterable_binding);
+    let (mut new_state, result) = get_values_from_binding(new_state, iterable_binding);
     match result {
-        Ok(Value::ValueLiteral(vl)) => match vl {
-            ValueLiteral::CharacterBased(_) => todo!(),
-            ValueLiteral::Numeric(_) => todo!(),
-            ValueLiteral::Bool(_) => todo!(),
-            ValueLiteral::Array(_) => todo!(),
-            ValueLiteral::Dictionary(_) => todo!(),
-            ValueLiteral::Function => todo!(),
-        },
-        Ok(Value::Void) => return (new_state, Err(EvaluatorError::InvalidIterable)),
-        Err(e) => todo!(),
+        Ok(Value::ValueLiteral(ValueLiteral::Array(a))) => {
+            let (maybe_state, result) = iterate_array(new_state, a, f.scoped_variable, f.body);
+            if result.is_err() {
+                return (state, result);
+            }
+            new_state = maybe_state;
+        }
+        Ok(Value::ValueLiteral(ValueLiteral::Dictionary(d))) => {
+            todo!()
+        }
+        Ok(Value::ValueLiteral(ValueLiteral::CharacterBased(CharacterBasedLiteral::String(s)))) => {
+            todo!()
+        }
+        Err(e) => return (state, Err(e)),
+        _ => return (new_state, Err(EvaluatorError::InvalidIterable)),
     }
 
-    todo!()
+    (new_state, Ok(Value::Void))
 }
 
 fn evaluate_while(
@@ -312,7 +320,7 @@ fn evaluate_function(
         let expr = get_binding_from_expression(&state, arg);
         match expr {
             Ok(b) => {
-                let error = new_state.add_local_symbols(&parameter.ident, b);
+                let error = new_state.add_or_mutate_symbols(&parameter.ident, b);
                 if let Some(e) = error {
                     return (
                         state,
@@ -507,7 +515,7 @@ fn add_binding_or_error(
     binding: EnvironmentBinding,
 ) -> (EnvironmentState, Result<Value, EvaluatorError>) {
     let mut maybe_state = state.clone();
-    let error = maybe_state.add_local_symbols(symbol, binding);
+    let error = maybe_state.add_or_mutate_symbols(symbol, binding);
     match error {
         Some(e) => (
             state,

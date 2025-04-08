@@ -134,7 +134,7 @@ impl EnvironmentState {
         get_local_binding_recursive(symbol, &self.current_scope)
     }
 
-    pub fn add_local_symbols(
+    pub fn add_or_mutate_symbols(
         &mut self,
         symbol: &str,
         binding: EnvironmentBinding,

@@ -157,8 +157,11 @@ while y >= 0 {
 // arrays are supported
 names = ["Jordan", "Jules", "Sylvester"]
 print names
+print
 
 // and we can iterate over them with for loops
+
+print "Iterating our names"
 
 for name in names {
     print name

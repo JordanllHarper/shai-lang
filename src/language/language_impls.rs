@@ -116,11 +116,11 @@ impl While {
     }
 }
 impl For {
-    fn new(scoped_variable: Expression, iterable: Expression, body: Expression) -> Self {
+    fn new(scoped_variable: ScopedVariable, iterable: Expression, body: Body) -> Self {
         Self {
-            scoped_variable: Box::new(scoped_variable),
+            scoped_variable,
             iterable: Box::new(iterable),
-            body: Box::new(body),
+            body,
         }
     }
 }
@@ -190,9 +190,9 @@ impl Expression {
     }
 
     pub fn new_for(
-        scoped_variable: Expression,
+        scoped_variable: ScopedVariable,
         iterable: Expression,
-        body: Expression,
+        body: Body,
     ) -> Expression {
         Expression::For(For::new(scoped_variable, iterable, body))
     }
@@ -294,5 +294,13 @@ impl Operations {
             rhs: Box::new(rhs),
             operation,
         }
+    }
+}
+impl ScopedVariable {
+    pub fn new_single(s: &str) -> Self {
+        Self::Single(s.to_string())
+    }
+    pub fn new_multiple(multiple: Vec<String>) -> Self {
+        Self::Multiple(multiple.to_vec())
     }
 }
