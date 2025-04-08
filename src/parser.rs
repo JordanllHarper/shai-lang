@@ -45,7 +45,9 @@ pub enum ParseError {
         message: String,
         token_context: Token,
     },
-    NoMoreTokens,
+    NoMoreTokens {
+        context: String,
+    },
 }
 
 pub fn parse<I>(tokens: I) -> ParseResult<Expression>
@@ -155,7 +157,11 @@ fn parse_parameters(
                 token_context: t,
             })
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "Parse parse_parameters".to_string(),
+            })
+        }
     };
     parameters.push(parameter);
 
@@ -185,7 +191,9 @@ fn on_function(state: ParseState, ident: &str) -> ParseResult<(Expression, Parse
             message: "Expected a function body or expression".to_string(),
             token_context: t,
         }),
-        None => Err(ParseError::NoMoreTokens),
+        None => Err(ParseError::NoMoreTokens {
+            context: "on_function".to_string(),
+        }),
     }
 }
 
@@ -206,7 +214,11 @@ fn on_return_type(state: ParseState) -> ParseResult<ReturnState> {
                         token_context: t,
                     })
                 }
-                None => return Err(ParseError::NoMoreTokens),
+                None => {
+                    return Err(ParseError::NoMoreTokens {
+                        context: "on_return_type".to_string(),
+                    })
+                }
             };
             Ok((ret_type, state))
         }
@@ -262,7 +274,9 @@ fn parse_array_literal(
             array.push(expr);
             parse_array_literal(state, array)
         }
-        None => Err(ParseError::NoMoreTokens),
+        None => Err(ParseError::NoMoreTokens {
+            context: "Parse array literal".to_string(),
+        }),
     }
 }
 
@@ -304,14 +318,18 @@ fn parse_dict_literal(
                             message: "Expected a comma".to_string(),
                             token_context: t,
                         }),
-                        None => Err(ParseError::NoMoreTokens),
+                        None => Err(ParseError::NoMoreTokens {
+                            context: "parse_dict_literal".to_string(),
+                        }),
                     }
                 }
                 Some(t) => Err(ParseError::InvalidSyntax {
                     message: "Expected a colon".to_string(),
                     token_context: t,
                 }),
-                None => Err(ParseError::NoMoreTokens),
+                None => Err(ParseError::NoMoreTokens {
+                    context: "parse_dict_literal".to_string(),
+                }),
             }
         }
         Some(Token::Literal(l)) => {
@@ -333,14 +351,18 @@ fn parse_dict_literal(
                             message: "Expected a comma".to_string(),
                             token_context: t.clone(),
                         }),
-                        None => Err(ParseError::NoMoreTokens),
+                        None => Err(ParseError::NoMoreTokens {
+                            context: "parse_dict_literal".to_string(),
+                        }),
                     }
                 }
                 Some(t) => Err(ParseError::InvalidSyntax {
                     message: "Expected a colon".to_string(),
                     token_context: t,
                 }),
-                None => Err(ParseError::NoMoreTokens),
+                None => Err(ParseError::NoMoreTokens {
+                    context: "parse_dict_literal".to_string(),
+                }),
             }
         }
         Some(Token::Symbol(Symbol::BraceClose)) => {
@@ -351,7 +373,9 @@ fn parse_dict_literal(
             message: "Expected an identifier, literal, or closing brace".to_string(),
             token_context: t,
         }),
-        None => Err(ParseError::NoMoreTokens),
+        None => Err(ParseError::NoMoreTokens {
+            context: "parse_dict_literal".to_string(),
+        }),
     }
 }
 
@@ -535,7 +559,11 @@ fn on_evaluation(state: ParseState, lhs: Expression) -> ParseResult<(Expression,
                 token_context: t,
             })
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_evaluation".to_string(),
+            })
+        }
     };
 
     let (rhs, state) = on_single_value(state)?;
@@ -573,7 +601,11 @@ fn on_expression(state: ParseState) -> ParseResult<(Expression, ParseState)> {
                 token_context: t,
             })
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_expression".to_string(),
+            })
+        }
     };
     Ok(expr)
 }
@@ -604,7 +636,9 @@ fn on_include(state: ParseState) -> ParseResult<(Expression, ParseState)> {
             message: "Expected a string for the package name".to_string(),
             token_context: t,
         }),
-        None => Err(ParseError::NoMoreTokens),
+        None => Err(ParseError::NoMoreTokens {
+            context: "on_include".to_string(),
+        }),
     }
 }
 
@@ -645,7 +679,11 @@ fn on_const(state: ParseState) -> ParseResult<(Expression, ParseState)> {
                 token_context: t,
             })
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_const".to_string(),
+            })
+        }
     };
     let peek = state.peek();
     let (type_assertion, state) = if let Some(Token::Kwd(Kwd::DataType(d))) = peek {
@@ -665,7 +703,11 @@ fn on_const(state: ParseState) -> ParseResult<(Expression, ParseState)> {
                 token_context: t,
             });
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_const".to_string(),
+            })
+        }
     }
 
     let (expr, state) = on_expression(state)?;
@@ -699,7 +741,11 @@ fn on_while(state: ParseState) -> ParseResult<(Expression, ParseState)> {
                 token_context: t,
             });
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_while".to_string(),
+            });
+        }
     }
 
     let (body, state) = on_body(state)?;
@@ -723,7 +769,9 @@ fn on_iterable(state: ParseState) -> ParseResult<(Expression, ParseState)> {
             message: "Expected Range or Range Equals operator".to_string(),
             token_context: t,
         }),
-        None => Err(ParseError::NoMoreTokens),
+        None => Err(ParseError::NoMoreTokens {
+            context: "on_iterable".to_string(),
+        }),
     }
 }
 
@@ -739,7 +787,11 @@ fn on_for(state: ParseState) -> ParseResult<(Expression, ParseState)> {
                 token_context: t,
             });
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_for".to_string(),
+            })
+        }
     }
 
     let (iterable, state) = on_iterable(state)?;
@@ -752,7 +804,11 @@ fn on_for(state: ParseState) -> ParseResult<(Expression, ParseState)> {
                 token_context: t,
             });
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_for".to_string(),
+            })
+        }
     }
     let (body, state) = on_body(state).map(|(body, state)| (Expression::new_body(body), state))?;
 
@@ -777,7 +833,9 @@ fn on_else(state: ParseState) -> ParseResult<(Expression, ParseState)> {
             message: "Expected a body or if else".to_string(),
             token_context: t,
         }),
-        None => Err(ParseError::NoMoreTokens),
+        None => Err(ParseError::NoMoreTokens {
+            context: "on_else".to_string(),
+        }),
     }
 }
 
@@ -795,7 +853,11 @@ fn on_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
                 token_context: t.to_owned(),
             })
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_if".to_string(),
+            })
+        }
     };
 
     let (evaluation, state) = on_evaluation(state, lhs)?;
@@ -810,7 +872,11 @@ fn on_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
                 token_context: t,
             });
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_if".to_string(),
+            })
+        }
     }
 
     let (on_true_evaluation, state) = on_body(state)?;
