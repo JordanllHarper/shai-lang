@@ -337,7 +337,7 @@ fn evaluate_statement(
     }
 }
 
-fn resolve_binding_to_string(
+fn get_string_from_binding(
     state: &EnvironmentState,
     binding: &EnvironmentBinding,
 ) -> Result<String, EvaluatorError> {
@@ -348,7 +348,7 @@ fn resolve_binding_to_string(
         },
         EnvironmentBinding::Function(f) => todo!(),
         EnvironmentBinding::Identifier(i) => match state.current_scope.local_symbols.get(i) {
-            Some(binding) => resolve_binding_to_string(state, binding),
+            Some(binding) => get_string_from_binding(state, binding),
             None => Err(EvaluatorError::NoSuchIdentifier),
         },
         EnvironmentBinding::Range(_) => todo!(),
@@ -383,8 +383,8 @@ fn resolve_function_arguments_to_string(
     for arg in args {
         let s = match arg {
             Expression::ValueLiteral(v) => v.to_string(),
-            Expression::Identifier(i) => match new_state.current_scope.local_symbols.get(&i) {
-                Some(binding) => match resolve_binding_to_string(&new_state, binding) {
+            Expression::Identifier(i) => match new_state.get_local_binding(&i) {
+                Some(binding) => match get_string_from_binding(&new_state, &binding) {
                     Ok(v) => v,
                     Err(e) => return (state, Err(e)),
                 },
@@ -398,7 +398,7 @@ fn resolve_function_arguments_to_string(
             Expression::While(_) => todo!(),
             Expression::For(_) => todo!(),
             Expression::Body(b) => {
-                let result = resolve_body_string_value(new_state, b);
+                let result = get_body_string_value(new_state, b);
                 match result {
                     (state, Ok(s)) => {
                         new_state = state;
@@ -418,7 +418,7 @@ fn resolve_function_arguments_to_string(
     (new_state, Ok(s_args))
 }
 
-fn resolve_body_string_value(
+fn get_body_string_value(
     state: EnvironmentState,
     b: Vec<Expression>,
 ) -> (EnvironmentState, Result<String, EvaluatorError>) {

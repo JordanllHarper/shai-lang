@@ -449,7 +449,6 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, Par
     match t {
         // Assignment
         Some(Token::Symbol(Symbol::Equals)) => Ok(on_assignment(state, ident, None)?),
-
         Some(Token::Symbol(Symbol::Op(t))) => {
             let operation = Operator::from_token(&t);
             Ok(on_math_expression(
@@ -462,7 +461,6 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, Par
             let (body, state) = on_body(state)?;
             on_function_call(state, ident, Expression::new_body(body))
         }
-
         // Operations
         // Function call if value literal or string
         Some(Token::Literal(l)) => Ok(on_function_call(
@@ -736,7 +734,8 @@ fn on_while(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         return Ok((Expression::new_while(None, body), state));
     }
 
-    let (lhs, state) = on_expression(state)?;
+    let (lhs, state) = on_single_value(state)?;
+
     let (evaluation, state) = on_evaluation(state, lhs)?;
 
     let (next, state) = state.next();
@@ -1314,6 +1313,46 @@ mod tests {
                 )],
             )]),
         );
+
+        // while y > 3 {
+        //     y = y + 1
+        // }
+        test(
+            "while loop with comparison",
+            vec![
+                Token::Kwd(Kwd::While),
+                Token::new_ident("y"),
+                Token::Symbol(Symbol::Evaluation(EvaluationSymbol::GzEq)),
+                Token::Literal(Literal::Int(3)),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                Token::new_ident("y"),
+                Token::Symbol(Symbol::Equals),
+                Token::new_ident("y"),
+                Token::Symbol(Symbol::Op(OpSymbol::Plus)),
+                Token::Literal(Literal::Int(1)),
+                Token::Symbol(Symbol::Newline),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::new_body(vec![Expression::new_while(
+                Some(Expression::new_evaluation(
+                    Expression::new_identifier("y"),
+                    Some(Expression::new_int(3)),
+                    EvaluationOperator::NumericOnly(EvaluationNumericOnly::GzEq),
+                )),
+                vec![Expression::new_assignment(
+                    "y",
+                    Expression::new_math_expression(
+                        Expression::new_identifier("y"),
+                        Expression::new_int(1),
+                        Operator::Add,
+                    ),
+                    None,
+                    None,
+                    false,
+                )],
+            )]),
+        )
     }
 
     #[test]

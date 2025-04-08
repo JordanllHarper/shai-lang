@@ -134,8 +134,23 @@ hold_my_number
 // print inner_num <- invalid!
 
 
-y = 0
-while true {
-    y = y + 1
+// we can iterate using a while loop construct
+
+
+y = 3
+while y >= 0 {
     print y
+    y = y - 1
 }
+
+// NOTE: conditions in while loops must be either single values or identifiers
+/*
+    E.g. this is *currently* invalid!
+    while {
+        x = 4
+        x
+    } > 5 {
+        print "Hello!"
+    }
+
+*/

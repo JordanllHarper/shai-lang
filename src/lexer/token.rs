@@ -12,6 +12,9 @@ impl Token {
     pub fn whitespace() -> Token {
         Token::Symbol(Symbol::Whitespace)
     }
+    pub fn new_ident(str: &str) -> Token {
+        Token::Ident(str.to_string())
+    }
 }
 
 impl Display for DataTypeKwd {
