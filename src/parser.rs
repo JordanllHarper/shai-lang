@@ -430,7 +430,9 @@ fn on_assignment(
                 .to_string(),
             token_context: t,
         }),
-        None => Err(ParseError::NoMoreTokens),
+        None => Err(ParseError::NoMoreTokens {
+            context: "on_assignment".to_string(),
+        }),
     }
 }
 
@@ -494,7 +496,9 @@ fn on_variable_type_assertion(
             message: "Expected an equals sign".to_string(),
             token_context: t,
         }),
-        None => Err(ParseError::NoMoreTokens),
+        None => Err(ParseError::NoMoreTokens {
+            context: "on_variable_type_assertion".to_string(),
+        }),
     }
 }
 
@@ -533,7 +537,11 @@ fn on_single_value(state: ParseState) -> ParseResult<(Expression, ParseState)> {
                 token_context: t,
             })
         }
-        None => return Err(ParseError::NoMoreTokens),
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_single_value".to_string(),
+            })
+        }
     };
     Ok((single_value, state))
 }
