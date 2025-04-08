@@ -145,13 +145,14 @@ fn peek_on_match<F>(lexer: &mut Lexer, test: char, on_match: F, or_else: Token) 
 where
     F: Fn(&mut Lexer) -> Token,
 {
+    let clone = or_else.clone();
     lexer.advance().map_or_else(
-        || or_else.clone(),
+        || clone,
         |c| {
             if c == test {
                 on_match(lexer)
             } else {
-                or_else.clone()
+                or_else
             }
         },
     )
@@ -172,6 +173,17 @@ fn is_symbol_applicable(symbol: &char) -> bool {
     allowed_symbols.contains(symbol)
 }
 
+/// Advances the lexer.
+///
+/// If the next character matches test, step back and return true.
+/// If the next character does not match test, step back and return false.
+/// If there are no more tokens, returns None.
+fn peek_next(lexer: &mut Lexer, test: char) -> Option<bool> {
+    let result = lexer.advance().map(|c| c == test);
+    lexer.step_back();
+    result
+}
+
 /// Advances a lexer until a non-alphanumeric delimeter and converts into an optional [Token].
 /// Returns Some if a text symbol can be found and None otherwise.
 /// e.g. whitespace, which should never happen unless there is a "  " double space.
@@ -183,7 +195,19 @@ fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
     while let Some(ch) = lexer.advance() {
         // allow designated symbols through
         if ch.is_alphanumeric() || is_symbol_applicable(&ch) {
-            buf.push(ch);
+            match ch {
+                '.' => {
+                    let result = peek_next(lexer, '.');
+                    if let Some(b) = result {
+                        if b {
+                            break;
+                        } else {
+                            buf.push(ch);
+                        }
+                    }
+                }
+                _ => buf.push(ch),
+            }
         } else {
             break;
         }
