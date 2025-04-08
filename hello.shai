@@ -161,12 +161,25 @@ print "My names:" names
 // and we can iterate over them with for loops
 
 print "Iterating our names"
-
 for name in names {
     print name
 }
 
-for character in "Jordan" {
+// characters in strings can be iterated over
+name = "Jordan"
+print "Characters in" name
+for character in name {
     print character
 }
+
+// for loops can be nested
+print
+print "Characters in" names
+for name in names {
+    for character in name {
+        print character
+    }
+}
+
+
 

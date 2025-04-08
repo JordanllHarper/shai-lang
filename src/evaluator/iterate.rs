@@ -1,7 +1,7 @@
 use crate::evaluator::{evaluate_body, get_values_from_binding, EnvironmentBinding};
 
 use super::{
-    evaluate, get_binding_from_expression, Body, EnvironmentState, EvaluatorError, Expression,
+    get_binding_from_expression, Body, EnvironmentState, EvaluatorError, Expression,
     ScopedVariable, Value,
 };
 
