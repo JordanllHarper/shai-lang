@@ -2,6 +2,7 @@ pub mod environment;
 pub mod evaluation;
 pub mod operation;
 pub mod rust_bindings;
+pub mod util;
 
 use std::collections::HashMap;
 
@@ -10,6 +11,7 @@ use environment::*;
 use evaluation::*;
 use operation::*;
 use rust_bindings::*;
+use util::value_literal_to_string;
 //
 //
 // TODO: Think about scopes
@@ -338,18 +340,19 @@ fn evaluate_statement(
 }
 
 fn get_string_from_binding(
-    state: &EnvironmentState,
+    state: EnvironmentState,
     binding: &EnvironmentBinding,
-) -> Result<String, EvaluatorError> {
+) -> (EnvironmentState, Result<String, EvaluatorError>) {
+    let new_state = state.clone();
     match binding {
         EnvironmentBinding::Value(v) => match v {
-            Value::ValueLiteral(vl) => Ok(vl.to_string()),
-            Value::Void => Ok(String::new()),
+            Value::ValueLiteral(vl) => value_literal_to_string(new_state, vl),
+            Value::Void => (new_state, Ok(String::new())),
         },
         EnvironmentBinding::Function(f) => todo!(),
-        EnvironmentBinding::Identifier(i) => match state.current_scope.local_symbols.get(i) {
-            Some(binding) => get_string_from_binding(state, binding),
-            None => Err(EvaluatorError::NoSuchIdentifier),
+        EnvironmentBinding::Identifier(i) => match state.get_local_binding(i) {
+            Some(binding) => get_string_from_binding(new_state, &binding),
+            None => (state, Err(EvaluatorError::NoSuchIdentifier)),
         },
         EnvironmentBinding::Range(_) => todo!(),
     }
@@ -384,9 +387,12 @@ fn resolve_function_arguments_to_string(
         let s = match arg {
             Expression::ValueLiteral(v) => v.to_string(),
             Expression::Identifier(i) => match new_state.get_local_binding(&i) {
-                Some(binding) => match get_string_from_binding(&new_state, &binding) {
-                    Ok(v) => v,
-                    Err(e) => return (state, Err(e)),
+                Some(binding) => match get_string_from_binding(new_state, &binding) {
+                    (maybe_state, Ok(v)) => {
+                        new_state = maybe_state;
+                        v
+                    }
+                    (_, Err(e)) => return (state, Err(e)),
                 },
                 None => return (state, Err(EvaluatorError::NoSuchIdentifier)),
             },
@@ -400,8 +406,8 @@ fn resolve_function_arguments_to_string(
             Expression::Body(b) => {
                 let result = get_body_string_value(new_state, b);
                 match result {
-                    (state, Ok(s)) => {
-                        new_state = state;
+                    (maybe_state, Ok(s)) => {
+                        new_state = maybe_state;
                         s
                     }
                     (state, Err(e)) => {
