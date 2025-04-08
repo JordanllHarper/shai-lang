@@ -7,7 +7,7 @@ pub fn evaluate_bindings(
     left: EnvironmentBinding,
     right: Option<EnvironmentBinding>,
     evaluation_op: EvaluationOperator,
-) -> (EnvironmentState, Result<bool, EvaluatorError>) {
+) -> Result<(EnvironmentState, bool), EvaluatorError> {
     let result: bool = match (left, right, evaluation_op) {
         (
             EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(lhs))),
@@ -31,22 +31,22 @@ pub fn evaluate_bindings(
             EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(_))),
             Some(EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(_)))),
             EvaluationOperator::BooleanTruthy,
-        ) => return (state, Err(EvaluatorError::NotABooleanValue)),
+        ) => return Err(EvaluatorError::NotABooleanValue),
 
         (EnvironmentBinding::Identifier(i), None, EvaluationOperator::BooleanTruthy) => {
             match get_identifier_binding(&state, &i) {
                 Ok(v) => match v {
                     EnvironmentBinding::Value(v) => match v {
                         Value::ValueLiteral(ValueLiteral::Bool(b)) => b,
-                        _ => return (state, Err(EvaluatorError::NotABooleanValue)),
+                        _ => return Err(EvaluatorError::NotABooleanValue),
                     },
                     EnvironmentBinding::Function(_) => todo!(),
                     EnvironmentBinding::Identifier(i) => {
                         let result = get_identifier_binding_recursively(&state, &i);
                         match result {
                             Ok(Value::ValueLiteral(ValueLiteral::Bool(b))) => b,
-                            Ok(_) => return (state, Err(EvaluatorError::NotABooleanValue)),
-                            Err(e) => return (state, Err(e)),
+                            Ok(_) => return Err(EvaluatorError::NotABooleanValue),
+                            Err(e) => return Err(e),
                         }
                     }
                     EnvironmentBinding::Range(_) => todo!(),
@@ -63,5 +63,5 @@ pub fn evaluate_bindings(
 
         _ => false,
     };
-    (state, Ok(result))
+    Ok((state, result))
 }

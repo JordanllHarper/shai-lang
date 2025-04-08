@@ -37,18 +37,17 @@ fn main() {
         println!("AST: {:?}", ast);
     }
 
-    let (new_state, result) = evaluator::evaluate(state, ast);
-    if debug_mode {
-        println!("{:?}", new_state);
-    }
+    let result = evaluator::evaluate(state, ast);
     match result {
-        Err(e) => {
-            eprintln!("{:?}", e);
-        }
-        Ok(v) => {
+        Ok((state, v)) => {
             if debug_mode {
+                println!("{:?}", state);
                 println!("Return value{:?}", v)
             }
+        }
+
+        Err(e) => {
+            eprintln!("{:?}", e);
         }
     }
 }
