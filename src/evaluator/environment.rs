@@ -122,7 +122,7 @@ fn mutate_local_binding_recursive(
 impl EnvironmentState {
     pub fn new(local_symbols: HashMap<String, EnvironmentBinding>) -> Self {
         Self {
-            current_scope: Scope::new(local_symbols, None),
+            current_scope: Scope::new_with_symbols(local_symbols, None),
             std_lib_symbols: HashMap::from([(
                 "print".to_string(),
                 RustBinding::Print(std_rust_print),
@@ -144,7 +144,17 @@ impl EnvironmentState {
 }
 
 impl Scope {
-    pub fn new(local_symbols: HashMap<String, EnvironmentBinding>, parent: Option<Scope>) -> Self {
+    pub fn new(parent: Option<Scope>) -> Self {
+        Self {
+            local_symbols: HashMap::new(),
+            parent: parent.map(Box::new),
+        }
+    }
+
+    pub fn new_with_symbols(
+        local_symbols: HashMap<String, EnvironmentBinding>,
+        parent: Option<Scope>,
+    ) -> Self {
         Self {
             local_symbols,
             parent: parent.map(Box::new),

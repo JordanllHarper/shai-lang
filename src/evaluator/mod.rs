@@ -50,11 +50,61 @@ pub fn evaluate(
         }
         Expression::If(if_expression) => evaluate_if(state, if_expression),
         Expression::While(w) => evaluate_while(state, w),
-        Expression::For(_) => todo!(),
+        Expression::For(f) => evaluate_for(state, f),
         Expression::Body(b) => evaluate_body(state, b),
         Expression::Range(_) => todo!(),
         Expression::Assignment(a) => evaluate_assignment(state, a),
         Expression::FunctionCall(f) => evaluate_function_call(state, f),
+    }
+}
+
+fn evaluate_for(
+    state: EnvironmentState,
+    f: For,
+) -> (EnvironmentState, Result<Value, EvaluatorError>) {
+    let mut new_state = state.clone();
+    let for_scope = Scope::new(Some(state.current_scope.clone()));
+    new_state.current_scope = for_scope;
+
+    todo!()
+}
+
+fn evaluate_iterable_len(
+    state: EnvironmentState,
+    iterable: EnvironmentBinding,
+) -> (EnvironmentState, Result<i32, EvaluatorError>) {
+    let new_state = state.clone();
+    match iterable {
+        EnvironmentBinding::Value(_) => todo!(),
+        EnvironmentBinding::Function(_) => todo!(),
+        EnvironmentBinding::Identifier(_) => todo!(),
+        EnvironmentBinding::Range(r) => {
+            let from_result = get_binding_from_expression(&new_state, *r.from);
+            let to_result = get_binding_from_expression(&new_state, *r.to);
+            let (from_binding, to_binding) = match (from_result, to_result) {
+                (Ok(b1), Ok(b2)) => (b1, b2),
+                (_, Err(e)) | (Err(e), _) => return (state, Err(e)),
+            };
+
+            let (new_state, from_value_result) = get_values_from_binding(new_state, from_binding);
+            let from_value = match from_value_result {
+                Ok(v) => v,
+                Err(e) => return (state, Err(e)),
+            };
+
+            let (new_state, to_value_result) = get_values_from_binding(new_state, to_binding);
+            let to_value = match to_value_result {
+                Ok(v) => v,
+                Err(e) => return (state, Err(e)),
+            };
+            match (from_value, to_value) {
+                (Value::ValueLiteral(vl1), Value::ValueLiteral(vl2)) => todo!(),
+                (Value::ValueLiteral(_), Value::Void) => todo!(),
+                (Value::Void, Value::ValueLiteral(_)) => todo!(),
+                (Value::Void, Value::Void) => todo!(),
+            }
+            todo!()
+        }
     }
 }
 
@@ -63,7 +113,7 @@ fn evaluate_while(
     w: While,
 ) -> (EnvironmentState, Result<Value, EvaluatorError>) {
     let mut new_state = state.clone();
-    let while_scope = Scope::new(HashMap::new(), Some(state.current_scope.clone()));
+    let while_scope = Scope::new(Some(state.current_scope.clone()));
     new_state.current_scope = while_scope;
 
     loop {
@@ -463,12 +513,7 @@ fn evaluate_function_call(
         return (state, Ok(Value::Void));
     }
 
-    if let Some(f) = state
-        .current_scope
-        .local_symbols
-        .get(&fc.identifier)
-        .cloned()
-    {
+    if let Some(f) = state.get_local_binding(&fc.identifier) {
         match f {
             EnvironmentBinding::Function(f) => evaluate_function(state, f, fc.args),
             _ => (state, Err(EvaluatorError::InvalidFunctionCall)),

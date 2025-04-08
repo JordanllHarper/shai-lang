@@ -8,6 +8,107 @@ pub enum Token {
     Literal(Literal),
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
+    Bool(bool),
+    Int(i32),
+    Float(f64),
+    String(String),
+    Char(char),
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum OpSymbol {
+    Minus,
+    Plus,
+    Asterisk,
+    FwdSlash,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum EvaluationSymbol {
+    Equality,
+    NotEquality,
+    LzEq,
+    GzEq,
+    Lz,
+    Gz,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Symbol {
+    ParenOpen,
+    ParenClose,
+    ChevOpen,
+    ChevClose,
+    AngOpen,
+    AngClose,
+    BraceOpen,
+    BraceClose,
+    Equals,
+    Modulus,
+    Quote,
+    Apstr,
+    Comma,
+    Period,
+    // operation symbols
+    Op(OpSymbol),
+    //
+    // comparison
+    Evaluation(EvaluationSymbol),
+    //
+    BckSlash,
+    Dollar,
+    Colon,
+    Underscore,
+    Ampsnd,
+    Pipe,
+    Whitespace,
+    Bang,
+    Newline,
+    // 2 char symbols
+    PlusAssign,
+    MinusAssign,
+    MultiplyAssign,
+    DivideAssign,
+    Arrow,
+    And,
+    Or,
+    MultilineComment(String),
+    Comment(String),
+    // Escape chars
+    EscapeQuote,
+    EscapeApos,
+    Range,
+    RangeEq,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum DataTypeKwd {
+    Bool,
+    Char,
+    Float,
+    Int,
+    String,
+    Void,
+    Dict,
+    Arr,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Kwd {
+    DataType(DataTypeKwd),
+    While,
+    For,
+    If,
+    Return,
+    In,
+    Break,
+    Include,
+    Else,
+    Const,
+}
+
 impl Token {
     pub fn whitespace() -> Token {
         Token::Symbol(Symbol::Whitespace)
@@ -146,105 +247,4 @@ impl Display for Literal {
         };
         f.write_str(&str_rep)
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
-    Bool(bool),
-    Int(i32),
-    Float(f64),
-    String(String),
-    Char(char),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum OpSymbol {
-    Minus,
-    Plus,
-    Asterisk,
-    FwdSlash,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum EvaluationSymbol {
-    Equality,
-    NotEquality,
-    LzEq,
-    GzEq,
-    Lz,
-    Gz,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Symbol {
-    ParenOpen,
-    ParenClose,
-    ChevOpen,
-    ChevClose,
-    AngOpen,
-    AngClose,
-    BraceOpen,
-    BraceClose,
-    Equals,
-    Modulus,
-    Quote,
-    Apstr,
-    Comma,
-    Period,
-    // operation symbols
-    Op(OpSymbol),
-    //
-    // comparison
-    Evaluation(EvaluationSymbol),
-    //
-    BckSlash,
-    Dollar,
-    Colon,
-    Underscore,
-    Ampsnd,
-    Pipe,
-    Whitespace,
-    Bang,
-    Newline,
-    // 2 char symbols
-    PlusAssign,
-    MinusAssign,
-    MultiplyAssign,
-    DivideAssign,
-    Arrow,
-    And,
-    Or,
-    MultilineComment(String),
-    Comment(String),
-    // Escape chars
-    EscapeQuote,
-    EscapeApos,
-    Range,
-    RangeEq,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum DataTypeKwd {
-    Bool,
-    Char,
-    Float,
-    Int,
-    String,
-    Void,
-    Dict,
-    Arr,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Kwd {
-    DataType(DataTypeKwd),
-    While,
-    For,
-    If,
-    Return,
-    In,
-    Break,
-    Include,
-    Else,
-    Const,
 }

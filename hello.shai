@@ -158,4 +158,10 @@ while y >= 0 {
 names = ["Jordan", "Jules", "Sylvester"]
 print names
 
+// and we can iterate over them with for loops
+
+for name in names {
+    print name
+}
+
 
