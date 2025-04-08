@@ -135,7 +135,7 @@ hold_my_number
 
 
 y = 0
-while {
+while true {
     y = y + 1
     print y
 }

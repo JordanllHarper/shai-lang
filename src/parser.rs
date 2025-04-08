@@ -686,8 +686,8 @@ fn on_while(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         return Ok((Expression::new_while(None, body), state));
     }
 
-    let (expr, state) = on_expression(state)?;
-    // let (evaluation, state) = on_evaluation(state, expr)?;
+    let (lhs, state) = on_expression(state)?;
+    let (evaluation, state) = on_evaluation(state, lhs)?;
 
     let (next, state) = state.next();
 
@@ -703,7 +703,7 @@ fn on_while(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     }
 
     let (body, state) = on_body(state)?;
-    let while_expr = Expression::new_while(Some(expr), body);
+    let while_expr = Expression::new_while(Some(evaluation), body);
     Ok((while_expr, state))
 }
 
