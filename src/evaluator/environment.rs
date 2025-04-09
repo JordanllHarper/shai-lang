@@ -78,6 +78,9 @@ impl EnvironmentBinding {
     pub fn new_bool(b: bool) -> EnvironmentBinding {
         EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Bool(b)))
     }
+    pub fn new_arr(v: Vec<Expression>) -> EnvironmentBinding {
+        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Array(v)))
+    }
 }
 
 /// The variations an Environment binding value can be.

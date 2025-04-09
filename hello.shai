@@ -171,15 +171,26 @@ print "Characters in" name
 for character in name {
     print character
 }
+print
 
 // for loops can be nested
-print
 print "Characters in" names
 for name in names {
     for character in name {
         print character
     }
 }
+print
 
+// you can specify ranges of numbers by using the range syntax
 
+for i in 0..5 {
+    print i
+}
 
+print "Backwards"
+// and backwards
+
+for i in 5..=1 {
+    print i
+}

@@ -80,23 +80,87 @@ pub fn get_string_from_binding(
         EnvironmentBinding::Range(_) => todo!(),
     }
 }
+
+// Code adapted from quaternic (2021)
+fn directed_range(a: i32, b: i32) -> impl Iterator<Item = i32> {
+    let mut start = a;
+    let end = b;
+    std::iter::from_fn(move || {
+        use std::cmp::Ordering::*;
+        match start.cmp(&end) {
+            Less => {
+                start += 1;
+                Some(start - 1)
+            }
+            Equal => None,
+            Greater => {
+                start -= 1;
+                Some(start + 1)
+            }
+        }
+    })
+}
+
 pub fn get_binding_from_expression(
     state: EnvironmentState,
     expr: Expression,
 ) -> Result<(EnvironmentState, EnvironmentBinding), EvaluatorError> {
-    let binding = match expr {
-        Expression::ValueLiteral(v) => EnvironmentBinding::Value(Value::ValueLiteral(v)),
+    match expr {
+        Expression::ValueLiteral(v) => {
+            Ok((state, EnvironmentBinding::Value(Value::ValueLiteral(v))))
+        }
         Expression::Identifier(i) => {
-            let result = get_identifier_binding(&state, &i);
-            match result {
-                Ok(v) => v,
-                Err(e) => return Err(e),
-            }
+            let binding = get_identifier_binding(&state, &i)?;
+            Ok((state, binding))
         }
         Expression::Evaluation(_) => todo!(),
         Expression::FunctionCall(_) => todo!(),
         Expression::Body(e) => todo!(),
-        _ => return Err(EvaluatorError::InvalidEvaluation),
-    };
-    Ok((state, binding))
+        // NOTE: This generates a list of numbers for the user. An optimization here could be to
+        // lazy load each number rather than generate this whole list.
+        Expression::Range(r) => {
+            println!("{:?}", r);
+            let (state, from_binding) = get_binding_from_expression(state, *r.from)?;
+            let (state, to_binding) = get_binding_from_expression(state, *r.to)?;
+
+            let (state, from_value) = get_values_from_binding(state, from_binding)?;
+            let (state, to_value) = get_values_from_binding(state, to_binding)?;
+
+            let values: Vec<Expression> = match (from_value, to_value) {
+                (
+                    Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i1))),
+                    Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i2))),
+                ) => {
+                    let mut range = directed_range(i1, i2).collect::<Vec<i32>>();
+                    if r.inclusive {
+                        range.push(i2);
+                    };
+
+                    range
+                        .into_iter()
+                        .map(Expression::new_int)
+                        .collect::<Vec<Expression>>()
+                }
+                _ => return Err(EvaluatorError::InvalidIterable),
+            };
+
+            Ok((state, EnvironmentBinding::new_arr(values)))
+        }
+        _ => todo!(),
+    }
+}
+
+pub fn get_values_from_binding(
+    state: EnvironmentState,
+    binding: EnvironmentBinding,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    match binding {
+        EnvironmentBinding::Value(v) => Ok((state, v)),
+        EnvironmentBinding::Function(f) => evaluate_function(state, f, vec![]),
+        EnvironmentBinding::Identifier(i) => {
+            let value = get_identifier_binding_recursively(&state, &i)?;
+            Ok((state, value))
+        }
+        EnvironmentBinding::Range(_) => todo!(),
+    }
 }
