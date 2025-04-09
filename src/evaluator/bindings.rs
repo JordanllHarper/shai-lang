@@ -1,6 +1,7 @@
 #[derive(Debug, Clone)]
 pub enum RustBinding {
     Print(Print),
+    Len,
 }
 
 pub type Print = fn(Vec<String>);

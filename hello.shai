@@ -158,6 +158,9 @@ while y >= 0 {
 names = ["Jordan", "Jules", "Sylvester"]
 print "My names:" names
 
+// we can get the length of the array using the builtin len function
+print "I have" { len names } "names"
+
 // and we can iterate over them with for loops
 
 print "Iterating our names"
@@ -172,6 +175,7 @@ for character in name {
     print character
 }
 print
+
 
 // for loops can be nested
 print "Characters in" names
@@ -194,3 +198,5 @@ print "Backwards"
 for i in 5..=1 {
     print i
 }
+
+

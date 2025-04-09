@@ -213,7 +213,10 @@ fn evaluate_assignment_expression(
         Expression::Body(_) => todo!(),
         Expression::Range(_) => todo!(),
         Expression::Assignment(_) => todo!(),
-        Expression::FunctionCall(_) => todo!(),
+        Expression::FunctionCall(fc) => {
+            let (state, value) = evaluate_function_call(state, fc)?;
+            Ok((state, EnvironmentBinding::Value(value)))
+        }
     }
 }
 
@@ -314,6 +317,29 @@ pub fn handle_rust_binding_with_args(
             std_print(args);
             Ok((new_state, Value::Void))
         }
+        RustBinding::Len => {
+            if args.len() > 1 {
+                return Err(EvaluatorError::InvalidNumberOfArguments);
+            }
+            let first = args.first().cloned();
+            if let Some(expr) = first {
+                let (new_state, binding) = get_binding_from_expression(state, expr)?;
+                let (new_state, value) = get_values_from_binding(new_state, binding)?;
+                let len = match value {
+                    Value::ValueLiteral(ValueLiteral::Array(a)) => a.len(),
+                    _ => todo!(),
+                };
+                Ok((
+                    new_state,
+                    Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(len as i32))),
+                ))
+            } else {
+                Ok((
+                    state,
+                    Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(0))),
+                ))
+            }
+        }
     }
 }
 
@@ -382,7 +408,7 @@ fn evaluate_function_call(
 
     if let Some(std) = maybe_std_fn {
         let (state, result) = handle_rust_binding_with_args(state, &std, fc.args)?;
-        return Ok((state, Value::Void));
+        return Ok((state, result));
     }
 
     if let Some(f) = state.get_local_binding(&fc.identifier) {

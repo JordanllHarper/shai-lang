@@ -126,10 +126,10 @@ impl EnvironmentState {
     pub fn new(local_symbols: HashMap<String, EnvironmentBinding>) -> Self {
         Self {
             current_scope: Scope::new_with_symbols(local_symbols, None),
-            std_lib_symbols: HashMap::from([(
-                "print".to_string(),
-                RustBinding::Print(std_rust_print),
-            )]),
+            std_lib_symbols: HashMap::from([
+                ("print".to_string(), RustBinding::Print(std_rust_print)),
+                ("len".to_string(), RustBinding::Len),
+            ]),
         }
     }
 
