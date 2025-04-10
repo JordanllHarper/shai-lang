@@ -139,6 +139,10 @@ impl Expression {
         Expression::ValueLiteral(l)
     }
 
+    pub fn new_index(collection: Expression, index: Expression) -> Expression {
+        Expression::Index(Index::new(collection, index))
+    }
+
     pub fn new_identifier(ident: &str) -> Expression {
         Expression::Identifier(ident.to_string())
     }
@@ -302,5 +306,14 @@ impl ScopedVariable {
     }
     pub fn new_multiple(multiple: Vec<String>) -> Self {
         Self::Multiple(multiple.to_vec())
+    }
+}
+
+impl Index {
+    pub fn new(collection: Expression, index: Expression) -> Self {
+        Self {
+            collection: Box::new(collection),
+            index: Box::new(index),
+        }
     }
 }

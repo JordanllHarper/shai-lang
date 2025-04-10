@@ -475,10 +475,58 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, Par
             Ok(on_range(state, Expression::new_identifier(ident), true)?)
         }
         Some(Token::Symbol(Symbol::ParenOpen)) => Ok(on_function(state, ident)?),
+        Some(Token::Symbol(Symbol::AngOpen)) => Ok(on_collection_index(
+            state,
+            Expression::new_identifier(ident),
+        )?),
         Some(Token::Ident(i)) => on_function_call(state, ident, Expression::new_identifier(&i)),
         Some(Token::Kwd(Kwd::DataType(d))) => Ok(on_variable_type_assertion(state, ident, d)?),
         _ => Ok((Expression::new_identifier(ident), state)),
     }
+}
+
+fn on_collection_index(
+    state: ParseState,
+    collection: Expression,
+) -> ParseResult<(Expression, ParseState)> {
+    let (next, state) = state.next();
+    let (index, state) = match next {
+        Some(Token::Symbol(Symbol::BraceOpen)) => {
+            let (body, state) = on_body(state)?;
+            (Expression::new_body(body), state)
+        }
+        Some(Token::Ident(i)) => on_identifier(state, &i)?,
+        Some(Token::Literal(l)) => on_literal(state, l)?,
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected a brace open, ident or literal".to_string(),
+                token_context: t,
+            })
+        }
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_collection_index".to_string(),
+            })
+        }
+    };
+
+    println!("{:?}", state);
+    let (next, state) = state.next();
+    match next {
+        Some(Token::Symbol(Symbol::AngClose)) => { /* Continue */ }
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected a closing bracket".to_string(),
+                token_context: t,
+            })
+        }
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_collection_index".to_string(),
+            })
+        }
+    }
+    Ok((Expression::new_index(collection, index), state))
 }
 
 fn on_variable_type_assertion(
@@ -619,6 +667,9 @@ fn on_expression(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 fn on_literal(state: ParseState, l: Literal) -> ParseResult<(Expression, ParseState)> {
     let peek = state.peek().cloned();
     match peek {
+        Some(Token::Symbol(Symbol::AngOpen)) => {
+            on_collection_index(state, Expression::new_from_literal(&l))
+        }
         Some(Token::Symbol(Symbol::Op(m))) => {
             let (_, state) = state.next();
             on_math_expression(

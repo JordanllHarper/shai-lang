@@ -199,4 +199,8 @@ for i in 5..=1 {
     print i
 }
 
+// we can also index values
 
+my_name = names[1]
+
+print my_name

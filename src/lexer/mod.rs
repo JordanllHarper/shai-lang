@@ -169,7 +169,7 @@ fn parse_literal_or_identifier(s: &str) -> Token {
 }
 
 fn is_symbol_applicable(symbol: &char) -> bool {
-    let allowed_symbols = HashSet::from(['[', ']', '.', '_']);
+    let allowed_symbols = HashSet::from(['.', '_']);
     allowed_symbols.contains(symbol)
 }
 
@@ -187,7 +187,7 @@ fn peek_next(lexer: &mut Lexer, test: char) -> Option<bool> {
 /// Advances a lexer until a non-alphanumeric delimeter and converts into an optional [Token].
 /// Returns Some if a text symbol can be found and None otherwise.
 /// e.g. whitespace, which should never happen unless there is a "  " double space.
-fn peek_non_symbol(lexer: &mut Lexer) -> Option<Token> {
+fn next_non_symbol(lexer: &mut Lexer) -> Option<Token> {
     let current = lexer.input.get(lexer.position)?;
     let mut buf = current.to_string();
 
@@ -355,7 +355,7 @@ impl Iterator for Lexer {
                 ),
                 '&' => peek_symbol(self, '&', Symbol::And, Symbol::Ampsnd),
                 '|' => peek_symbol(self, '|', Symbol::Or, Symbol::Pipe),
-                _ => peek_non_symbol(self)?,
+                _ => next_non_symbol(self)?,
             };
             self.advance();
             Some(token)

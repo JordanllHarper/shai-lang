@@ -29,6 +29,7 @@ use std::collections::HashMap;
 pub enum Expression {
     ValueLiteral(ValueLiteral),
     Identifier(String),
+    Index(Index),
     Statement(Statement),
     MathOperation(Operations),
     Evaluation(Evaluation),
@@ -40,6 +41,13 @@ pub enum Expression {
     Range(Range),
     Assignment(Assignment),
     FunctionCall(FunctionCall),
+}
+
+/// Expressses indexing an item in a collection
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Index {
+    pub collection: Box<Expression>,
+    pub index: Box<Expression>,
 }
 
 /// The supported native data types in the language.

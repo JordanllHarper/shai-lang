@@ -24,6 +24,8 @@ pub enum EvaluatorError {
     InvalidOperationValue,
     InvalidIterable,
     InvalidForLoopIdentifier,
+    IndexOutOfRange,
+    InvalidIndex,
 }
 
 pub fn evaluate(
@@ -43,9 +45,62 @@ pub fn evaluate(
         Expression::While(w) => evaluate_while(state, w),
         Expression::For(f) => evaluate_for(state, f),
         Expression::Body(b) => evaluate_body(state, b),
-        Expression::Range(_) => todo!(),
+        Expression::Range(r) => todo!(),
         Expression::Assignment(a) => evaluate_assignment(state, a),
         Expression::FunctionCall(f) => evaluate_function_call(state, f),
+        Expression::Index(i) => evaluate_index(state, i),
+    }
+}
+
+fn evaluate_index(
+    state: EnvironmentState,
+    i: Index,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    let collection = *i.collection;
+    let (state, index) = get_binding_from_expression(state, *i.index)?;
+    let (state, value) = get_values_from_binding(state, index)?;
+
+    let (state, binding) = get_binding_from_expression(state, collection)?;
+    match binding {
+        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Array(a))) => {
+            index_array(state, value, a)
+        }
+        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Dictionary(d))) => {
+            index_dict(state, value, d)
+        }
+        EnvironmentBinding::Value(v) => match v {
+            Value::ValueLiteral(_) => todo!(),
+            Value::Void => todo!(),
+        },
+        EnvironmentBinding::Identifier(i) => todo!(),
+        EnvironmentBinding::Range(_) => todo!(),
+        EnvironmentBinding::Function(_) => todo!(),
+    }
+}
+
+fn index_dict(
+    state: EnvironmentState,
+    value: Value,
+    d: std::collections::HashMap<DictionaryKey, Expression>,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    todo!()
+}
+fn index_array(
+    state: EnvironmentState,
+    value: Value,
+    a: Vec<Expression>,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    if let Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i))) = value {
+        let result = a.get(i as usize);
+        if let Some(v) = result {
+            let (state, binding) = get_binding_from_expression(state, v.clone())?;
+            let (state, value) = get_values_from_binding(state, binding)?;
+            return Ok((state, value));
+        } else {
+            return Err(EvaluatorError::IndexOutOfRange);
+        }
+    } else {
+        return Err(EvaluatorError::InvalidIndex);
     }
 }
 
@@ -61,7 +116,7 @@ fn evaluate_for(
     let (mut new_state, result) = get_values_from_binding(new_state, binding)?;
     match result {
         Value::ValueLiteral(ValueLiteral::Array(a)) => {
-            let (maybe_state, _) = iterate_array(new_state, a, f.scoped_variable, f.body)?;
+            let (maybe_state, _) = iterate_array(new_state, a, f.scoped_variable, f.body.to_vec())?;
             new_state = maybe_state;
         }
         Value::ValueLiteral(ValueLiteral::Dictionary(d)) => {
@@ -215,6 +270,10 @@ fn evaluate_assignment_expression(
         Expression::Assignment(_) => todo!(),
         Expression::FunctionCall(fc) => {
             let (state, value) = evaluate_function_call(state, fc)?;
+            Ok((state, EnvironmentBinding::Value(value)))
+        }
+        Expression::Index(index) => {
+            let (state, value) = evaluate_index(state, index)?;
             Ok((state, EnvironmentBinding::Value(value)))
         }
     }
@@ -375,6 +434,7 @@ fn resolve_function_arguments_to_string(
             Expression::Range(_) => todo!(),
             Expression::Assignment(_) => todo!(),
             Expression::FunctionCall(_) => todo!(),
+            Expression::Index(_) => todo!(),
         };
         s_args.push(s);
     }
