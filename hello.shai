@@ -199,6 +199,11 @@ for i in 5..=1 {
     print i
 }
 
+// NOTE: ranges are also classed as first class values in shai
+
+my_range = 0..10
+print my_range
+
 // we can also index values
 
 my_name = names[1]

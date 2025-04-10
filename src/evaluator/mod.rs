@@ -5,6 +5,8 @@ pub mod iterate;
 pub mod operation;
 pub mod util;
 
+use std::collections::HashMap;
+
 use crate::language::*;
 use bindings::*;
 use environment::*;
@@ -26,6 +28,7 @@ pub enum EvaluatorError {
     InvalidForLoopIdentifier,
     IndexOutOfRange,
     InvalidIndex,
+    NotACollection,
 }
 
 pub fn evaluate(
@@ -45,43 +48,50 @@ pub fn evaluate(
         Expression::While(w) => evaluate_while(state, w),
         Expression::For(f) => evaluate_for(state, f),
         Expression::Body(b) => evaluate_body(state, b),
-        Expression::Range(r) => todo!(),
+        Expression::Range(r) => evaluate_range(state, r),
         Expression::Assignment(a) => evaluate_assignment(state, a),
         Expression::FunctionCall(f) => evaluate_function_call(state, f),
         Expression::Index(i) => evaluate_index(state, i),
     }
 }
 
+fn evaluate_range(
+    state: EnvironmentState,
+    r: Range,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    let (state, from_value) = get_values_from_expression(state, *r.from)?;
+    let (state, to_value) = get_values_from_expression(state, *r.to)?;
+
+    Ok((
+        state,
+        match (from_value, to_value) {
+            (
+                Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i1))),
+                Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i2))),
+            ) => Value::Range(RangeValue::new(i1, i2, r.inclusive)),
+            _ => return Err(EvaluatorError::InvalidIterable),
+        },
+    ))
+}
+
 fn evaluate_index(
     state: EnvironmentState,
     i: Index,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let collection = *i.collection;
-    let (state, index) = get_binding_from_expression(state, *i.index)?;
-    let (state, value) = get_values_from_binding(state, index)?;
+    let (state, index_value) = get_values_from_expression(state, *i.index)?;
+    let (state, collection_value) = get_values_from_expression(state, *i.collection)?;
 
-    let (state, binding) = get_binding_from_expression(state, collection)?;
-    match binding {
-        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Array(a))) => {
-            index_array(state, value, a)
-        }
-        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Dictionary(d))) => {
-            index_dict(state, value, d)
-        }
-        EnvironmentBinding::Value(v) => match v {
-            Value::ValueLiteral(_) => todo!(),
-            Value::Void => todo!(),
-        },
-        EnvironmentBinding::Identifier(i) => todo!(),
-        EnvironmentBinding::Range(_) => todo!(),
-        EnvironmentBinding::Function(_) => todo!(),
+    match collection_value {
+        Value::ValueLiteral(ValueLiteral::Array(a)) => index_array(state, index_value, a),
+        Value::ValueLiteral(ValueLiteral::Dictionary(d)) => index_dict(state, index_value, d),
+        _ => Err(EvaluatorError::NotACollection),
     }
 }
 
 fn index_dict(
     state: EnvironmentState,
     value: Value,
-    d: std::collections::HashMap<DictionaryKey, Expression>,
+    d: HashMap<DictionaryKey, Expression>,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     todo!()
 }
@@ -93,14 +103,13 @@ fn index_array(
     if let Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i))) = value {
         let result = a.get(i as usize);
         if let Some(v) = result {
-            let (state, binding) = get_binding_from_expression(state, v.clone())?;
-            let (state, value) = get_values_from_binding(state, binding)?;
-            return Ok((state, value));
+            let (state, value) = get_values_from_expression(state, v.clone())?;
+            Ok((state, value))
         } else {
-            return Err(EvaluatorError::IndexOutOfRange);
+            Err(EvaluatorError::IndexOutOfRange)
         }
     } else {
-        return Err(EvaluatorError::InvalidIndex);
+        Err(EvaluatorError::InvalidIndex)
     }
 }
 
@@ -112,8 +121,7 @@ fn evaluate_for(
     let for_scope = Scope::new(Some(state.current_scope.clone()));
     new_state.current_scope = for_scope;
 
-    let (new_state, binding) = get_binding_from_expression(new_state, *f.iterable)?;
-    let (mut new_state, result) = get_values_from_binding(new_state, binding)?;
+    let (mut new_state, result) = get_values_from_expression(new_state, *f.iterable)?;
     match result {
         Value::ValueLiteral(ValueLiteral::Array(a)) => {
             let (maybe_state, _) = iterate_array(new_state, a, f.scoped_variable, f.body.to_vec())?;
@@ -154,7 +162,7 @@ fn evaluate_while(
         };
 
         if b {
-            let (maybe_state, value) = evaluate_body(maybe_state, w.body.clone())?;
+            let (maybe_state, _) = evaluate_body(maybe_state, w.body.clone())?;
             new_state = maybe_state;
         } else {
             return Ok((state, Value::Void));
@@ -230,7 +238,6 @@ pub fn get_identifier_binding_recursively(
                 EnvironmentBinding::Value(v) => Ok(v.clone()),
                 EnvironmentBinding::Function(_) => todo!(),
                 EnvironmentBinding::Identifier(i) => get_identifier_binding_recursively(state, &i),
-                EnvironmentBinding::Range(_) => todo!(),
             },
         )
 }
@@ -266,7 +273,10 @@ fn evaluate_assignment_expression(
         Expression::While(_) => todo!(),
         Expression::For(_) => todo!(),
         Expression::Body(_) => todo!(),
-        Expression::Range(_) => todo!(),
+        Expression::Range(r) => {
+            let (state, value) = evaluate_range(state, r)?;
+            Ok((state, EnvironmentBinding::Value(value)))
+        }
         Expression::Assignment(_) => todo!(),
         Expression::FunctionCall(fc) => {
             let (state, value) = evaluate_function_call(state, fc)?;
@@ -331,7 +341,6 @@ fn evaluate_identifier(
             EnvironmentBinding::Value(v) => Ok((state, v)),
             EnvironmentBinding::Identifier(i) => evaluate_identifier(state, &i),
             EnvironmentBinding::Function(f) => evaluate_function(state, f, vec![]),
-            EnvironmentBinding::Range(_) => todo!(),
         },
         None => Err(EvaluatorError::NoSuchIdentifier),
     }
@@ -361,7 +370,6 @@ fn get_string_from_binding(
             Some(binding) => get_string_from_binding(new_state, &binding),
             None => Err(EvaluatorError::NoSuchIdentifier),
         },
-        EnvironmentBinding::Range(_) => todo!(),
     }
 }
 
@@ -382,8 +390,7 @@ pub fn handle_rust_binding_with_args(
             }
             let first = args.first().cloned();
             if let Some(expr) = first {
-                let (new_state, binding) = get_binding_from_expression(state, expr)?;
-                let (new_state, value) = get_values_from_binding(new_state, binding)?;
+                let (new_state, value) = get_values_from_expression(state, expr)?;
                 let len = match value {
                     Value::ValueLiteral(ValueLiteral::Array(a)) => a.len(),
                     _ => todo!(),
@@ -453,6 +460,7 @@ fn get_body_string_value(
         str = match value {
             Value::ValueLiteral(v) => v.to_string(),
             Value::Void => "".to_string(),
+            Value::Range(r) => r.to_string(),
         };
         new_state = state;
     }

@@ -43,6 +43,7 @@ pub fn value_to_string(
         },
 
         Value::Void => "".to_string(),
+        Value::Range(r) => r.to_string(),
     };
 
     Ok((state, s))
@@ -77,12 +78,11 @@ pub fn get_string_from_binding(
             Some(binding) => get_string_from_binding(state, &binding),
             None => Err(EvaluatorError::NoSuchIdentifier),
         },
-        EnvironmentBinding::Range(_) => todo!(),
     }
 }
 
 // Code adapted from quaternic (2021)
-fn directed_range(a: i32, b: i32) -> impl Iterator<Item = i32> {
+pub fn directed_range(a: i32, b: i32) -> impl Iterator<Item = i32> {
     let mut start = a;
     let end = b;
     std::iter::from_fn(move || {
@@ -120,11 +120,8 @@ pub fn get_binding_from_expression(
         // lazy load each number rather than generate this whole list.
         Expression::Range(r) => {
             println!("{:?}", r);
-            let (state, from_binding) = get_binding_from_expression(state, *r.from)?;
-            let (state, to_binding) = get_binding_from_expression(state, *r.to)?;
-
-            let (state, from_value) = get_values_from_binding(state, from_binding)?;
-            let (state, to_value) = get_values_from_binding(state, to_binding)?;
+            let (state, from_value) = get_values_from_expression(state, *r.from)?;
+            let (state, to_value) = get_values_from_expression(state, *r.to)?;
 
             let values: Vec<Expression> = match (from_value, to_value) {
                 (
@@ -161,6 +158,14 @@ pub fn get_values_from_binding(
             let value = get_identifier_binding_recursively(&state, &i)?;
             Ok((state, value))
         }
-        EnvironmentBinding::Range(_) => todo!(),
     }
+}
+
+pub fn get_values_from_expression(
+    state: EnvironmentState,
+    expr: Expression,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    let (state, binding) = get_binding_from_expression(state, expr)?;
+    let (state, value) = get_values_from_binding(state, binding)?;
+    Ok((state, value))
 }

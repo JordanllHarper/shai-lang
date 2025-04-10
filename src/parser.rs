@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Neg, thread::Scope};
+use std::collections::HashMap;
 
 use token::*;
 use For;
@@ -448,7 +448,7 @@ fn on_assignment(
             ))
         }
         Some(Token::Ident(i)) => {
-            let is_evaluation = matches!(state.peek(), Some(Token::Symbol(Symbol::Evaluation(e))));
+            let is_evaluation = matches!(state.peek(), Some(Token::Symbol(Symbol::Evaluation(_))));
 
             let (rhs, state) = if is_evaluation {
                 on_evaluation(state, Expression::new_identifier(&i))?
@@ -484,39 +484,33 @@ fn on_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, Par
     let (t, state) = state.next();
     match t {
         // Assignment
-        Some(Token::Symbol(Symbol::Equals)) => Ok(on_assignment(state, ident, None)?),
-        Some(Token::Symbol(Symbol::Op(t))) => {
-            let operation = Operator::from_token(&t);
-            Ok(on_math_expression(
-                state,
-                operation,
-                Expression::new_identifier(ident),
-            )?)
-        }
+        Some(Token::Symbol(Symbol::Equals)) => on_assignment(state, ident, None),
+        Some(Token::Symbol(Symbol::Op(t))) => on_math_expression(
+            state,
+            Operator::from_token(&t),
+            Expression::new_identifier(ident),
+        ),
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             let (body, state) = on_body(state)?;
             on_function_call(state, ident, Expression::new_body(body))
         }
         // Operations
         // Function call if value literal or string
-        Some(Token::Literal(l)) => Ok(on_function_call(
-            state,
-            ident,
-            Expression::new_from_literal(&l),
-        )?),
+        Some(Token::Literal(l)) => on_function_call(state, ident, Expression::new_from_literal(&l)),
         Some(Token::Symbol(Symbol::Range)) => {
-            Ok(on_range(state, Expression::new_identifier(ident), false)?)
+            let state = state.advance();
+            on_range(state, Expression::new_identifier(ident), false)
         }
         Some(Token::Symbol(Symbol::RangeEq)) => {
-            Ok(on_range(state, Expression::new_identifier(ident), true)?)
+            let state = state.advance();
+            on_range(state, Expression::new_identifier(ident), true)
         }
-        Some(Token::Symbol(Symbol::ParenOpen)) => Ok(on_function(state, ident)?),
-        Some(Token::Symbol(Symbol::AngOpen)) => Ok(on_collection_index(
-            state,
-            Expression::new_identifier(ident),
-        )?),
+        Some(Token::Symbol(Symbol::ParenOpen)) => on_function(state, ident),
+        Some(Token::Symbol(Symbol::AngOpen)) => {
+            on_collection_index(state, Expression::new_identifier(ident))
+        }
         Some(Token::Ident(i)) => on_function_call(state, ident, Expression::new_identifier(&i)),
-        Some(Token::Kwd(Kwd::DataType(d))) => Ok(on_variable_type_assertion(state, ident, d)?),
+        Some(Token::Kwd(Kwd::DataType(d))) => on_variable_type_assertion(state, ident, d),
         _ => Ok((Expression::new_identifier(ident), state)),
     }
 }
@@ -706,14 +700,19 @@ fn on_literal(state: ParseState, l: Literal) -> ParseResult<(Expression, ParseSt
         Some(Token::Symbol(Symbol::AngOpen)) => {
             on_collection_index(state, Expression::new_from_literal(&l))
         }
-        Some(Token::Symbol(Symbol::Op(m))) => {
-            let (_, state) = state.next();
-            on_math_expression(
-                state,
-                Operator::from_token(&m),
-                Expression::new_from_literal(&l),
-            )
+        Some(Token::Symbol(Symbol::Range)) => {
+            let state = state.advance();
+            on_range(state, Expression::new_from_literal(&l), false)
         }
+        Some(Token::Symbol(Symbol::RangeEq)) => {
+            let state = state.advance();
+            on_range(state, Expression::new_from_literal(&l), true)
+        }
+        Some(Token::Symbol(Symbol::Op(m))) => on_math_expression(
+            state.advance(),
+            Operator::from_token(&m),
+            Expression::new_from_literal(&l),
+        ),
         _ => Ok((Expression::new_from_literal(&l), state)),
     }
 }

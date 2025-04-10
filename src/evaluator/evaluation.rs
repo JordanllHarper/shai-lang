@@ -49,7 +49,6 @@ pub fn evaluate_bindings(
                             Err(e) => return Err(e),
                         }
                     }
-                    EnvironmentBinding::Range(_) => todo!(),
                 },
                 Err(_) => todo!(),
             }

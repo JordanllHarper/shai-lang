@@ -13,7 +13,7 @@ pub fn iterate_array(
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     let scoped_identifier = match scoped_variable {
         ScopedVariable::Single(s) => s,
-        ScopedVariable::Multiple(v) => return Err(EvaluatorError::InvalidForLoopIdentifier),
+        ScopedVariable::Multiple(_) => return Err(EvaluatorError::InvalidForLoopIdentifier),
     };
     let mut new_state = state.clone();
     for expr in arr {

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::language::*;
 
@@ -36,7 +36,6 @@ pub enum EnvironmentBinding {
     Value(Value),
     Function(Function),
     Identifier(String),
-    Range(Range),
 }
 
 /// A Scoped set of variables.
@@ -87,7 +86,43 @@ impl EnvironmentBinding {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     ValueLiteral(ValueLiteral),
+    Range(RangeValue),
     Void,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RangeValue {
+    pub from: i32,
+    pub to: i32,
+    pub inclusive: bool,
+}
+
+impl Display for RangeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = format!(
+            "{}..{}{}",
+            self.from,
+            {
+                if self.inclusive {
+                    "="
+                } else {
+                    ""
+                }
+            },
+            self.to,
+        );
+        f.write_str(&s)
+    }
+}
+
+impl RangeValue {
+    pub fn new(from: i32, to: i32, inclusive: bool) -> Self {
+        Self {
+            from,
+            to,
+            inclusive,
+        }
+    }
 }
 
 fn get_local_binding_recursive(symbol: &str, current_scope: &Scope) -> Option<EnvironmentBinding> {
