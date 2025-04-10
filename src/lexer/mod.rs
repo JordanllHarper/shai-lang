@@ -212,8 +212,8 @@ fn next_non_symbol(lexer: &mut Lexer) -> Option<Token> {
             break;
         }
     }
-
-    let token = match buf.as_str() {
+    let buf = buf.trim();
+    let token = match buf {
         "for" => Token::Kwd(Kwd::For),
         "while" => Token::Kwd(Kwd::While),
         "if" => Token::Kwd(Kwd::If),
