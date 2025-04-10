@@ -1,4 +1,4 @@
-use std::{collections::HashMap, thread::Scope};
+use std::{collections::HashMap, ops::Neg, thread::Scope};
 
 use token::*;
 use For;
@@ -383,13 +383,49 @@ fn on_dict_literal(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     parse_dict_literal(state, &mut HashMap::new())
 }
 
+fn on_minus(state: ParseState) -> ParseResult<(Expression, ParseState)> {
+    let (next, state) = state.next();
+    let (neg_num, state) = match next {
+        Some(Token::Literal(Literal::Int(i))) => (Expression::new_int(-i), state),
+        Some(Token::Literal(Literal::Float(f))) => (Expression::new_float(-f), state),
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected an integer literal".to_string(),
+                token_context: t,
+            })
+        }
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_minus".to_string(),
+            })
+        }
+    };
+    let peek = state.peek();
+    match peek {
+        Some(Token::Symbol(Symbol::Op(op))) => {
+            let op = op.clone();
+            let state = state.advance();
+            on_math_expression(state, Operator::from_token(&op), neg_num)
+        }
+        _ => Ok((neg_num, state)),
+    }
+}
+
 fn on_assignment(
     state: ParseState,
     ident: &str,
     type_assertion: Option<NativeType>,
 ) -> ParseResult<(Expression, ParseState)> {
     let (t, state) = state.next();
+
     match t {
+        Some(Token::Symbol(Symbol::Op(OpSymbol::Minus))) => {
+            let (minus, state) = on_minus(state)?;
+            Ok((
+                Expression::new_assignment(ident, minus, None, type_assertion, false),
+                state,
+            ))
+        }
         Some(Token::Literal(l)) => {
             let (vl, state) = on_literal(state, l)?;
             Ok((

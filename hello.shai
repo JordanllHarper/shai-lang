@@ -86,7 +86,7 @@ if my_condition {
 
 // we have basic math operations
 
-addition = 1 + 2
+addition = -1 + 2
 print addition
 
 subtraction = 1 - 2
