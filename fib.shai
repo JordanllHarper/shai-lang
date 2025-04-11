@@ -1,11 +1,11 @@
 // fibonacci in shai
 
 fib (num) {
-    print "hi"
-	if num == 3 {
-	    num = { fib { num - 1 } }  + { fib {num - 2 } }
-        num
-	}
+    if num <= 1 {
+        return 1
+    } else {
+        return { num - 1 } + { num - 2 }
+    }
 }
 
 print { fib 10 }
