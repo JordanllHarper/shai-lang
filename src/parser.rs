@@ -29,6 +29,9 @@ impl ParseState {
 
         (next, new_state)
     }
+    pub fn step_back(self) -> Self {
+        ParseState::new(self.tokens, self.position - 1)
+    }
     pub fn new(tokens: Vec<Token>, position: usize) -> Self {
         Self { tokens, position }
     }
@@ -73,7 +76,7 @@ where
     let mut top_level_body: Body = vec![];
     let mut parse_state = ParseState::new(tokens, 0);
     while !parse_state.end() {
-        let (expr, new_state) = parse_expression(parse_state, None)?;
+        let (expr, new_state) = parse_expression(parse_state, None, None)?;
         top_level_body.push(expr);
         parse_state = new_state;
     }
@@ -223,7 +226,7 @@ fn parse_body(state: ParseState, body: &mut Body) -> ParseResult<BodyState> {
         _ => (),
     }
 
-    let (expression, state) = parse_expression(state, body.last().cloned())?;
+    let (expression, state) = parse_expression(state, None, None)?;
 
     body.push(expression);
 
@@ -253,7 +256,7 @@ fn parse_array_literal(
             parse_array_literal(state, array)
         }
         Some(_) => {
-            let (expr, state) = parse_expression(state, None)?;
+            let (expr, state) = parse_expression(state, None, None)?;
             array.push(expr);
             parse_array_literal(state, array)
         }
@@ -287,7 +290,7 @@ fn parse_dict_literal(
             let (t, state) = state.next();
             match t {
                 Some(Token::Symbol(Symbol::Colon)) => {
-                    let (rhs, state) = parse_expression(state, None)?;
+                    let (rhs, state) = parse_expression(state, None, None)?;
 
                     dict.insert(DictionaryKey::Identifier(i), rhs);
 
@@ -318,7 +321,7 @@ fn parse_dict_literal(
             let (t, state) = state.next();
             match t {
                 Some(Token::Symbol(Symbol::Colon)) => {
-                    let (rhs, state) = parse_expression(state, None)?;
+                    let (rhs, state) = parse_expression(state, None, None)?;
                     dict.insert(key, rhs);
                     let (t, state) = state.next();
                     match t {
@@ -381,7 +384,7 @@ fn parse_minus(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         Some(Token::Symbol(Symbol::Op(op))) => {
             let op = op.clone();
             let state = state.advance();
-            parse_math_expression(state, Operator::from_token(&op), neg_num)
+            parse_operator(state, Operator::from_token(&op), None, neg_num)
         }
         _ => Ok((neg_num, state)),
     }
@@ -403,7 +406,7 @@ fn parse_assignment(
             ))
         }
         Some(Token::Literal(l)) => {
-            let (vl, state) = parse_literal(state, l)?;
+            let (vl, state) = parse_literal(state, l, None)?;
             Ok((
                 Expression::new_assignment(ident, vl, None, type_assertion, false),
                 state,
@@ -461,9 +464,10 @@ fn parse_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, 
     match t {
         // Assignment
         Some(Token::Symbol(Symbol::Equals)) => parse_assignment(state, ident, None),
-        Some(Token::Symbol(Symbol::Op(t))) => parse_math_expression(
+        Some(Token::Symbol(Symbol::Op(t))) => parse_operator(
             state,
             Operator::from_token(&t),
+            None,
             Expression::new_identifier(ident),
         ),
         Some(Token::Symbol(Symbol::BraceOpen)) => {
@@ -504,7 +508,7 @@ fn parse_collection_index(
             (Expression::new_body(body), state)
         }
         Some(Token::Ident(i)) => parse_identifier(state, &i)?,
-        Some(Token::Literal(l)) => parse_literal(state, l)?,
+        Some(Token::Literal(l)) => parse_literal(state, l, None)?,
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected a brace open, ident or literal".to_string(),
@@ -573,13 +577,35 @@ fn parse_function_call(
     ))
 }
 
-fn parse_math_expression(
+fn parse_operator(
     state: ParseState,
-    operation: Operator,
+    current: Operator,
+    previous_op: Option<Operator>,
     lhs: Expression,
 ) -> ParseResult<(Expression, ParseState)> {
-    let (rhs, state) = parse_expression(state, None)?;
-    Ok((Expression::new_math_expression(lhs, rhs, operation), state))
+    if let Some(prev) = previous_op.clone() {
+        let precedence = current > prev;
+        if !precedence {
+            println!("Precedence Current {:?} < Prev {:?}", current, prev);
+            // the previous op has greater precedence
+            // therefore, we want to give it's rhs (or our lhs in this case).
+            println!("Returning {:?}", lhs);
+            return Ok((lhs, state.step_back()));
+        }
+    }
+    // the current op, if any, is more important than previous op
+    // Therefore we want it lower in the tree.
+    // So we want the lhs passed in to be our lhs and the rhs should be whatever we get
+    // This will then get returned back up to us to construct our expression
+
+    let (rhs, state) = parse_expression(state, Some(lhs.clone()), Some(current.clone()))?;
+    println!("Precedence Rhs {:?}", rhs);
+    let new_lhs = Expression::new_math_expression(lhs, rhs, current);
+    println!("{:?}", new_lhs);
+    if state.end() {
+        return Ok((new_lhs, state));
+    }
+    parse_expression(state, Some(new_lhs), None)
 }
 
 fn parse_single_value(state: ParseState) -> ParseResult<(Expression, ParseState)> {
@@ -648,18 +674,24 @@ fn parse_range(
 
 fn parse_expression(
     state: ParseState,
-    context: Option<Expression>,
+    lhs: Option<Expression>,
+    previous_op: Option<Operator>,
 ) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
-
+    println!("Expr {:?}", next);
     let (expr, state) = match next {
         Some(Token::Ident(ident)) => parse_identifier(state, &ident)?,
         Some(Token::Kwd(k)) => parse_keyword(state, &k)?,
-        Some(Token::Literal(l)) => parse_literal(state, l)?,
-        Some(Token::Symbol(Symbol::Op(op))) => parse_op(state, context, op)?,
+        Some(Token::Literal(l)) => parse_literal(state, l, previous_op.clone())?,
         Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![])
             .map(|(body, state)| (Expression::new_body(body), state))?,
-        Some(Token::Symbol(Symbol::Newline)) => parse_expression(state, None)?,
+        Some(Token::Symbol(Symbol::Newline)) => parse_expression(state, lhs, previous_op.clone())?,
+        Some(Token::Symbol(Symbol::Op(op))) => parse_operator(
+            state,
+            Operator::from_token(&op),
+            previous_op,
+            lhs.ok_or(ParseError::ExpectedLhs)?,
+        )?,
 
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
@@ -674,33 +706,14 @@ fn parse_expression(
             })
         }
     };
-    let (expr, state) = if let Some(t) = state.peek() {
-        match t {
-            Token::Symbol(Symbol::Newline)
-            | Token::Symbol(Symbol::BraceClose)
-            | Token::Symbol(Symbol::AngClose)
-            | Token::Symbol(Symbol::Comma) => (expr, state),
-            _ => parse_expression(state, Some(expr))?,
-        }
-    } else {
-        (expr, state)
-    };
     Ok((expr, state))
 }
 
-fn parse_op(
+fn parse_literal(
     state: ParseState,
-    lhs: Option<Expression>,
-    op: OpSymbol,
+    l: Literal,
+    previous_op: Option<Operator>,
 ) -> ParseResult<(Expression, ParseState)> {
-    let lhs = match lhs {
-        Some(e) => e,
-        None => return Err(ParseError::ExpectedLhs),
-    };
-    parse_math_expression(state, Operator::from_token(&op), lhs)
-}
-
-fn parse_literal(state: ParseState, l: Literal) -> ParseResult<(Expression, ParseState)> {
     let peek = state.peek().cloned();
     match peek {
         Some(Token::Symbol(Symbol::AngOpen)) => {
@@ -712,9 +725,10 @@ fn parse_literal(state: ParseState, l: Literal) -> ParseResult<(Expression, Pars
         Some(Token::Symbol(Symbol::RangeEq)) => {
             parse_range(state.advance(), Expression::new_from_literal(&l), true)
         }
-        Some(Token::Symbol(Symbol::Op(m))) => parse_math_expression(
+        Some(Token::Symbol(Symbol::Op(m))) => parse_operator(
             state.advance(),
             Operator::from_token(&m),
+            previous_op,
             Expression::new_from_literal(&l),
         ),
         _ => Ok((Expression::new_from_literal(&l), state)),
@@ -806,7 +820,7 @@ fn parse_const(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         }
     }
 
-    let (expr, state) = parse_expression(state, None)?;
+    let (expr, state) = parse_expression(state, None, None)?;
     Ok((
         Expression::new_assignment(&identifier, expr, None, type_assertion, true),
         state,
@@ -1023,7 +1037,7 @@ fn parse_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 }
 
 fn parse_return(state: ParseState) -> ParseResult<(Expression, ParseState)> {
-    let (e, state) = parse_expression(state, None)?;
+    let (e, state) = parse_expression(state, None, None)?;
     Ok((
         Expression::new_statement(Some(e), StatementOperator::Return),
         state,
@@ -2318,7 +2332,7 @@ mod tests {
     #[test]
     fn operator_precedence() {
         test(
-            "Operator precendence",
+            "Operator precendence 3 * 4 + 5",
             vec![
                 Token::Literal(Literal::Int(3)),
                 Token::Symbol(Symbol::Op(OpSymbol::Asterisk)),
@@ -2333,7 +2347,7 @@ mod tests {
                     Operator::Multiply,
                 ),
                 Expression::new_int(5),
-                Operator::Multiply,
+                Operator::Add,
             )]),
         )
     }

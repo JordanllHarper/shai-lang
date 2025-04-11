@@ -1,6 +1,9 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    cmp::Ordering,
+    ops::{Add, Div, Mul, Sub},
+};
 
-use super::NumericLiteral;
+use super::{NumericLiteral, Operator};
 
 impl Add for NumericLiteral {
     type Output = NumericLiteral;
@@ -77,4 +80,32 @@ impl Div for NumericLiteral {
             }
         }
     }
+}
+
+impl PartialOrd for Operator {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Operator {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Operator::Divide, Operator::Divide) => Ordering::Equal,
+            (Operator::Divide, _) => Ordering::Greater,
+            (Operator::Multiply, Operator::Multiply) => Ordering::Equal,
+            (Operator::Multiply, Operator::Divide) => Ordering::Less,
+            (Operator::Multiply, Operator::Add) => Ordering::Greater,
+            (Operator::Multiply, Operator::Subtract) => Ordering::Greater,
+            (Operator::Add, Operator::Add) => Ordering::Equal,
+            (Operator::Add, Operator::Subtract) => Ordering::Greater,
+            (Operator::Add, Operator::Multiply) => Ordering::Less,
+            (Operator::Add, Operator::Divide) => Ordering::Less,
+            (Operator::Subtract, Operator::Add) => Ordering::Less,
+            (Operator::Subtract, Operator::Subtract) => Ordering::Less,
+            (Operator::Subtract, Operator::Multiply) => Ordering::Less,
+            (Operator::Subtract, Operator::Divide) => Ordering::Less,
+        }
+    }
+    // add code here
 }
