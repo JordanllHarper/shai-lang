@@ -15,7 +15,7 @@ fn read_from_file(path: &str) -> String {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let debug_mode = matches!(args.len(), 2);
-    let input = read_from_file("./hello.shai");
+    let input = read_from_file("./fib.shai");
     let state = EnvironmentState::new(HashMap::new());
 
     if debug_mode {
