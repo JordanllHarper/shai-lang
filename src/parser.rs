@@ -2332,4 +2332,27 @@ mod tests {
             )]),
         )
     }
+
+    #[test]
+    fn operator_precedence() {
+        test(
+            "Operator precendence",
+            vec![
+                Token::Literal(Literal::Int(3)),
+                Token::Symbol(Symbol::Op(OpSymbol::Asterisk)),
+                Token::Literal(Literal::Int(4)),
+                Token::Symbol(Symbol::Op(OpSymbol::Plus)),
+                Token::Literal(Literal::Int(5)),
+            ],
+            Expression::new_body(vec![Expression::new_math_expression(
+                Expression::new_math_expression(
+                    Expression::new_int(3),
+                    Expression::new_int(4),
+                    Operator::Multiply,
+                ),
+                Expression::new_int(5),
+                Operator::Multiply,
+            )]),
+        )
+    }
 }
