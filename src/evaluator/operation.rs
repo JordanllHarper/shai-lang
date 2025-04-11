@@ -1,5 +1,5 @@
 use util::get_binding_from_expression;
-use util::value_to_string;
+use util::get_value_to_string;
 
 use super::environment::*;
 use crate::evaluator::*;
@@ -31,7 +31,7 @@ fn handle_concatenation(
     other: Value,
     in_reverse: bool,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let (new_state, s) = value_to_string(state, &other)?;
+    let (new_state, s) = get_value_to_string(state, &other)?;
 
     let format = if in_reverse {
         format!("{}{}", s, c)

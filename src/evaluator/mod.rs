@@ -380,8 +380,11 @@ fn get_string_from_binding(
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
     let new_state = state.clone();
     match binding {
-        EnvironmentBinding::Value(v) => value_to_string(state, v),
-        EnvironmentBinding::Function(f) => todo!(),
+        EnvironmentBinding::Value(v) => get_value_to_string(state, v),
+        EnvironmentBinding::Function(f) => {
+            let (state, value) = evaluate_function(state, f.clone(), vec![])?;
+            get_value_to_string(state, &value)
+        }
         EnvironmentBinding::Identifier(i) => match state.get_local_binding(i) {
             Some(binding) => get_string_from_binding(new_state, &binding),
             None => Err(EvaluatorError::NoSuchIdentifier),

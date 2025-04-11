@@ -9,7 +9,7 @@ pub fn get_string_from_expression(
     Ok((new_state, result))
 }
 
-pub fn value_to_string(
+pub fn get_value_to_string(
     state: EnvironmentState,
     v: &Value,
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
@@ -58,7 +58,7 @@ pub fn get_body_string_value(
     for expr in b {
         let (maybe_state, value) = evaluate(new_state, expr)?;
 
-        let (maybe_state, new_s) = value_to_string(maybe_state, &value)?;
+        let (maybe_state, new_s) = get_value_to_string(maybe_state, &value)?;
 
         s = format!("{}{}", s, new_s);
         new_state = maybe_state;
@@ -72,7 +72,7 @@ pub fn get_string_from_binding(
     binding: &EnvironmentBinding,
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
     match binding {
-        EnvironmentBinding::Value(v) => value_to_string(state, v),
+        EnvironmentBinding::Value(v) => get_value_to_string(state, v),
         EnvironmentBinding::Function(f) => todo!(),
         EnvironmentBinding::Identifier(i) => match state.get_local_binding(i) {
             Some(binding) => get_string_from_binding(state, &binding),
