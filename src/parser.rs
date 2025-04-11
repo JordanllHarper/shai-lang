@@ -46,7 +46,7 @@ pub enum ParseError {
     NoMoreTokens {
         context: String,
     },
-    ExpectedContext,
+    ExpectedLhs,
 }
 
 pub fn parse<I>(tokens: I) -> ParseResult<Expression>
@@ -518,7 +518,6 @@ fn parse_collection_index(
         }
     };
 
-    println!("{:?}", state);
     let (next, state) = state.next();
     match next {
         Some(Token::Symbol(Symbol::AngClose)) => { /* Continue */ }
@@ -691,12 +690,12 @@ fn parse_expression(
 
 fn parse_op(
     state: ParseState,
-    context: Option<Expression>,
+    lhs: Option<Expression>,
     op: OpSymbol,
 ) -> ParseResult<(Expression, ParseState)> {
-    let lhs = match context {
+    let lhs = match lhs {
         Some(e) => e,
-        None => return Err(ParseError::ExpectedContext),
+        None => return Err(ParseError::ExpectedLhs),
     };
     parse_math_expression(state, Operator::from_token(&op), lhs)
 }
@@ -708,12 +707,10 @@ fn parse_literal(state: ParseState, l: Literal) -> ParseResult<(Expression, Pars
             parse_collection_index(state, Expression::new_from_literal(&l))
         }
         Some(Token::Symbol(Symbol::Range)) => {
-            let state = state.advance();
-            parse_range(state, Expression::new_from_literal(&l), false)
+            parse_range(state.advance(), Expression::new_from_literal(&l), false)
         }
         Some(Token::Symbol(Symbol::RangeEq)) => {
-            let state = state.advance();
-            parse_range(state, Expression::new_from_literal(&l), true)
+            parse_range(state.advance(), Expression::new_from_literal(&l), true)
         }
         Some(Token::Symbol(Symbol::Op(m))) => parse_math_expression(
             state.advance(),
