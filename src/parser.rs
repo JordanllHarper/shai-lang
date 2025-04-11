@@ -635,10 +635,7 @@ fn on_evaluation(state: ParseState, lhs: Expression) -> ParseResult<(Expression,
 
     let evaluation_operator = match next {
         Some(Token::Symbol(Symbol::Evaluation(e))) => {
-            println!("cheese {:?}", e);
-            let result = EvaluationOperator::from_evaluation_symbol(&e);
-            println!("cheddar {:?}", result);
-            result
+            EvaluationOperator::from_evaluation_symbol(&e)
         }
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
@@ -721,7 +718,6 @@ fn on_op(
         Some(e) => e,
         None => return Err(ParseError::ExpectedContext),
     };
-    println!("{:?}", lhs);
     on_math_expression(state, Operator::from_token(&op), lhs)
 }
 

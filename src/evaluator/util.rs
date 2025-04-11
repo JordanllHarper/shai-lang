@@ -115,7 +115,10 @@ pub fn get_binding_from_expression(
         }
         Expression::Evaluation(_) => todo!(),
         Expression::FunctionCall(_) => todo!(),
-        Expression::Body(e) => todo!(),
+        Expression::Body(e) => {
+            let (state, body_value) = evaluate_body(state, e)?;
+            Ok((state, EnvironmentBinding::Value(body_value)))
+        }
         // NOTE: This generates a list of numbers for the user. An optimization here could be to
         // lazy load each number rather than generate this whole list.
         Expression::Range(r) => {
@@ -142,6 +145,10 @@ pub fn get_binding_from_expression(
             };
 
             Ok((state, EnvironmentBinding::new_arr(values)))
+        }
+        Expression::MathOperation(o) => {
+            let (state, value) = evaluate_operation(state, o)?;
+            Ok((state, EnvironmentBinding::Value(value)))
         }
         _ => todo!(),
     }

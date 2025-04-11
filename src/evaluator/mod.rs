@@ -39,7 +39,7 @@ pub fn evaluate(
         Expression::ValueLiteral(v) => Ok((state, Value::ValueLiteral(v))),
         Expression::Identifier(ident) => evaluate_identifier(state, &ident),
         Expression::Statement(s) => evaluate_statement(state, s),
-        Expression::MathOperation(_) => todo!(),
+        Expression::MathOperation(m) => evaluate_operation(state, m),
         Expression::Evaluation(_) => todo!(),
         Expression::Function(f) => {
             add_binding_or_error(state, &f.ident.clone(), EnvironmentBinding::Function(f))
@@ -255,7 +255,10 @@ fn evaluate_assignment_expression(
             Ok((state, get_identifier_binding))
         }
         Expression::Statement(_) => todo!(),
-        Expression::MathOperation(math_op) => evaluate_operation(state, math_op),
+        Expression::MathOperation(math_op) => {
+            let (state, value) = evaluate_operation(state, math_op)?;
+            Ok((state, EnvironmentBinding::Value(value)))
+        }
         Expression::Evaluation(eval) => {
             let (state, lhs) = get_binding_from_expression(state, *eval.lhs)?;
             let (state, rhs) = if let Some(s) = eval.rhs {
@@ -353,9 +356,22 @@ fn evaluate_statement(
     match s.operation {
         StatementOperator::Break => todo!(),
         StatementOperator::Continue => todo!(),
-        StatementOperator::Return => todo!(),
+        StatementOperator::Return => evaluate_return(state, s.expression.as_deref().cloned()),
         StatementOperator::Include => todo!(),
     }
+}
+
+fn evaluate_return(
+    state: EnvironmentState,
+    body: Option<Expression>,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    let expr = if let Some(b) = body {
+        b
+    } else {
+        return Ok((state, Value::Void));
+    };
+    let (state, value) = get_values_from_expression(state, expr)?;
+    Ok((state, value))
 }
 
 fn get_string_from_binding(

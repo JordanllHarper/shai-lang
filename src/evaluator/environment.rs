@@ -89,6 +89,17 @@ pub enum Value {
     Range(RangeValue),
     Void,
 }
+impl Value {
+    pub fn new_numeric(n: NumericLiteral) -> Value {
+        Value::ValueLiteral(ValueLiteral::Numeric(n))
+    }
+
+    pub fn new_string(s: &str) -> Value {
+        Value::ValueLiteral(ValueLiteral::CharacterBased(CharacterBasedLiteral::String(
+            s.to_string(),
+        )))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RangeValue {

@@ -8,7 +8,7 @@ use crate::language::*;
 pub fn evaluate_operation(
     state: EnvironmentState,
     m: Operations,
-) -> Result<(EnvironmentState, EnvironmentBinding), EvaluatorError> {
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
     let new_state = state.clone();
     let (new_state, lh_binding) = get_binding_from_expression(new_state, *m.lhs)?;
     let (new_state, rh_binding) = get_binding_from_expression(new_state, *m.rhs)?;
@@ -30,7 +30,7 @@ fn handle_concatenation(
     c: CharacterBasedLiteral,
     other: Value,
     in_reverse: bool,
-) -> Result<(EnvironmentState, EnvironmentBinding), EvaluatorError> {
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
     let (new_state, s) = value_to_string(state, &other)?;
 
     let format = if in_reverse {
@@ -38,13 +38,13 @@ fn handle_concatenation(
     } else {
         format!("{}{}", c, s)
     };
-    Ok((new_state, EnvironmentBinding::new_string(&(format))))
+    Ok((new_state, Value::new_string(&(format))))
 }
 
 fn handle_add(
     state: EnvironmentState,
     values: (Value, Value),
-) -> Result<(EnvironmentState, EnvironmentBinding), EvaluatorError> {
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
     match values {
         (Value::ValueLiteral(ValueLiteral::CharacterBased(c)), other) => {
             handle_concatenation(state, c, other, false)
@@ -56,7 +56,7 @@ fn handle_add(
         (
             Value::ValueLiteral(ValueLiteral::Numeric(n1)),
             Value::ValueLiteral(ValueLiteral::Numeric(n2)),
-        ) => Ok((state, EnvironmentBinding::new_numeric(n1 + n2))),
+        ) => Ok((state, Value::new_numeric(n1 + n2))),
         _ => Err(EvaluatorError::InvalidOperationValue),
     }
 }
@@ -64,12 +64,12 @@ fn handle_add(
 fn handle_subtract(
     state: EnvironmentState,
     values: (Value, Value),
-) -> Result<(EnvironmentState, EnvironmentBinding), EvaluatorError> {
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
     match values {
         (
             Value::ValueLiteral(ValueLiteral::Numeric(n1)),
             Value::ValueLiteral(ValueLiteral::Numeric(n2)),
-        ) => Ok((state, EnvironmentBinding::new_numeric(n1 - n2))),
+        ) => Ok((state, Value::new_numeric(n1 - n2))),
         _ => Err(EvaluatorError::InvalidOperationValue),
     }
 }
@@ -77,12 +77,12 @@ fn handle_subtract(
 fn handle_divide(
     state: EnvironmentState,
     values: (Value, Value),
-) -> Result<(EnvironmentState, EnvironmentBinding), EvaluatorError> {
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
     match values {
         (
             Value::ValueLiteral(ValueLiteral::Numeric(n1)),
             Value::ValueLiteral(ValueLiteral::Numeric(n2)),
-        ) => Ok((state, EnvironmentBinding::new_numeric(n1 / n2))),
+        ) => Ok((state, Value::new_numeric(n1 / n2))),
 
         _ => Err(EvaluatorError::InvalidOperationValue),
     }
@@ -91,12 +91,12 @@ fn handle_divide(
 fn handle_multiply(
     state: EnvironmentState,
     values: (Value, Value),
-) -> Result<(EnvironmentState, EnvironmentBinding), EvaluatorError> {
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
     match values {
         (
             Value::ValueLiteral(ValueLiteral::Numeric(n1)),
             Value::ValueLiteral(ValueLiteral::Numeric(n2)),
-        ) => Ok((state, EnvironmentBinding::new_numeric(n1 * n2))),
+        ) => Ok((state, Value::new_numeric(n1 * n2))),
         _ => Err(EvaluatorError::InvalidOperationValue),
     }
 }
