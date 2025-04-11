@@ -48,6 +48,7 @@ pub enum ParseError {
     NoMoreTokens {
         context: String,
     },
+    ExpectedContext,
 }
 
 pub fn parse<I>(tokens: I) -> ParseResult<Expression>
@@ -74,7 +75,7 @@ where
     let mut top_level_body: Body = vec![];
     let mut parse_state = ParseState::new(tokens, 0);
     while !parse_state.end() {
-        let (expr, new_state) = on_expression(parse_state)?;
+        let (expr, new_state) = on_expression(parse_state, None)?;
         top_level_body.push(expr);
         parse_state = new_state;
     }
@@ -229,14 +230,13 @@ fn on_return_type(state: ParseState) -> ParseResult<ReturnState> {
 type BodyState = (Body, ParseState);
 fn parse_body(state: ParseState, body: &mut Body) -> ParseResult<BodyState> {
     let peek = state.peek();
-
     match peek {
         Some(Token::Symbol(Symbol::BraceClose)) => return Ok((body.to_vec(), state.advance())),
         Some(Token::Symbol(Symbol::Newline)) => return parse_body(state.advance(), body),
         _ => (),
     }
 
-    let (expression, state) = on_expression(state)?;
+    let (expression, state) = on_expression(state, body.last().cloned())?;
 
     body.push(expression);
 
@@ -270,7 +270,7 @@ fn parse_array_literal(
             parse_array_literal(state, array)
         }
         Some(_) => {
-            let (expr, state) = on_expression(state)?;
+            let (expr, state) = on_expression(state, None)?;
             array.push(expr);
             parse_array_literal(state, array)
         }
@@ -307,7 +307,7 @@ fn parse_dict_literal(
             let (t, state) = state.next();
             match t {
                 Some(Token::Symbol(Symbol::Colon)) => {
-                    let (rhs, state) = on_expression(state)?;
+                    let (rhs, state) = on_expression(state, None)?;
 
                     dict.insert(DictionaryKey::Identifier(i), rhs);
 
@@ -338,7 +338,7 @@ fn parse_dict_literal(
             let (t, state) = state.next();
             match t {
                 Some(Token::Symbol(Symbol::Colon)) => {
-                    let (rhs, state) = on_expression(state)?;
+                    let (rhs, state) = on_expression(state, None)?;
                     dict.insert(key, rhs);
                     let (t, state) = state.next();
                     match t {
@@ -598,7 +598,7 @@ fn on_math_expression(
     operation: Operator,
     lhs: Expression,
 ) -> ParseResult<(Expression, ParseState)> {
-    let (rhs, state) = on_expression(state)?;
+    let (rhs, state) = on_expression(state, None)?;
     Ok((Expression::new_math_expression(lhs, rhs, operation), state))
 }
 
@@ -635,7 +635,10 @@ fn on_evaluation(state: ParseState, lhs: Expression) -> ParseResult<(Expression,
 
     let evaluation_operator = match next {
         Some(Token::Symbol(Symbol::Evaluation(e))) => {
-            EvaluationOperator::from_evaluation_symbol(&e)
+            println!("cheese {:?}", e);
+            let result = EvaluationOperator::from_evaluation_symbol(&e);
+            println!("cheddar {:?}", result);
+            result
         }
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
@@ -666,17 +669,21 @@ fn on_range(
     Ok((Expression::new_range(lhs, rhs, inclusive), state))
 }
 
-fn on_expression(state: ParseState) -> ParseResult<(Expression, ParseState)> {
+fn on_expression(
+    state: ParseState,
+    context: Option<Expression>,
+) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
 
-    let expr = match next {
+    let (expr, state) = match next {
         Some(Token::Ident(ident)) => on_identifier(state, &ident)?,
         Some(Token::Kwd(k)) => on_keyword(state, &k)?,
         Some(Token::Literal(l)) => on_literal(state, l)?,
+        Some(Token::Symbol(Symbol::Op(op))) => on_op(state, context, op)?,
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             on_body(state).map(|(body, state)| (Expression::new_body(body), state))?
         }
-        Some(Token::Symbol(Symbol::Newline)) => on_expression(state)?,
+        Some(Token::Symbol(Symbol::Newline)) => on_expression(state, None)?,
 
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
@@ -691,7 +698,31 @@ fn on_expression(state: ParseState) -> ParseResult<(Expression, ParseState)> {
             })
         }
     };
-    Ok(expr)
+    let (expr, state) = if let Some(t) = state.peek() {
+        match t {
+            Token::Symbol(Symbol::Newline)
+            | Token::Symbol(Symbol::BraceClose)
+            | Token::Symbol(Symbol::AngClose)
+            | Token::Symbol(Symbol::Comma) => (expr, state),
+            _ => on_expression(state, Some(expr))?,
+        }
+    } else {
+        (expr, state)
+    };
+    Ok((expr, state))
+}
+
+fn on_op(
+    state: ParseState,
+    context: Option<Expression>,
+    op: OpSymbol,
+) -> ParseResult<(Expression, ParseState)> {
+    let lhs = match context {
+        Some(e) => e,
+        None => return Err(ParseError::ExpectedContext),
+    };
+    println!("{:?}", lhs);
+    on_math_expression(state, Operator::from_token(&op), lhs)
 }
 
 fn on_literal(state: ParseState, l: Literal) -> ParseResult<(Expression, ParseState)> {
@@ -802,7 +833,7 @@ fn on_const(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         }
     }
 
-    let (expr, state) = on_expression(state)?;
+    let (expr, state) = on_expression(state, None)?;
     Ok((
         Expression::new_assignment(&identifier, expr, None, type_assertion, true),
         state,
@@ -1020,7 +1051,7 @@ fn on_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 }
 
 fn on_return(state: ParseState) -> ParseResult<(Expression, ParseState)> {
-    let (e, state) = on_expression(state)?;
+    let (e, state) = on_expression(state, None)?;
     Ok((
         Expression::new_statement(Some(e), StatementOperator::Return),
         state,
@@ -2190,5 +2221,121 @@ mod tests {
                 token_context: Token::Symbol(Symbol::Comma),
             },
         );
+    }
+    #[test]
+    fn fib() {
+        test(
+            "fibonacci",
+            vec![
+                Token::new_ident("fib"),
+                Token::Symbol(Symbol::ParenOpen),
+                Token::new_ident("num"),
+                Token::Symbol(Symbol::ParenClose),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                // tab
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                //
+                Token::Kwd(Kwd::If),
+                Token::new_ident("num"),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Evaluation(EvaluationSymbol::LzEq)),
+                Token::whitespace(),
+                Token::Literal(Literal::Int(1)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                // body
+                //
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                //
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                //
+                Token::Kwd(Kwd::Return),
+                Token::whitespace(),
+                Token::Literal(Literal::Int(1)),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Kwd(Kwd::Else),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                //
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                //
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                //
+                Token::Kwd(Kwd::Return),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::whitespace(),
+                Token::new_ident("num"),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Op(OpSymbol::Minus)),
+                Token::whitespace(),
+                Token::Literal(Literal::Int(1)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceClose),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Op(OpSymbol::Plus)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::whitespace(),
+                Token::new_ident("num"),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Op(OpSymbol::Minus)),
+                Token::whitespace(),
+                Token::Literal(Literal::Int(2)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::new_body(vec![Expression::new_function(
+                "fib",
+                vec![Parameter::new("num", None)],
+                None,
+                Expression::new_body(vec![Expression::new_if(
+                    Expression::new_evaluation(
+                        Expression::new_identifier("num"),
+                        Some(Expression::new_int(1)),
+                        EvaluationOperator::NumericOnly(EvaluationNumericOnly::LzEq),
+                    ),
+                    Expression::new_body(vec![Expression::Statement(Statement::new(
+                        Some(Expression::new_int(1)),
+                        StatementOperator::Return,
+                    ))]),
+                    Some(Expression::new_body(vec![Expression::new_statement(
+                        Some(Expression::new_math_expression(
+                            Expression::new_body(vec![Expression::new_math_expression(
+                                Expression::new_identifier("num"),
+                                Expression::new_int(1),
+                                Operator::Subtract,
+                            )]),
+                            Expression::new_body(vec![Expression::new_math_expression(
+                                Expression::new_identifier("num"),
+                                Expression::new_int(2),
+                                Operator::Subtract,
+                            )]),
+                            Operator::Add,
+                        )),
+                        StatementOperator::Return,
+                    )])),
+                )]),
+            )]),
+        )
     }
 }

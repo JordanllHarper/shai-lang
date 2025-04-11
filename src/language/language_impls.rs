@@ -125,7 +125,7 @@ impl For {
     }
 }
 impl Statement {
-    fn new(expression: Option<Expression>, operation: StatementOperator) -> Self {
+    pub fn new(expression: Option<Expression>, operation: StatementOperator) -> Self {
         Self {
             expression: expression.map(Box::new),
             operation,
