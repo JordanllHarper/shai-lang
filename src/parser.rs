@@ -108,7 +108,7 @@ fn parse_arguments(state: ParseState, args: &mut Vec<Expression>) -> ParseResult
             state
         }
         Some(Token::Symbol(Symbol::BraceOpen)) => {
-            let (body, state) = parse_body(state, &mut vec![])?;
+            let (body, state) = parse_body(state, &mut vec![], None)?;
             args.push(Expression::new_body(body));
             state
         }
@@ -173,7 +173,7 @@ fn parse_function(state: ParseState, ident: &str) -> ParseResult<(Expression, Pa
     match next {
         Some(Token::Symbol(Symbol::BraceOpen)) => {
             // Body
-            let (body, state) = parse_body(state, &mut vec![])?;
+            let (body, state) = parse_body(state, &mut vec![], None)?;
             let f =
                 Expression::new_function(ident, params, return_type, Expression::new_body(body));
             Ok((f, state))
@@ -219,19 +219,28 @@ fn parse_return_type(state: ParseState) -> ParseResult<ReturnState> {
 }
 type BodyState = (Body, ParseState);
 
-fn parse_body(state: ParseState, body: &mut Body) -> ParseResult<BodyState> {
+fn parse_body(
+    state: ParseState,
+    body: &mut Body,
+    previous: Option<Expression>,
+) -> ParseResult<BodyState> {
     let peek = state.peek();
     match peek {
         Some(Token::Symbol(Symbol::BraceClose)) => return Ok((body.to_vec(), state.advance())),
-        Some(Token::Symbol(Symbol::Newline)) => return parse_body(state.advance(), body),
+        // WARNING: This might be a bug passing previous through
+        Some(Token::Symbol(Symbol::Newline)) => return parse_body(state.advance(), body, previous),
         _ => (),
     }
 
-    let (expression, state) = parse_expression(state, None, None)?;
-
-    body.push(expression);
-
-    parse_body(state, body)
+    let (expression, state) = parse_expression(state, previous, None)?;
+    println!("Body statement: {:?}", expression);
+    match state.peek() {
+        Some(Token::Symbol(Symbol::Op(_))) => parse_body(state, body, Some(expression)),
+        _ => {
+            body.push(expression);
+            parse_body(state, body, None)
+        }
+    }
 }
 
 fn parse_array_literal(
@@ -472,7 +481,7 @@ fn parse_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, 
             Expression::new_identifier(ident),
         ),
         Some(Token::Symbol(Symbol::BraceOpen)) => {
-            let (body, state) = parse_body(state, &mut vec![])?;
+            let (body, state) = parse_body(state, &mut vec![], None)?;
             parse_function_call(state, ident, Expression::new_body(body))
         }
         // Operations
@@ -505,7 +514,7 @@ fn parse_collection_index(
     let (next, state) = state.next();
     let (index, state) = match next {
         Some(Token::Symbol(Symbol::BraceOpen)) => {
-            let (body, state) = parse_body(state, &mut vec![])?;
+            let (body, state) = parse_body(state, &mut vec![], None)?;
             (Expression::new_body(body), state)
         }
         Some(Token::Ident(i)) => parse_identifier(state, &i)?,
@@ -606,7 +615,14 @@ fn parse_operator(
     if state.end() {
         return Ok((new_lhs, state));
     }
-    parse_expression(state, Some(new_lhs), None)
+    match state.peek() {
+        // WARNING: This might be bad, due to newlines.
+        Some(Token::Symbol(Symbol::BraceClose)) | Some(Token::Symbol(Symbol::Newline)) => {
+            Ok((new_lhs, state))
+        }
+        None => Ok((new_lhs, state)),
+        _ => parse_expression(state, Some(new_lhs), None),
+    }
 }
 
 fn parse_single_value(state: ParseState) -> ParseResult<(Expression, ParseState)> {
@@ -684,13 +700,13 @@ fn parse_expression(
         Some(Token::Ident(ident)) => parse_identifier(state, &ident)?,
         Some(Token::Kwd(k)) => parse_keyword(state, &k)?,
         Some(Token::Literal(l)) => parse_literal(state, l, previous_op.clone())?,
-        Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![])
+        Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![], lhs)
             .map(|(body, state)| (Expression::new_body(body), state))?,
         Some(Token::Symbol(Symbol::Newline)) => parse_expression(state, lhs, previous_op.clone())?,
         Some(Token::Symbol(Symbol::Op(op))) => parse_operator(
             state,
             Operator::from_token(&op),
-            previous_op,
+            previous_op.clone(),
             lhs.ok_or(ParseError::ExpectedLhs)?,
         )?,
 
@@ -835,7 +851,7 @@ fn parse_while(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         // handle infinite loops
         let state = state.advance();
 
-        let (body, state) = parse_body(state, &mut vec![])?;
+        let (body, state) = parse_body(state, &mut vec![], None)?;
         return Ok((Expression::new_while(None, body), state));
     }
 
@@ -860,7 +876,7 @@ fn parse_while(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         }
     }
 
-    let (body, state) = parse_body(state, &mut vec![])?;
+    let (body, state) = parse_body(state, &mut vec![], None)?;
     let while_expr = Expression::new_while(Some(evaluation), body);
     Ok((while_expr, state))
 }
@@ -951,7 +967,7 @@ fn parse_for(state: ParseState) -> ParseResult<(Expression, ParseState)> {
             })
         }
     }
-    let (body, state) = parse_body(state, &mut vec![])?;
+    let (body, state) = parse_body(state, &mut vec![], None)?;
 
     Ok((
         Expression::For(For {
@@ -967,7 +983,7 @@ fn parse_else(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
     match next {
         Some(Token::Symbol(Symbol::BraceOpen)) => {
-            parse_body(state, &mut vec![]).map(|(b, state)| (Expression::new_body(b), state))
+            parse_body(state, &mut vec![], None).map(|(b, state)| (Expression::new_body(b), state))
         }
         Some(Token::Kwd(Kwd::If)) => parse_if(state),
         Some(t) => Err(ParseError::InvalidSyntax {
@@ -983,7 +999,7 @@ fn parse_else(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 fn parse_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (t, state) = state.next();
     let (lhs, state) = match t {
-        Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![])
+        Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![], None)
             .map(|(body, state)| (Expression::new_body(body), state))?,
         Some(Token::Ident(i)) => (Expression::new_identifier(&i), state),
         Some(Token::Literal(l)) => (Expression::new_from_literal(&l), state),
@@ -1019,7 +1035,7 @@ fn parse_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         }
     }
 
-    let (on_true_evaluation, state) = parse_body(state, &mut vec![])?;
+    let (on_true_evaluation, state) = parse_body(state, &mut vec![], None)?;
     let (next, state) = state.next();
     let (on_false_evaluation, state) = if let Some(Token::Kwd(Kwd::Else)) = next {
         let (expr, state) = parse_else(state)?;
@@ -1038,11 +1054,17 @@ fn parse_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 }
 
 fn parse_return(state: ParseState) -> ParseResult<(Expression, ParseState)> {
-    let (e, state) = parse_expression(state, None, None)?;
-    Ok((
-        Expression::new_statement(Some(e), StatementOperator::Return),
-        state,
-    ))
+    let (return_expression, state) = parse_expression(state, None, None)?;
+    println!("Ret rhs {:?}", return_expression);
+    match state.peek() {
+        Some(Token::Symbol(Symbol::Op(_))) => {
+            parse_expression(state, Some(return_expression), None)
+        }
+        _ => Ok((
+            Expression::new_statement(Some(return_expression), StatementOperator::Return),
+            state,
+        )),
+    }
 }
 
 fn is_new_body(t: Option<&Token>) -> bool {
@@ -2311,7 +2333,7 @@ mod tests {
                         StatementOperator::Return,
                     ))]),
                     Some(Expression::new_body(vec![Expression::new_statement(
-                        Some(Expression::new_math_expression(
+                        Some(Expression::new_body(vec![Expression::new_math_expression(
                             Expression::new_body(vec![Expression::new_math_expression(
                                 Expression::new_identifier("num"),
                                 Expression::new_int(1),
@@ -2323,7 +2345,7 @@ mod tests {
                                 Operator::Subtract,
                             )]),
                             Operator::Add,
-                        )),
+                        )])),
                         StatementOperator::Return,
                     )])),
                 )]),
