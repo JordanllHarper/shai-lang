@@ -5,6 +5,7 @@ use For;
 use FunctionCall;
 use Statement;
 
+use crate::dbg;
 use crate::{language::*, lexer::*};
 
 type ParseResult<T> = Result<T, ParseError>;
@@ -586,10 +587,10 @@ fn parse_operator(
     if let Some(prev) = previous_op.clone() {
         let precedence = current > prev;
         if !precedence {
-            println!("Precedence Current {:?} < Prev {:?}", current, prev);
+            dbg!("Precedence Current {:?} < Prev {:?}", &current, prev);
             // the previous op has greater precedence
             // therefore, we want to give it's rhs (or our lhs in this case).
-            println!("Returning {:?}", lhs);
+            dbg!("Returning {:?}", &lhs);
             return Ok((lhs, state.step_back()));
         }
     }
@@ -599,9 +600,9 @@ fn parse_operator(
     // This will then get returned back up to us to construct our expression
 
     let (rhs, state) = parse_expression(state, Some(lhs.clone()), Some(current.clone()))?;
-    println!("Precedence Rhs {:?}", rhs);
+    dbg!("Precedence Rhs {:?}", &rhs);
     let new_lhs = Expression::new_math_expression(lhs, rhs, current);
-    println!("{:?}", new_lhs);
+    dbg!("{:?}", &new_lhs);
     if state.end() {
         return Ok((new_lhs, state));
     }
@@ -678,7 +679,7 @@ fn parse_expression(
     previous_op: Option<Operator>,
 ) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
-    println!("Expr {:?}", next);
+    dbg!("Expr {:?}", &next);
     let (expr, state) = match next {
         Some(Token::Ident(ident)) => parse_identifier(state, &ident)?,
         Some(Token::Kwd(k)) => parse_keyword(state, &k)?,
@@ -1054,11 +1055,12 @@ mod tests {
     use std::{collections::HashMap, vec};
 
     use super::*;
+    use crate::dbg;
 
     use pretty_assertions::assert_eq;
 
     fn test(label: &str, input: Vec<Token>, expected: Expression) {
-        println!("{}", label);
+        dbg!("{}", label);
         let actual = parse(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -2192,7 +2194,7 @@ mod tests {
             )]),
         );
         // x = {"hello": "world",,}
-        println!("Error");
+        dbg!("Error");
         test_err(
             vec![
                 Token::Ident("x".to_string()),
