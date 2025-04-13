@@ -209,3 +209,10 @@ print my_range
 my_name = names[1]
 
 print my_name
+
+my_dict = {
+    "hello": "world",
+    "hi": "mom"
+}
+
+print my_dict

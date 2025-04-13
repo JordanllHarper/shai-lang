@@ -294,7 +294,6 @@ fn parse_dict_literal(
     dict: &mut HashMap<DictionaryKey, Expression>,
 ) -> ParseResult<(Expression, ParseState)> {
     let (t, state) = state.next();
-
     match t {
         Some(Token::Ident(i)) => {
             let (t, state) = state.next();
@@ -307,6 +306,7 @@ fn parse_dict_literal(
                     let (t, state) = state.next();
                     match t {
                         Some(Token::Symbol(Symbol::Comma)) => parse_dict_literal(state, dict),
+                        Some(Token::Symbol(Symbol::Newline)) => parse_dict_literal(state, dict),
                         Some(t) => Err(ParseError::InvalidSyntax {
                             message: "Expected a comma".to_string(),
                             token_context: t,
@@ -335,7 +335,8 @@ fn parse_dict_literal(
                     dict.insert(key, rhs);
                     let (t, state) = state.next();
                     match t {
-                        Some(Token::Symbol(Symbol::Comma)) => parse_dict_literal(state, dict),
+                        Some(Token::Symbol(Symbol::Comma))
+                        | Some(Token::Symbol(Symbol::Newline)) => parse_dict_literal(state, dict),
                         Some(Token::Symbol(Symbol::BraceClose)) => {
                             Ok((Expression::new_dict(dict.to_owned()), state))
                         }
@@ -349,6 +350,7 @@ fn parse_dict_literal(
                         }),
                     }
                 }
+                Some(Token::Symbol(Symbol::Newline)) => parse_dict_literal(state, dict),
                 Some(t) => Err(ParseError::InvalidSyntax {
                     message: "Expected a colon".to_string(),
                     token_context: t,
@@ -358,6 +360,7 @@ fn parse_dict_literal(
                 }),
             }
         }
+        Some(Token::Symbol(Symbol::Newline)) => parse_dict_literal(state, dict),
         Some(Token::Symbol(Symbol::BraceClose)) => {
             Ok((Expression::new_dict(dict.to_owned()), state))
         }

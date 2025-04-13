@@ -38,8 +38,39 @@ pub fn get_value_to_string(
                 s
             }
 
-            ValueLiteral::Dictionary(_) => todo!(),
-            ValueLiteral::Function => todo!(),
+            ValueLiteral::Dictionary(d) => {
+                let mut new_state = state.clone();
+                let mut s = String::from("{");
+                let len_array = d.len();
+                for (index, (key, expr)) in d.iter().enumerate() {
+                    let mut maybe_state = new_state.clone();
+                    let key_string = match key {
+                        DictionaryKey::String(s) => s.to_string(),
+                        DictionaryKey::Int(i) => i.to_string(),
+                        DictionaryKey::Bool(b) => b.to_string(),
+                        DictionaryKey::Identifier(i) => {
+                            let value = get_identifier_binding_recursively(&state, i)?;
+                            let (s, string) = get_value_to_string(maybe_state, &value)?;
+                            maybe_state = s;
+                            string
+                        }
+                        DictionaryKey::Char(c) => c.to_string(),
+                    };
+                    let (maybe_state, result) =
+                        get_string_from_expression(maybe_state, expr.clone())?;
+                    s = format!("{}\n{}: {}{}", s, key_string, result, {
+                        if index == len_array - 1 {
+                            "\n}"
+                        } else {
+                            ", "
+                        }
+                    });
+
+                    new_state = maybe_state;
+                }
+                s
+            }
+            ValueLiteral::Function => "function".to_string(),
         },
 
         Value::Void => "".to_string(),
@@ -73,7 +104,7 @@ pub fn get_string_from_binding(
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
     match binding {
         EnvironmentBinding::Value(v) => get_value_to_string(state, v),
-        EnvironmentBinding::Function(f) => todo!(),
+        EnvironmentBinding::Function(f) => Err(EvaluatorError::NotYetImplemented),
         EnvironmentBinding::Identifier(i) => match state.get_local_binding(i) {
             Some(binding) => get_string_from_binding(state, &binding),
             None => Err(EvaluatorError::NoSuchIdentifier),
@@ -113,8 +144,8 @@ pub fn get_binding_from_expression(
             let binding = get_identifier_binding(&state, &i)?;
             Ok((state, binding))
         }
-        Expression::Evaluation(_) => todo!(),
-        Expression::FunctionCall(_) => todo!(),
+        Expression::Evaluation(_) => Err(EvaluatorError::NotYetImplemented),
+        Expression::FunctionCall(_) => Err(EvaluatorError::NotYetImplemented),
         Expression::Body(e) => {
             let (state, body_value) = evaluate_body(state, e)?;
             Ok((state, EnvironmentBinding::Value(body_value)))
@@ -149,7 +180,7 @@ pub fn get_binding_from_expression(
             let (state, value) = evaluate_operation(state, o)?;
             Ok((state, EnvironmentBinding::Value(value)))
         }
-        _ => todo!(),
+        _ => Err(EvaluatorError::NotYetImplemented),
     }
 }
 
