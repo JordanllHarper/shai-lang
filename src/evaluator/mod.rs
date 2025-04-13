@@ -378,24 +378,6 @@ fn evaluate_return(
     Ok((state, value))
 }
 
-fn get_string_from_binding(
-    state: EnvironmentState,
-    binding: &EnvironmentBinding,
-) -> Result<(EnvironmentState, String), EvaluatorError> {
-    let new_state = state.clone();
-    match binding {
-        EnvironmentBinding::Value(v) => get_value_to_string(state, v),
-        EnvironmentBinding::Function(f) => {
-            let (state, value) = evaluate_function(state, f.clone(), vec![])?;
-            get_value_to_string(state, &value)
-        }
-        EnvironmentBinding::Identifier(i) => match state.get_local_binding(i) {
-            Some(binding) => get_string_from_binding(new_state, &binding),
-            None => Err(EvaluatorError::NoSuchIdentifier),
-        },
-    }
-}
-
 pub fn handle_rust_binding_with_args(
     state: EnvironmentState,
     std: &RustBinding,
@@ -445,16 +427,6 @@ fn resolve_function_arguments_to_string(
         new_state = maybe_state;
     }
     Ok((new_state, s_args))
-}
-
-fn get_body_string_value(
-    state: EnvironmentState,
-    body: Vec<Expression>,
-) -> Result<(EnvironmentState, String), EvaluatorError> {
-    let (state, value) = evaluate_body(state, body)?;
-    let (state, str) = get_value_to_string(state, &value)?;
-
-    Ok((state, str))
 }
 
 fn evaluate_function_call(

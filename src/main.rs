@@ -57,7 +57,7 @@ fn main() {
 
     let result = evaluator::evaluate(state, ast);
     match result {
-        Ok((state, v)) => {
+        Ok((state, _)) => {
             dbg!("State: {:?}", state);
         }
 

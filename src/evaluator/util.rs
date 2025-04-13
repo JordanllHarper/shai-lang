@@ -122,7 +122,6 @@ pub fn get_binding_from_expression(
         // NOTE: This generates a list of numbers for the user. An optimization here could be to
         // lazy load each number rather than generate this whole list.
         Expression::Range(r) => {
-            println!("{:?}", r);
             let (state, from_value) = get_values_from_expression(state, *r.from)?;
             let (state, to_value) = get_values_from_expression(state, *r.to)?;
 
