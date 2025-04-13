@@ -247,3 +247,29 @@ pub fn map_value_to_dictionary_key(
 
     Ok((state, key))
 }
+
+pub fn get_identifier_binding(
+    state: &EnvironmentState,
+    symbol: &str,
+) -> Result<EnvironmentBinding, EvaluatorError> {
+    state
+        .get_local_binding(symbol)
+        .map_or(Err(EvaluatorError::NoSuchIdentifier), |binding| {
+            Ok(binding.clone())
+        })
+}
+pub fn get_identifier_binding_recursively(
+    state: &EnvironmentState,
+    symbol: &str,
+) -> Result<Value, EvaluatorError> {
+    state
+        .get_local_binding(symbol)
+        .map_or(
+            Err(EvaluatorError::NoSuchIdentifier),
+            |binding| match binding {
+                EnvironmentBinding::Value(v) => Ok(v.clone()),
+                EnvironmentBinding::Function(_) => todo!(),
+                EnvironmentBinding::Identifier(i) => get_identifier_binding_recursively(state, &i),
+            },
+        )
+}

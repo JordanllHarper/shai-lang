@@ -1,6 +1,6 @@
 use crate::{
     evaluator::environment::{EnvironmentBinding, EnvironmentState, Value},
-    evaluator::{get_identifier_binding, EvaluatorError},
+    evaluator::{util::get_identifier_binding, EvaluatorError},
     language::{
         EvaluationNumericAndString, EvaluationNumericOnly, EvaluationOperator, ValueLiteral,
     },
