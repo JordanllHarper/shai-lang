@@ -4,7 +4,7 @@ pub mod language;
 pub mod lexer;
 pub mod parser;
 
-use std::{collections::HashMap, fs::read_to_string};
+use std::{collections::HashMap, env, fs::read_to_string};
 
 use evaluator::environment::EnvironmentState;
 use lexer::Lexer;
@@ -29,7 +29,15 @@ fn read_from_file(path: &str) -> String {
 }
 
 fn main() {
-    let input = read_from_file("./hello.shai");
+    let args = env::args();
+    let file = if let Some(s) = args.into_iter().nth(1) {
+        s
+    } else {
+        println!("Error! No source file specified");
+        return;
+    };
+
+    let input = read_from_file(&file);
     let state = EnvironmentState::new(HashMap::new());
 
     dbg!("Input: {}", &input);
