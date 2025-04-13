@@ -83,6 +83,7 @@ pub enum Value {
     Range(RangeValue),
     Void,
 }
+
 impl Value {
     pub fn new_numeric(n: NumericLiteral) -> Value {
         Value::ValueLiteral(ValueLiteral::Numeric(n))

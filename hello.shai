@@ -211,7 +211,7 @@ my_name = names[1]
 print my_name
 
 
-// the language has support for dicionaries
+// The language has support for dicionaries
 
 my_dict = {
     "hello": "world",
@@ -220,12 +220,14 @@ my_dict = {
 
 print my_dict
 
-
-// and iterate
+// We can iterate dictionaries like so
 
 for k, v in my_dict {
     print k
     print v
 }
 
+// And index them using similar syntax to the array syntax
 
+subject = my_dict["hello"]
+print subject

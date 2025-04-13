@@ -212,7 +212,7 @@ pub fn map_identifier_to_value(
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     let binding = state
         .get_local_binding(ident)
-        .ok_or_else(|| EvaluatorError::NoSuchIdentifier)?;
+        .ok_or(EvaluatorError::NoSuchIdentifier)?;
     map_binding_to_value(state, binding)
 }
 
@@ -227,4 +227,23 @@ pub fn map_dictionary_key_to_value(
         DictionaryKey::Identifier(i) => map_identifier_to_value(state, &i),
         DictionaryKey::Char(c) => Ok((state, Value::new_char(c))),
     }
+}
+
+pub fn map_value_to_dictionary_key(
+    state: EnvironmentState,
+    v: Value,
+) -> Result<(EnvironmentState, DictionaryKey), EvaluatorError> {
+    let key = match v {
+        Value::ValueLiteral(ValueLiteral::CharacterBased(CharacterBasedLiteral::String(s))) => {
+            DictionaryKey::String(s)
+        }
+        Value::ValueLiteral(ValueLiteral::CharacterBased(CharacterBasedLiteral::Char(c))) => {
+            DictionaryKey::Char(c)
+        }
+        Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i))) => DictionaryKey::Int(i),
+        Value::ValueLiteral(ValueLiteral::Bool(b)) => DictionaryKey::Bool(b),
+        _ => return Err(EvaluatorError::InvalidDictionaryKey),
+    };
+
+    Ok((state, key))
 }

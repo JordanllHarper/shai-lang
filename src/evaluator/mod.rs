@@ -30,6 +30,7 @@ pub enum EvaluatorError {
     IndexOutOfRange,
     InvalidIndex,
     NotACollection,
+    InvalidDictionaryKey,
 }
 
 pub fn evaluate(
@@ -94,8 +95,15 @@ fn index_dict(
     value: Value,
     d: HashMap<DictionaryKey, Expression>,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    todo!()
+    let (state, dict_key) = map_value_to_dictionary_key(state, value)?;
+    let result = d.get(&dict_key);
+    if let Some(expr) = result {
+        map_expression_to_value(state, expr.clone())
+    } else {
+        Ok((state, Value::Void))
+    }
 }
+
 fn index_array(
     state: EnvironmentState,
     value: Value,
