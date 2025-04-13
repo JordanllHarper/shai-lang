@@ -363,12 +363,12 @@ fn evaluate_return(
 
 pub fn handle_rust_binding_with_args(
     state: EnvironmentState,
-    std: &RustBinding,
+    rb: &RustBinding,
     args: Vec<Expression>,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    match std {
+    match rb {
         RustBinding::Print(std_print) => {
-            let (new_state, args) = resolve_function_arguments_to_string(state, args)?;
+            let (new_state, args) = map_expression_vec_to_string(state, args)?;
             std_print(args);
             Ok((new_state, Value::Void))
         }

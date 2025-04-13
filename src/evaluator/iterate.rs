@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use crate::evaluator::{
-    evaluate_body, map_dictionary_key_to_value, map_expression_to_binding, map_value_to_string,
-    EnvironmentBinding,
+    evaluate_body, map_dictionary_key_to_value, map_expression_to_binding, EnvironmentBinding,
 };
 
 use super::{

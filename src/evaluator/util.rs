@@ -97,6 +97,22 @@ pub fn map_body_to_string(
     Ok((new_state, s))
 }
 
+pub fn map_expression_vec_to_string(
+    state: EnvironmentState,
+    exprs: Vec<Expression>,
+) -> Result<(EnvironmentState, Vec<String>), EvaluatorError> {
+    let mut strings = vec![];
+
+    let mut new_state = state.clone();
+
+    for expr in exprs {
+        let (maybe_state, s) = map_expression_to_string(new_state, expr)?;
+        strings.push(s);
+        new_state = maybe_state;
+    }
+    Ok((new_state, strings))
+}
+
 pub fn map_binding_to_string(
     state: EnvironmentState,
     binding: &EnvironmentBinding,
