@@ -233,7 +233,7 @@ fn parse_body(
     }
 
     let (expression, state) = parse_expression(state, previous, None)?;
-    println!("Body statement: {:?}", expression);
+    dbg!("Body statement: {:?}", &expression);
     match state.peek() {
         Some(Token::Symbol(Symbol::Op(_))) => parse_body(state, body, Some(expression)),
         _ => {

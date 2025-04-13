@@ -99,6 +99,10 @@ impl Value {
             s.to_string(),
         )))
     }
+
+    pub fn new_bool(b: bool) -> Value {
+        Value::ValueLiteral(ValueLiteral::Bool(b))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

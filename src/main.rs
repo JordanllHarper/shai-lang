@@ -1,3 +1,4 @@
+pub mod condition_evaluation;
 pub mod evaluator;
 pub mod language;
 pub mod lexer;
@@ -23,7 +24,6 @@ macro_rules! dbg {
         }
     }
 }
-
 fn read_from_file(path: &str) -> String {
     read_to_string(path).unwrap()
 }
@@ -32,30 +32,29 @@ fn main() {
     let input = read_from_file("./hello.shai");
     let state = EnvironmentState::new(HashMap::new());
 
-    dbg!("{}", &input);
+    dbg!("Input: {}", &input);
     let tokens = Lexer::new(&input);
 
-    dbg!("{:?}", &tokens);
+    dbg!("Token stream: {:?}", &tokens);
 
     let ast = match parser::parse(tokens) {
         Ok(v) => v,
         Err(e) => {
-            println!("Parse error! {:?}", e);
+            println!("Error!: {:?}", e);
             return;
         }
     };
 
-    dbg!("AST: {:?}", &ast);
+    dbg!("Generated AST: {:?}", &ast);
 
     let result = evaluator::evaluate(state, ast);
     match result {
         Ok((state, v)) => {
-            dbg!("{:?}", state);
-            dbg!("Return value{:?}", v);
+            dbg!("State: {:?}", state);
         }
 
         Err(e) => {
-            println!("{:?}", e);
+            println!("Error!: {:?}", e);
         }
     }
 }

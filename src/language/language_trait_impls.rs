@@ -57,19 +57,6 @@ impl Display for CharacterBasedLiteral {
         f.write_str(&s)
     }
 }
-impl Display for ValueLiteral {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            ValueLiteral::CharacterBased(c) => c.to_string(),
-            ValueLiteral::Numeric(n) => n.to_string(),
-            ValueLiteral::Bool(b) => b.to_string(),
-            ValueLiteral::Array(arr) => todo!(),
-            ValueLiteral::Dictionary(dict) => todo!(),
-            ValueLiteral::Function => "Function".to_string(),
-        };
-        f.write_str(&s)
-    }
-}
 
 impl Display for NumericLiteral {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

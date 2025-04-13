@@ -21,6 +21,7 @@ pub enum EvaluatorError {
     NoSuchIdentifier,
     InvalidFunctionCall,
     InvalidEvaluation,
+    NotYetImplemented,
     NotABooleanValue,
     InvalidNumberOfArguments,
     InvalidOperationValue,
@@ -40,7 +41,7 @@ pub fn evaluate(
         Expression::Identifier(ident) => evaluate_identifier(state, &ident),
         Expression::Statement(s) => evaluate_statement(state, s),
         Expression::MathOperation(m) => evaluate_operation(state, m),
-        Expression::Evaluation(_) => todo!(),
+        Expression::Evaluation(b) => evaluate_evaluation(state, b),
         Expression::Function(f) => {
             add_binding_or_error(state, &f.ident.clone(), EnvironmentBinding::Function(f))
         }
@@ -156,16 +157,17 @@ fn evaluate_while(
     new_state.current_scope = while_scope;
 
     loop {
-        let (maybe_state, b) = match w.condition {
-            Some(ref v) => evaluate_evaluation(new_state, *v.clone())?,
-            None => (new_state, true),
+        let (maybe_state, v) = match w.condition.as_deref() {
+            Some(Expression::Evaluation(e)) => evaluate_evaluation(new_state, e.clone())?,
+            _ => (new_state, Value::new_bool(true)),
         };
 
-        if b {
-            let (maybe_state, _) = evaluate_body(maybe_state, w.body.clone())?;
-            new_state = maybe_state;
-        } else {
-            return Ok((state, Value::Void));
+        match v {
+            Value::ValueLiteral(ValueLiteral::Bool(true)) => {
+                let (maybe_state, _) = evaluate_body(maybe_state, w.body.clone())?;
+                new_state = maybe_state;
+            }
+            _ => return Ok((state, Value::Void)),
         }
     }
 }
@@ -174,32 +176,34 @@ fn evaluate_if(
     state: EnvironmentState,
     if_expression: crate::language::If,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let (state, is_true_eval) = evaluate_evaluation(state, *if_expression.evaluation)?;
-    match (is_true_eval, if_expression.on_false_evaluation) {
-        (true, _) => evaluate(state.clone(), *if_expression.on_true_evaluation),
-        (false, None) => Ok((state, Value::Void)),
-        (false, Some(e)) => evaluate(state.clone(), *e),
+    if let Expression::Evaluation(e) = *if_expression.evaluation {
+        let (state, v) = evaluate_evaluation(state, e)?;
+        if let Value::ValueLiteral(ValueLiteral::Bool(is_true_eval)) = v {
+            match (is_true_eval, if_expression.on_false_evaluation) {
+                (true, _) => return evaluate(state.clone(), *if_expression.on_true_evaluation),
+                (false, None) => return Ok((state, Value::Void)),
+                (false, Some(e)) => return evaluate(state.clone(), *e),
+            }
+        }
     }
+    Err(EvaluatorError::InvalidEvaluation)
 }
 
 fn evaluate_evaluation(
     state: EnvironmentState,
-    evaluation: Expression,
-) -> Result<(EnvironmentState, bool), EvaluatorError> {
-    if let Expression::Evaluation(e) = evaluation {
-        let (state, lhs_binding) = get_binding_from_expression(state, *e.lhs)?;
+    e: Evaluation,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    let (state, lhs_binding) = get_binding_from_expression(state, *e.lhs)?;
 
-        let (state, rhs_binding) = if let Some(expr) = e.rhs {
-            let (s, b) = get_binding_from_expression(state, *expr)?;
-            (s, Some(b))
-        } else {
-            (state, None)
-        };
-
-        evaluate_bindings(state, lhs_binding, rhs_binding, e.evaluation_op)
+    let (state, rhs_binding) = if let Some(expr) = e.rhs {
+        let (s, b) = get_binding_from_expression(state, *expr)?;
+        (s, Some(b))
     } else {
-        Err(EvaluatorError::InvalidEvaluation)
-    }
+        (state, None)
+    };
+
+    let (state, b) = evaluate_bindings(state, lhs_binding, rhs_binding, e.evaluation_op)?;
+    Ok((state, Value::new_bool(b)))
 }
 
 fn evaluate_body(
@@ -435,56 +439,22 @@ fn resolve_function_arguments_to_string(
     let mut new_state = state.clone();
     let mut s_args: Vec<String> = vec![];
     for arg in args {
-        let s = match arg {
-            Expression::ValueLiteral(v) => v.to_string(),
-            Expression::Identifier(i) => match new_state.get_local_binding(&i) {
-                Some(binding) => {
-                    let (maybe_state, s) = get_string_from_binding(new_state, &binding)?;
-                    new_state = maybe_state;
-                    s
-                }
-                None => return Err(EvaluatorError::NoSuchIdentifier),
-            },
-            Expression::Statement(_) => todo!(),
-            Expression::MathOperation(_) => todo!(),
-            Expression::Evaluation(_) => todo!(),
-            Expression::Function(_) => todo!(),
-            Expression::If(_) => todo!(),
-            Expression::While(_) => todo!(),
-            Expression::For(_) => todo!(),
-            Expression::Body(b) => {
-                let (maybe_state, s) = get_body_string_value(new_state, b)?;
-                new_state = maybe_state;
-                s
-            }
-            Expression::Range(_) => todo!(),
-            Expression::Assignment(_) => todo!(),
-            Expression::FunctionCall(_) => todo!(),
-            Expression::Index(_) => todo!(),
-        };
+        let (maybe_state, value) = get_values_from_expression(new_state, arg)?;
+        let (maybe_state, s) = get_value_to_string(maybe_state, &value)?;
         s_args.push(s);
+        new_state = maybe_state;
     }
     Ok((new_state, s_args))
 }
 
 fn get_body_string_value(
     state: EnvironmentState,
-    b: Vec<Expression>,
+    body: Vec<Expression>,
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
-    let mut new_state = state.clone();
-    let mut str = String::new();
-    for expr in b {
-        let (state, value) = evaluate(new_state, expr)?;
+    let (state, value) = evaluate_body(state, body)?;
+    let (state, str) = get_value_to_string(state, &value)?;
 
-        str = match value {
-            Value::ValueLiteral(v) => v.to_string(),
-            Value::Void => "".to_string(),
-            Value::Range(r) => r.to_string(),
-        };
-        new_state = state;
-    }
-
-    Ok((new_state, str))
+    Ok((state, str))
 }
 
 fn evaluate_function_call(

@@ -1,5 +1,5 @@
 use crate::{
-    environment::{EnvironmentBinding, EnvironmentState, Value},
+    evaluator::environment::{EnvironmentBinding, EnvironmentState, Value},
     evaluator::{get_identifier_binding, EvaluatorError},
     language::{
         EvaluationNumericAndString, EvaluationNumericOnly, EvaluationOperator, ValueLiteral,
@@ -11,7 +11,7 @@ pub fn should_evaluate(
     left: EnvironmentBinding,
     right: Option<EnvironmentBinding>,
     evaluation_op: EvaluationOperator,
-) -> (EnvironmentState, Result<bool, EvaluatorError>) {
+) -> Result<(EnvironmentState, bool), EvaluatorError> {
     let result: bool = match (left, right, evaluation_op) {
         (
             EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(lhs))),
@@ -35,20 +35,17 @@ pub fn should_evaluate(
             EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(_))),
             Some(EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(_)))),
             EvaluationOperator::BooleanTruthy,
-        ) => return (state, Err(EvaluatorError::NotABooleanValue)),
+        ) => return Err(EvaluatorError::NotABooleanValue),
 
         (EnvironmentBinding::Identifier(i), None, EvaluationOperator::BooleanTruthy) => {
-            match get_identifier_binding(&state, &i) {
-                Ok(v) => match v {
-                    EnvironmentBinding::Value(v) => match v {
-                        Value::ValueLiteral(ValueLiteral::Bool(b)) => b,
-                        _ => return (state, Err(EvaluatorError::NotABooleanValue)),
-                    },
-                    EnvironmentBinding::Function(_) => todo!(),
-                    EnvironmentBinding::Identifier(i) => todo!(),
-                    EnvironmentBinding::Range(_) => todo!(),
+            let binding = get_identifier_binding(&state, &i)?;
+            match binding {
+                EnvironmentBinding::Value(v) => match v {
+                    Value::ValueLiteral(ValueLiteral::Bool(b)) => b,
+                    _ => return Err(EvaluatorError::NotABooleanValue),
                 },
-                Err(_) => todo!(),
+                EnvironmentBinding::Function(_) => return Err(EvaluatorError::NotYetImplemented),
+                EnvironmentBinding::Identifier(_) => return Err(EvaluatorError::NotYetImplemented),
             }
         }
 
@@ -60,5 +57,5 @@ pub fn should_evaluate(
 
         _ => false,
     };
-    (state, Ok(result))
+    Ok((state, result))
 }
