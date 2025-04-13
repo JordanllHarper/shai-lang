@@ -1,5 +1,5 @@
-use util::get_binding_from_expression;
-use util::get_value_to_string;
+use util::map_expression_to_binding;
+use util::map_value_to_string;
 
 use super::environment::*;
 use crate::evaluator::*;
@@ -10,11 +10,11 @@ pub fn evaluate_operation(
     m: Operations,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     let new_state = state.clone();
-    let (new_state, lh_binding) = get_binding_from_expression(new_state, *m.lhs)?;
-    let (new_state, rh_binding) = get_binding_from_expression(new_state, *m.rhs)?;
+    let (new_state, lh_binding) = map_expression_to_binding(new_state, *m.lhs)?;
+    let (new_state, rh_binding) = map_expression_to_binding(new_state, *m.rhs)?;
 
-    let (new_state, left_value) = get_values_from_binding(new_state, lh_binding)?;
-    let (new_state, right_value) = get_values_from_binding(new_state, rh_binding)?;
+    let (new_state, left_value) = map_binding_to_value(new_state, lh_binding)?;
+    let (new_state, right_value) = map_binding_to_value(new_state, rh_binding)?;
     let values = (left_value, right_value);
 
     match m.operation {
@@ -31,7 +31,7 @@ fn handle_concatenation(
     other: Value,
     in_reverse: bool,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let (new_state, s) = get_value_to_string(state, &other)?;
+    let (new_state, s) = map_value_to_string(state, &other)?;
 
     let format = if in_reverse {
         format!("{}{}", s, c)

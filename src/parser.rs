@@ -281,7 +281,6 @@ fn parse_dict_key(literal: Literal) -> ParseResult<DictionaryKey> {
         Literal::Bool(b) => Ok(DictionaryKey::Bool(b)),
         Literal::Int(i) => Ok(DictionaryKey::Int(i)),
         Literal::String(s) => Ok(DictionaryKey::String(s)),
-        Literal::Char(c) => Ok(DictionaryKey::Char(c)),
         Literal::Float(f) => Err(ParseError::InvalidSyntax {
             message: "Float cannot be used as key to Dictionary".to_string(),
             token_context: Token::Literal(Literal::Float(f)),

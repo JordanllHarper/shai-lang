@@ -52,12 +52,6 @@ impl EnvironmentBinding {
         )))
     }
 
-    pub fn new_char(c: &char) -> EnvironmentBinding {
-        EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::CharacterBased(
-            CharacterBasedLiteral::Char(c.to_owned()),
-        )))
-    }
-
     pub fn new_numeric(n: NumericLiteral) -> EnvironmentBinding {
         EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(n)))
     }
@@ -102,6 +96,10 @@ impl Value {
 
     pub fn new_bool(b: bool) -> Value {
         Value::ValueLiteral(ValueLiteral::Bool(b))
+    }
+
+    pub(crate) fn new_char(c: char) -> Value {
+        Value::ValueLiteral(ValueLiteral::CharacterBased(CharacterBasedLiteral::Char(c)))
     }
 }
 

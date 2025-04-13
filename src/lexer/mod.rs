@@ -242,7 +242,6 @@ fn map_datatype_kwd(s: &str) -> Option<DataTypeKwd> {
     match s {
         "bool" => Some(DataTypeKwd::Bool),
         "int" => Some(DataTypeKwd::Int),
-        "char" => Some(DataTypeKwd::Char),
         "float" => Some(DataTypeKwd::Float),
         "string" => Some(DataTypeKwd::String),
         "dict" => Some(DataTypeKwd::Dict),
@@ -459,7 +458,6 @@ hello
     #[test]
     fn read_kwd_data_type() {
         test("bool", vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Bool))]);
-        test("char", vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Char))]);
         test("float", vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Float))]);
         test("int", vec![Token::Kwd(Kwd::DataType(DataTypeKwd::Int))]);
         test(

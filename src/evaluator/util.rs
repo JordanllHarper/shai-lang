@@ -1,15 +1,15 @@
 use super::*;
 
-pub fn get_string_from_expression(
+pub fn map_expression_to_string(
     state: EnvironmentState,
     expr: Expression,
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
-    let (new_state, binding) = get_binding_from_expression(state.clone(), expr)?;
-    let (new_state, result) = get_string_from_binding(new_state, &binding)?;
+    let (new_state, binding) = map_expression_to_binding(state.clone(), expr)?;
+    let (new_state, result) = map_binding_to_string(new_state, &binding)?;
     Ok((new_state, result))
 }
 
-pub fn get_value_to_string(
+pub fn map_value_to_string(
     state: EnvironmentState,
     v: &Value,
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
@@ -23,8 +23,7 @@ pub fn get_value_to_string(
                 let mut s = String::from("[");
                 let len_array = array.len();
                 for (index, expr) in array.iter().enumerate() {
-                    let (maybe_state, result) =
-                        get_string_from_expression(new_state, expr.clone())?;
+                    let (maybe_state, result) = map_expression_to_string(new_state, expr.clone())?;
                     s = format!("{}{}{}", s, result, {
                         if index == len_array - 1 {
                             "]"
@@ -50,14 +49,14 @@ pub fn get_value_to_string(
                         DictionaryKey::Bool(b) => b.to_string(),
                         DictionaryKey::Identifier(i) => {
                             let value = get_identifier_binding_recursively(&state, i)?;
-                            let (s, string) = get_value_to_string(maybe_state, &value)?;
+                            let (s, string) = map_value_to_string(maybe_state, &value)?;
                             maybe_state = s;
                             string
                         }
                         DictionaryKey::Char(c) => c.to_string(),
                     };
                     let (maybe_state, result) =
-                        get_string_from_expression(maybe_state, expr.clone())?;
+                        map_expression_to_string(maybe_state, expr.clone())?;
                     s = format!("{}\n{}: {}{}", s, key_string, result, {
                         if index == len_array - 1 {
                             "\n}"
@@ -80,7 +79,7 @@ pub fn get_value_to_string(
     Ok((state, s))
 }
 
-pub fn get_body_string_value(
+pub fn map_body_to_string(
     state: EnvironmentState,
     b: Vec<Expression>,
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
@@ -89,7 +88,7 @@ pub fn get_body_string_value(
     for expr in b {
         let (maybe_state, value) = evaluate(new_state, expr)?;
 
-        let (maybe_state, new_s) = get_value_to_string(maybe_state, &value)?;
+        let (maybe_state, new_s) = map_value_to_string(maybe_state, &value)?;
 
         s = format!("{}{}", s, new_s);
         new_state = maybe_state;
@@ -98,22 +97,22 @@ pub fn get_body_string_value(
     Ok((new_state, s))
 }
 
-pub fn get_string_from_binding(
+pub fn map_binding_to_string(
     state: EnvironmentState,
     binding: &EnvironmentBinding,
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
     match binding {
-        EnvironmentBinding::Value(v) => get_value_to_string(state, v),
+        EnvironmentBinding::Value(v) => map_value_to_string(state, v),
         EnvironmentBinding::Function(f) => Err(EvaluatorError::NotYetImplemented),
         EnvironmentBinding::Identifier(i) => match state.get_local_binding(i) {
-            Some(binding) => get_string_from_binding(state, &binding),
+            Some(binding) => map_binding_to_string(state, &binding),
             None => Err(EvaluatorError::NoSuchIdentifier),
         },
     }
 }
 
 // Code adapted from quaternic (2021)
-pub fn directed_range(a: i32, b: i32) -> impl Iterator<Item = i32> {
+pub fn convert_to_directed_range(a: i32, b: i32) -> impl Iterator<Item = i32> {
     let mut start = a;
     let end = b;
     std::iter::from_fn(move || {
@@ -132,7 +131,7 @@ pub fn directed_range(a: i32, b: i32) -> impl Iterator<Item = i32> {
     })
 }
 
-pub fn get_binding_from_expression(
+pub fn map_expression_to_binding(
     state: EnvironmentState,
     expr: Expression,
 ) -> Result<(EnvironmentState, EnvironmentBinding), EvaluatorError> {
@@ -153,15 +152,15 @@ pub fn get_binding_from_expression(
         // NOTE: This generates a list of numbers for the user. An optimization here could be to
         // lazy load each number rather than generate this whole list.
         Expression::Range(r) => {
-            let (state, from_value) = get_values_from_expression(state, *r.from)?;
-            let (state, to_value) = get_values_from_expression(state, *r.to)?;
+            let (state, from_value) = map_expression_to_value(state, *r.from)?;
+            let (state, to_value) = map_expression_to_value(state, *r.to)?;
 
             let values: Vec<Expression> = match (from_value, to_value) {
                 (
                     Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i1))),
                     Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i2))),
                 ) => {
-                    let mut range = directed_range(i1, i2).collect::<Vec<i32>>();
+                    let mut range = convert_to_directed_range(i1, i2).collect::<Vec<i32>>();
                     if r.inclusive {
                         range.push(i2);
                     };
@@ -184,7 +183,7 @@ pub fn get_binding_from_expression(
     }
 }
 
-pub fn get_values_from_binding(
+pub fn map_binding_to_value(
     state: EnvironmentState,
     binding: EnvironmentBinding,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
@@ -198,11 +197,34 @@ pub fn get_values_from_binding(
     }
 }
 
-pub fn get_values_from_expression(
+pub fn map_expression_to_value(
     state: EnvironmentState,
     expr: Expression,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let (state, binding) = get_binding_from_expression(state, expr)?;
-    let (state, value) = get_values_from_binding(state, binding)?;
+    let (state, binding) = map_expression_to_binding(state, expr)?;
+    let (state, value) = map_binding_to_value(state, binding)?;
     Ok((state, value))
+}
+
+pub fn map_identifier_to_value(
+    state: EnvironmentState,
+    ident: &str,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    let binding = state
+        .get_local_binding(ident)
+        .ok_or_else(|| EvaluatorError::NoSuchIdentifier)?;
+    map_binding_to_value(state, binding)
+}
+
+pub fn map_dictionary_key_to_value(
+    state: EnvironmentState,
+    key: DictionaryKey,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    match key {
+        DictionaryKey::String(s) => Ok((state, Value::new_string(&s))),
+        DictionaryKey::Int(i) => Ok((state, Value::new_numeric(NumericLiteral::Int(i)))),
+        DictionaryKey::Bool(b) => Ok((state, Value::new_bool(b))),
+        DictionaryKey::Identifier(i) => map_identifier_to_value(state, &i),
+        DictionaryKey::Char(c) => Ok((state, Value::new_char(c))),
+    }
 }

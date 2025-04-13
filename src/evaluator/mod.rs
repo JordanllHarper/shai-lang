@@ -11,7 +11,7 @@ use crate::language::*;
 use bindings::*;
 use environment::*;
 use evaluation::*;
-use iterate::iterate_array;
+use iterate::{iterate_array, iterate_dict};
 use operation::*;
 use util::*;
 
@@ -60,8 +60,8 @@ fn evaluate_range(
     state: EnvironmentState,
     r: Range,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let (state, from_value) = get_values_from_expression(state, *r.from)?;
-    let (state, to_value) = get_values_from_expression(state, *r.to)?;
+    let (state, from_value) = map_expression_to_value(state, *r.from)?;
+    let (state, to_value) = map_expression_to_value(state, *r.to)?;
 
     Ok((
         state,
@@ -79,8 +79,8 @@ fn evaluate_index(
     state: EnvironmentState,
     i: Index,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let (state, index_value) = get_values_from_expression(state, *i.index)?;
-    let (state, collection_value) = get_values_from_expression(state, *i.collection)?;
+    let (state, index_value) = map_expression_to_value(state, *i.index)?;
+    let (state, collection_value) = map_expression_to_value(state, *i.collection)?;
 
     match collection_value {
         Value::ValueLiteral(ValueLiteral::Array(a)) => index_array(state, index_value, a),
@@ -104,7 +104,7 @@ fn index_array(
     if let Value::ValueLiteral(ValueLiteral::Numeric(NumericLiteral::Int(i))) = value {
         let result = a.get(i as usize);
         if let Some(v) = result {
-            let (state, value) = get_values_from_expression(state, v.clone())?;
+            let (state, value) = map_expression_to_value(state, v.clone())?;
             Ok((state, value))
         } else {
             Err(EvaluatorError::IndexOutOfRange)
@@ -122,14 +122,15 @@ fn evaluate_for(
     let for_scope = Scope::new(Some(state.current_scope.clone()));
     new_state.current_scope = for_scope;
 
-    let (mut new_state, result) = get_values_from_expression(new_state, *f.iterable)?;
+    let (mut new_state, result) = map_expression_to_value(new_state, *f.iterable)?;
     match result {
         Value::ValueLiteral(ValueLiteral::Array(a)) => {
             let (maybe_state, _) = iterate_array(new_state, a, f.scoped_variable, f.body.to_vec())?;
             new_state = maybe_state;
         }
         Value::ValueLiteral(ValueLiteral::Dictionary(d)) => {
-            todo!()
+            let (maybe_state, _) = iterate_dict(state, d, f.scoped_variable, f.body.to_vec())?;
+            new_state = maybe_state;
         }
         Value::ValueLiteral(ValueLiteral::CharacterBased(CharacterBasedLiteral::String(s))) => {
             let (maybe_state, _) = iterate_array(
@@ -193,10 +194,10 @@ fn evaluate_evaluation(
     state: EnvironmentState,
     e: Evaluation,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let (state, lhs_binding) = get_binding_from_expression(state, *e.lhs)?;
+    let (state, lhs_binding) = map_expression_to_binding(state, *e.lhs)?;
 
     let (state, rhs_binding) = if let Some(expr) = e.rhs {
-        let (s, b) = get_binding_from_expression(state, *expr)?;
+        let (s, b) = map_expression_to_binding(state, *expr)?;
         (s, Some(b))
     } else {
         (state, None)
@@ -264,9 +265,9 @@ fn evaluate_assignment_expression(
             Ok((state, EnvironmentBinding::Value(value)))
         }
         Expression::Evaluation(eval) => {
-            let (state, lhs) = get_binding_from_expression(state, *eval.lhs)?;
+            let (state, lhs) = map_expression_to_binding(state, *eval.lhs)?;
             let (state, rhs) = if let Some(s) = eval.rhs {
-                let (state, binding) = get_binding_from_expression(state, *s)?;
+                let (state, binding) = map_expression_to_binding(state, *s)?;
                 (state, Some(binding))
             } else {
                 (state, None)
@@ -316,7 +317,7 @@ fn evaluate_function(
     let mut new_state = state.clone();
 
     for (arg, parameter) in args.into_iter().zip(f.params) {
-        let (mut maybe_state, binding) = get_binding_from_expression(new_state, arg)?;
+        let (mut maybe_state, binding) = map_expression_to_binding(new_state, arg)?;
 
         let error = maybe_state.add_or_mutate_symbols(&parameter.ident, binding);
         if let Some(e) = error {
@@ -374,7 +375,7 @@ fn evaluate_return(
     } else {
         return Ok((state, Value::Void));
     };
-    let (state, value) = get_values_from_expression(state, expr)?;
+    let (state, value) = map_expression_to_value(state, expr)?;
     Ok((state, value))
 }
 
@@ -395,7 +396,7 @@ pub fn handle_rust_binding_with_args(
             }
             let first = args.first().cloned();
             if let Some(expr) = first {
-                let (new_state, value) = get_values_from_expression(state, expr)?;
+                let (new_state, value) = map_expression_to_value(state, expr)?;
                 let len = match value {
                     Value::ValueLiteral(ValueLiteral::Array(a)) => a.len(),
                     _ => todo!(),
@@ -421,8 +422,8 @@ fn resolve_function_arguments_to_string(
     let mut new_state = state.clone();
     let mut s_args: Vec<String> = vec![];
     for arg in args {
-        let (maybe_state, value) = get_values_from_expression(new_state, arg)?;
-        let (maybe_state, s) = get_value_to_string(maybe_state, &value)?;
+        let (maybe_state, value) = map_expression_to_value(new_state, arg)?;
+        let (maybe_state, s) = map_value_to_string(maybe_state, &value)?;
         s_args.push(s);
         new_state = maybe_state;
     }

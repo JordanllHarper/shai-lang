@@ -87,7 +87,6 @@ impl ValueLiteral {
             Literal::String(s) => {
                 Self::CharacterBased(CharacterBasedLiteral::String(s.to_string()))
             }
-            Literal::Char(c) => Self::CharacterBased(CharacterBasedLiteral::Char(c.to_owned())),
         }
     }
 }
@@ -96,7 +95,6 @@ impl NativeType {
     pub fn from_datatype_kwd(kwd: &DataTypeKwd) -> Self {
         match kwd {
             DataTypeKwd::Bool => Self::Bool,
-            DataTypeKwd::Char => Self::Char,
             DataTypeKwd::Float => Self::Float,
             DataTypeKwd::Int => Self::Int,
             DataTypeKwd::String => Self::String,

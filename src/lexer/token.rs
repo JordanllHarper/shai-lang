@@ -14,7 +14,6 @@ pub enum Literal {
     Int(i32),
     Float(f64),
     String(String),
-    Char(char),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -86,7 +85,6 @@ pub enum Symbol {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DataTypeKwd {
     Bool,
-    Char,
     Float,
     Int,
     String,
@@ -122,7 +120,6 @@ impl Display for DataTypeKwd {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let representation = match self {
             DataTypeKwd::Bool => "bool",
-            DataTypeKwd::Char => "char",
             DataTypeKwd::Float => "float",
             DataTypeKwd::Int => "int",
             DataTypeKwd::String => "string",
@@ -243,7 +240,6 @@ impl Display for Literal {
             Literal::Int(i) => i.to_string(),
             Literal::String(s) => s.to_string(),
             Literal::Float(f) => f.to_string(),
-            Literal::Char(c) => c.to_string(),
         };
         f.write_str(&str_rep)
     }
