@@ -772,7 +772,7 @@ fn parse_include(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 }
 
 fn parse_keyword(state: ParseState, k: &Kwd) -> ParseResult<(Expression, ParseState)> {
-    let expr = match k {
+    let (expr, state) = match k {
         Kwd::Return => parse_return(state)?,
         Kwd::While => parse_while(state)?,
         Kwd::For => parse_for(state)?,
@@ -795,7 +795,9 @@ fn parse_keyword(state: ParseState, k: &Kwd) -> ParseResult<(Expression, ParseSt
         }
     };
 
-    Ok(expr)
+    dbg!("Parse keyword expr {}", &expr);
+
+    Ok((expr, state))
 }
 
 fn parse_const(state: ParseState) -> ParseResult<(Expression, ParseState)> {
@@ -1057,16 +1059,24 @@ fn parse_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 
 fn parse_return(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (return_expression, state) = parse_expression(state, None, None)?;
-    println!("Ret rhs {:?}", return_expression);
-    match state.peek() {
+    println!("Result {:?}", return_expression);
+    let statement = match state.peek() {
         Some(Token::Symbol(Symbol::Op(_))) => {
-            parse_expression(state, Some(return_expression), None)
+            parse_expression(state, Some(return_expression), None).map(|(expr, state)| {
+                (
+                    Expression::new_statement(Some(expr), StatementOperator::Return),
+                    state,
+                )
+            })
         }
         _ => Ok((
             Expression::new_statement(Some(return_expression), StatementOperator::Return),
             state,
         )),
-    }
+    };
+
+    dbg!("Parse return statement{}", &statement);
+    statement
 }
 
 fn is_new_body(t: Option<&Token>) -> bool {
@@ -2334,8 +2344,9 @@ mod tests {
                         Some(Expression::new_int(1)),
                         StatementOperator::Return,
                     ))]),
+                    // on false evaluation
                     Some(Expression::new_body(vec![Expression::new_statement(
-                        Some(Expression::new_body(vec![Expression::new_math_expression(
+                        Some(Expression::new_math_expression(
                             Expression::new_body(vec![Expression::new_math_expression(
                                 Expression::new_identifier("num"),
                                 Expression::new_int(1),
@@ -2347,7 +2358,7 @@ mod tests {
                                 Operator::Subtract,
                             )]),
                             Operator::Add,
-                        )])),
+                        )),
                         StatementOperator::Return,
                     )])),
                 )]),
