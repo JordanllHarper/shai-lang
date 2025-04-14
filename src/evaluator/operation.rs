@@ -1,8 +1,6 @@
-use util::map_expression_to_binding;
 use util::map_value_to_string;
 
 use super::environment::*;
-use crate::dbg;
 use crate::evaluator::*;
 use crate::language::*;
 
@@ -11,19 +9,18 @@ pub fn evaluate_operation(
     m: Operations,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     let new_state = state.clone();
-    let (new_state, lh_binding) = map_expression_to_binding(new_state, *m.lhs)?;
-    let (new_state, rh_binding) = map_expression_to_binding(new_state, *m.rhs)?;
+    let (new_state, left_value) = map_expression_to_value(new_state, *m.lhs)?;
+    let (new_state, right_value) = map_expression_to_value(new_state, *m.rhs)?;
 
-    let (new_state, left_value) = map_binding_to_value(new_state, lh_binding, vec![])?;
-    let (new_state, right_value) = map_binding_to_value(new_state, rh_binding, vec![])?;
     let values = (left_value, right_value);
 
-    match m.operation {
+    let (_, result) = match m.operation {
         Operator::Add => handle_add(new_state, values),
         Operator::Subtract => handle_subtract(new_state, values),
         Operator::Multiply => handle_multiply(new_state, values),
         Operator::Divide => handle_divide(new_state, values),
-    }
+    }?;
+    Ok((state, result))
 }
 
 fn handle_concatenation(
@@ -46,7 +43,6 @@ fn handle_add(
     state: EnvironmentState,
     values: (Value, Value),
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    dbg!(&values);
     match values {
         (Value::ValueLiteral(ValueLiteral::CharacterBased(c)), other) => {
             handle_concatenation(state, c, other, false)
@@ -58,7 +54,10 @@ fn handle_add(
         (
             Value::ValueLiteral(ValueLiteral::Numeric(n1)),
             Value::ValueLiteral(ValueLiteral::Numeric(n2)),
-        ) => Ok((state, Value::new_numeric(n1 + n2))),
+        ) => {
+            let new_numeric = Value::new_numeric(n1 + n2);
+            Ok((state, new_numeric))
+        }
         (Value::ValueLiteral(_), Value::Range(_)) => todo!(),
         (Value::ValueLiteral(_), Value::Void) => todo!(),
         (Value::Range(_), Value::ValueLiteral(_)) => todo!(),

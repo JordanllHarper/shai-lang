@@ -122,7 +122,9 @@ pub fn map_binding_to_string(
         EnvironmentBinding::Function(f) => todo!(),
         EnvironmentBinding::Identifier(i) => match state.get_local_binding(i) {
             Some(binding) => map_binding_to_string(state, &binding),
-            None => Err(EvaluatorError::NoSuchIdentifier),
+            None => Err(EvaluatorError::NoSuchIdentifier {
+                ident: i.to_string(),
+            }),
         },
     }
 }
@@ -162,7 +164,7 @@ pub fn map_expression_to_binding(
         Expression::Evaluation(_) => todo!(),
         Expression::FunctionCall(_) => todo!(),
         Expression::Body(e) => {
-            let (state, body_value) = evaluate_body(state, e)?;
+            let (state, body_value) = evaluate_body(state, e, 0, Value::Void)?;
             Ok((state, EnvironmentBinding::Value(body_value)))
         }
         // NOTE: This generates a list of numbers for the user. An optimization here could be to
@@ -237,7 +239,9 @@ pub fn map_identifier_to_value(
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     let binding = state
         .get_local_binding(ident)
-        .ok_or(EvaluatorError::NoSuchIdentifier)?;
+        .ok_or(EvaluatorError::NoSuchIdentifier {
+            ident: ident.to_string(),
+        })?;
     map_binding_to_value(state, binding, args)
 }
 
@@ -277,24 +281,25 @@ pub fn get_identifier_binding(
     state: &EnvironmentState,
     symbol: &str,
 ) -> Result<EnvironmentBinding, EvaluatorError> {
-    state
-        .get_local_binding(symbol)
-        .map_or(Err(EvaluatorError::NoSuchIdentifier), |binding| {
-            Ok(binding.clone())
-        })
+    state.get_local_binding(symbol).map_or(
+        Err(EvaluatorError::NoSuchIdentifier {
+            ident: symbol.to_string(),
+        }),
+        |binding| Ok(binding.clone()),
+    )
 }
 pub fn get_identifier_binding_recursively(
     state: &EnvironmentState,
     symbol: &str,
 ) -> Result<Value, EvaluatorError> {
-    state
-        .get_local_binding(symbol)
-        .map_or(
-            Err(EvaluatorError::NoSuchIdentifier),
-            |binding| match binding {
-                EnvironmentBinding::Value(v) => Ok(v.clone()),
-                EnvironmentBinding::Function(_) => todo!(),
-                EnvironmentBinding::Identifier(i) => get_identifier_binding_recursively(state, &i),
-            },
-        )
+    state.get_local_binding(symbol).map_or(
+        Err(EvaluatorError::NoSuchIdentifier {
+            ident: symbol.to_string(),
+        }),
+        |binding| match binding {
+            EnvironmentBinding::Value(v) => Ok(v.clone()),
+            EnvironmentBinding::Function(_) => todo!(),
+            EnvironmentBinding::Identifier(i) => get_identifier_binding_recursively(state, &i),
+        },
+    )
 }

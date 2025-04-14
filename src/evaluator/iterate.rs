@@ -22,8 +22,9 @@ pub fn iterate_array(
     let mut new_state = state.clone();
     for expr in arr {
         let (mut maybe_state, value) = map_expression_to_value(new_state, expr)?;
-        maybe_state.add_or_mutate_symbols(&scoped_identifier, EnvironmentBinding::Value(value));
-        let (maybe_state, _) = evaluate_body(maybe_state, body.clone())?;
+        let result = maybe_state
+            .add_or_mutate_symbols(&scoped_identifier, EnvironmentBinding::Value(value))?;
+        let (maybe_state, _) = evaluate_body(maybe_state, body.clone(), 0, Value::Void)?;
         new_state = maybe_state;
     }
     Ok((new_state, Value::Void))
@@ -51,7 +52,7 @@ pub fn iterate_dict(
         maybe_state.add_or_mutate_symbols(key_ident, EnvironmentBinding::Value(key_value));
         let (mut maybe_state, value_binding) = map_expression_to_binding(maybe_state, value)?;
         maybe_state.add_or_mutate_symbols(value_ident, value_binding);
-        let (maybe_state, _) = evaluate_body(maybe_state, body.clone())?;
+        let (maybe_state, _) = evaluate_body(maybe_state, body.clone(), 0, Value::Void)?;
         new_state = maybe_state;
     }
 

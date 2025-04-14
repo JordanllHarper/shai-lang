@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use crate::language::*;
 
-use super::{std_rust_print, RustBinding};
+use super::{std_rust_print, EvaluatorError, RustBinding};
 
 /// Represents the current Environment State of the program. This is for resolving symbols that a user will reference in their program,
 /// including the standard library bindings.
@@ -155,9 +155,9 @@ fn mutate_local_binding_recursive(
     scope: &mut Scope,
     symbol: &str,
     binding: EnvironmentBinding,
-) -> Result<EnvironmentBinding, MutateBindingError> {
+) -> Result<EnvironmentBinding, EvaluatorError> {
     match scope.local_symbols.get(symbol) {
-        Some(EnvironmentBinding::Function(_)) => Err(MutateBindingError::InvalidRedeclaration),
+        Some(EnvironmentBinding::Function(_)) => Err(EvaluatorError::InvalidRedeclaration),
         _ => {
             let _ = scope
                 .local_symbols
@@ -189,7 +189,7 @@ impl EnvironmentState {
         &mut self,
         symbol: &str,
         binding: EnvironmentBinding,
-    ) -> Result<EnvironmentBinding, MutateBindingError> {
+    ) -> Result<EnvironmentBinding, EvaluatorError> {
         mutate_local_binding_recursive(&mut self.current_scope, symbol, binding)
     }
 }

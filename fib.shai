@@ -2,15 +2,15 @@
 
 fib (num) {
     if num <= 1 {
-        return 1
-        print 1
-    } else {
-        num = { fib { num - 1 } } + { fib { num - 2 } }
-        print "Current" num
         return num
+    } else {
+        new_num = { fib { num - 1 } } + { fib { num - 2 } }
+        return new_num
     }
 }
 
-print { fib 10 }
+for i in 0..10 {
+    print { fib i }
+}
 
 

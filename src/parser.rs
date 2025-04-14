@@ -234,7 +234,7 @@ fn parse_body(
     }
 
     let (expression, state) = parse_expression(state, previous, None)?;
-    dbg!("Body statement: {:?}", &expression);
+    dbg!("Body statement", &expression);
     match state.peek() {
         Some(Token::Symbol(Symbol::Op(_))) => parse_body(state, body, Some(expression)),
         _ => {
@@ -473,14 +473,12 @@ fn parse_brace_open(state: ParseState) -> ParseResult<(Expression, ParseState)> 
         return Ok((Expression::new_dict(HashMap::new()), state.advance()));
     }
 
-    println!("Start of something {:?}", next);
     match state.peek() {
         Some(Token::Symbol(Symbol::Newline)) => parse_brace_open(state),
         Some(Token::Symbol(Symbol::Colon)) => {
             parse_dict_literal(state.step_back(), &mut HashMap::new())
         }
         Some(t) => {
-            println!("Start of something {:?}", t);
             // previous is part of a body expression, so handle that...
             parse_body(state.step_back(), &mut vec![], None)
                 .map(|(expr, state)| (Expression::new_body(expr), state))
@@ -752,6 +750,7 @@ fn parse_expression(
             })
         }
     };
+
     Ok((expr, state))
 }
 
@@ -1086,7 +1085,6 @@ fn parse_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 
 fn parse_return(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (return_expression, state) = parse_expression(state, None, None)?;
-    println!("Result {:?}", return_expression);
     let statement = match state.peek() {
         Some(Token::Symbol(Symbol::Op(_))) => {
             parse_expression(state, Some(return_expression), None).map(|(expr, state)| {
@@ -2307,6 +2305,7 @@ mod tests {
             },
         );
     }
+
     #[test]
     fn fib() {
         test(
@@ -2422,7 +2421,130 @@ mod tests {
                     )])),
                 )]),
             )]),
-        )
+        );
+
+        test(
+            "fibonacci with variable store",
+            vec![
+                Token::new_ident("fib"),
+                Token::Symbol(Symbol::ParenOpen),
+                Token::new_ident("num"),
+                Token::Symbol(Symbol::ParenClose),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                // tab
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                //
+                Token::Kwd(Kwd::If),
+                Token::new_ident("num"),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Evaluation(EvaluationSymbol::LzEq)),
+                Token::whitespace(),
+                Token::Literal(Literal::Int(1)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                // body
+                //
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                //
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                //
+                Token::Kwd(Kwd::Return),
+                Token::whitespace(),
+                Token::Literal(Literal::Int(1)),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Kwd(Kwd::Else),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                //
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                //
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                Token::whitespace(),
+                //
+                Token::Ident("new_num".to_string()),
+                Token::Symbol(Symbol::Equals),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::whitespace(),
+                Token::new_ident("num"),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Op(OpSymbol::Minus)),
+                Token::whitespace(),
+                Token::Literal(Literal::Int(1)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceClose),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Op(OpSymbol::Plus)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::whitespace(),
+                Token::new_ident("num"),
+                Token::whitespace(),
+                Token::Symbol(Symbol::Op(OpSymbol::Minus)),
+                Token::whitespace(),
+                Token::Literal(Literal::Int(2)),
+                Token::whitespace(),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::Newline),
+                Token::Kwd(Kwd::Return),
+                Token::Ident("new_num".to_string()),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::BraceClose),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::new_body(vec![Expression::new_function(
+                "fib",
+                vec![Parameter::new("num", None)],
+                None,
+                Expression::new_body(vec![Expression::new_if(
+                    Expression::new_evaluation(
+                        Expression::new_identifier("num"),
+                        Some(Expression::new_int(1)),
+                        EvaluationOperator::NumericOnly(EvaluationNumericOnly::LzEq),
+                    ),
+                    Expression::new_body(vec![Expression::Statement(Statement::new(
+                        Some(Expression::new_int(1)),
+                        StatementOperator::Return,
+                    ))]),
+                    // on false evaluation
+                    Some(Expression::new_body(vec![Expression::new_assignment(
+                        "new_num",
+                        Expression::new_math_expression(
+                            Expression::new_body(vec![Expression::new_math_expression(
+                                Expression::new_identifier("num"),
+                                Expression::new_int(1),
+                                Operator::Subtract,
+                            )]),
+                            Expression::new_body(vec![Expression::new_math_expression(
+                                Expression::new_identifier("num"),
+                                Expression::new_int(2),
+                                Operator::Subtract,
+                            )]),
+                            Operator::Add,
+                        ),
+                        None,
+                        None,
+                        false,
+                    )])),
+                )]),
+            )]),
+        );
     }
 
     #[test]
