@@ -174,6 +174,7 @@ print "Characters in" name
 for character in name {
     print character
 }
+
 print
 
 
@@ -210,8 +211,7 @@ my_name = names[1]
 
 print my_name
 
-
-// The language has support for dicionaries
+// The language has support for dictionaries
 
 my_dict = {
     "hello": "world",

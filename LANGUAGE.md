@@ -15,357 +15,219 @@ Below is an overview of the language.
 
 ## Comments
 
-Declaration:
-
-`// C `
-
-where
-
-C = comment text
-
-OR
-
-/*
-   C
-*/
-C = comment text
-
-Examples:
-`// This is a comment`
-
 ```
+// I won't get executed
+
 /*
-    This is a
-    multiline comment
+    I am multiple lines!
+    Look
+    at
+    me
+    go
 */
 ```
 
-## Data Types
+## Hello World
 
-- `char`
-- `string`
-- `int`
+Let's get going with hello world!
+
+```
+print "Hello, World!"
+
+print "Hi, Mom!" // puts text on a new line
+
+print "Hello" "Everyone" // separate out the text as you need
+```
+
+## Storing variables and Data types
+
+The supported data types of the language are:
+
 - `bool`
+- `int`
+- `string`
 - `float`
-- `arr`(arrays)
-    - where T is the item stored in the array
-- `dict`(dictionaries)
-    - where K is the Key type and V is the Value type
-
-## Variable assignment
-
-Declaration:
-
-`x = y`
-
-where
-
-x = variable name
-T = variable data type
-y = variable value
-
-OR
-
-x = y
-
-where
-
-x = variable name
-y = variable value
-
-> [!NOTE]
-> Type is inferred automatically
-
-Examples:
-`x int = 5`
-    OR
-`x = 5`
-
-
-`y string = "hello"`
-    OR
-`y = "hello"`
-
-`b bool = true`
-    OR
-`b = true`
-
-## Variable Constants
-
-Declaration:
-
-`const x = y`
-OR
-`const x T = y`
-
-where
-
-x = variable name
-T = type
-y = value
-
-Examples:
-const x : int = 5 // immutable
-
-## Functions
-
-Declaration:
-
-fx (y T1, z T2, ... T...) -> RT
-{ ... }
-
-where
-
-fx = function name
-y, z and ... = arguments
-T1, T2 and T... = argument types
-RT = return type
-{ ... } = function body
-
-OR
-
-fx (y, z, ...) -> RT { ... }
-
-where
-
-fx = function name
-y, z and ... = arguments (types inferred)
-RT = return type
-
-OR
-
-fx (y, z, ...) { ... }
-
-where
-
-fx = function name
-y, z and ... = arguments (types inferred)
-
-> [!NOTE]
-> Return type is inferred
-
-Examples:
+- `char`
+- `arr`
+- `dict`
 
 ```
-calculateArea (l int, w int) -> int {
-    return l * w
+
+is_cool = true // bool
+
+my_num = 5 // int
+
+name = "Bob" // string
+
+pi = 3.14 // float
+
+my_initial = 'J' // char
+
+my_empty_array = [] // array (empty)
+
+my_populated_array = [1, 2, 3] // array (populated)
+
+my_empty_dict = {:} // dict (empty)
+
+my_populated_dict = { // dict (populated)
+    "hello": "world"
 }
-```
 
-```
-calculateArea (x, y) -> int {
-    return x * y
-}
-```
-
-```
-concatString (s1, s2) -> string {
-    return s1 + s2
-}
-```
-
-```
-concatString (s1, s2) {
-    return s1 + s2 // Return type is string
-}
-```
-
-```
-concatStringAndInt (s1, i1) {
-    return s1 + i1 // Return type is string
-}
-```
-
-## Array Literals
-
-Declaration:
-
-`a arr = [v1, v2, v3]`
-
-where
-
-T = array type
-a = array name
-\[v1, v2, v3] = array initialization values
-
-Examples:
-```
-values arr = ["one", "two", "three"]
-```
-## Function calls
-
-Declaration:
-
-`x ...`
-
-where
-
-x = function name
-... = arguments specified
-
-Examples:
-> Without variable
-`calculateArea 9 10`
-    OR
-> With inferred type
-`area = calculateArea 9 10`
-    OR
-> With explicit type
-`area int = calculateArea 9 10`
-
-
-## Property/Method Access
-
-Declaration:
-
-`e.p`
-
-where
-
-e = expression
-p = property on expression
-
-Examples:
-
-```
-"hello".chars // char[]
-```
-```
-"5".parseInt // 5
-```
-
-## Imports
-
-Declaration:
-
-`include x`
-
-where
-
-x = file name
-
-OR
-
-include x as y
-
-where
-
-x = file name
-y = alias
-
-Examples:
-
-```
-include "foo"
-
-// usage
-x = someFunctionFromFoo()
-```
-```
-include "bar" as baz
-
-x = baz.someFunctionFromFoo()
 ```
 
 ## If else expressions
 
-Declaration:
+Shai allows you to branch based on a condition that evaluates to true or false:
 
-`if x { ... }`
-
-where
-
-x = condition to enter block if evaluated to true
-
-Examples:
 ```
-if true {
-    //always go in here
+x = true
+
+if x {  // x evaluates to true so this will run
+    print "You are awesome"
 }
-```
-```
-i = 5
-if i > 3 {
-    print i
-}
-```
 
-```
-i = 5
-if i > 3 {
-    print i
-} else {
-    print i + 1
-}
-```
-## For Loops
-
-Declaration:
-
-```
-for x in y {
-    ...
+x = false
+if x { // x now evaluates to false so this will not run
+    print ":("
+} else { // x is false so this WILL
+    print "...still awesome"
 }
 
 ```
 
-where
+## Loops
 
-x = scoped variable
-y = range
+Shai supports various methods of iterating
 
-Examples:
 ```
-for i in 0..10{
-    print i
+
+// iterates forever
+while true {
+    print "forever"
 }
-```
-```
-names = ["Jordan", "Jules", "Sarah"]
-for name in names {
-    print name
-}
-```
 
-## While loop
-
-Declaration:
-
-```
-while x {
-
-}
-```
-
-where
-
-x is loop continuation condition that evaluates to true or false.
-
-> [!NOTE]
-> If x is ommitted, loop will continue until a break statement is hit
-
-```
+// for these kinds of loops, you can omit the condition entirely
 while {
-    print "hello"
-    // infinite loop
+    print "still forever"
 }
-```
-```
-// print hello 10 times
-i = 0
-while i < 10 {
-    print "hello"
-    i+=1
+
+// you can loop while a certain condition is true. When it is false, the loop will end
+x = 5
+while x > 0 {
+    print x
+    x -= 1 // decrement each loop
 }
-```
-```
-// print hello 3 times
-i = 0
-while i < 10 {
-    print "hello"
-    if i / 2 == 1 {
-        break
-    }
-    i+=1
+// output:
+// 5
+// 4
+// 3
+// 2
+// 1
+
+// you can also specify the amount of times you'd like to use by using a for loop.
+// Shai supports "ranges", which represents a range of numbers from one point to another
+
+for i in 0..5 {
+    print i
 }
+
+// output:
+// 0
+// 1
+// 2
+// 3
+// 4
+
+// To include the last number in the iteration, add an '='
+for i in 0..=5 {
+    print i
+}
+
+// output:
+// 0
+// 1
+// 2
+// 3
+// 4
+// 5
+
+// for loops can be used to iterate over a collection such as an array or dictionary
+
+my_array = [1, 2, 3]
+
+for i in my_array {
+    print i
+}
+
+// output:
+// 1
+// 2
+// 3
+
+my_dict = {
+    "hello": "world"
+    "hi": "mom"
+}
+
+for key, value in my_dict {
+    print key
+    print value
+}
+
+// output:
+// hello
+// world
+// hi
+// mom
+
 ```
+
+## Getting values out of arrays and dictionaries
+
+Getting values resembles Python syntax. Shai is 0 indexed so arrays start at index 0:
+
+```
+my_array = [1, 2, 3]
+
+my_first_number = my_array[0] // note 0 means the first item here
+
+my_dict = {
+    "hello": "world"
+    "hi": "mom"
+}
+
+my_first_number = my_dict["hello"] // "world"
+
+```
+
+## Functions
+
+You can declare blocks of functionality called Functions:
+
+```
+
+// declare a function
+// it has a name so you can reference it
+// the "name" between the brackets are called the paramters, these are your input into the function
+say_hi (name) {
+    // the code in this block will get run
+    print "Hi" name
+}
+
+// this is how you run (called "calling") a function...notice similarities with printing? print is also a function!
+say_hi "Reader :)"
+
+```
+
+The language currently has 2 builtin functions for you: `print`, which you already know about, displays text to the screen. There is also a `len` function to get the length of something you can loop over:
+
+```
+
+my_values =  [1, 2, 3]
+
+my_values_len = len my_values
+
+print my_values_len
+
+```
+
