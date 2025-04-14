@@ -325,13 +325,10 @@ fn parse_dict_literal(
             }
         }
         Some(Token::Literal(l)) => {
-            let key = parse_dict_key(l)?;
-
             let (t, state) = state.next();
             match t {
                 Some(Token::Symbol(Symbol::Colon)) => {
                     let (rhs, state) = parse_expression(state, None, None)?;
-                    dict.insert(key, rhs);
                     let (t, state) = state.next();
                     match t {
                         Some(Token::Symbol(Symbol::Comma))
@@ -432,7 +429,7 @@ fn parse_assignment(
             ))
         }
         Some(Token::Symbol(Symbol::BraceOpen)) => {
-            let (expr, state) = parse_dict_literal(state, &mut HashMap::new())?;
+            let (expr, state) = parse_brace_open(state)?;
             Ok((
                 Expression::new_assignment(ident, expr, None, type_assertion, false),
                 state,
@@ -460,6 +457,21 @@ fn parse_assignment(
         None => Err(ParseError::NoMoreTokens {
             context: "on_assignment".to_string(),
         }),
+    }
+}
+
+fn parse_brace_open(state: ParseState) -> ParseResult<(Expression, ParseState)> {
+    let state = state.advance();
+
+    match state.peek() {
+        Some(Token::Symbol(Symbol::Colon)) => {
+            parse_dict_literal(state.step_back(), &mut HashMap::new())
+        }
+        _ => {
+            // previous is part of a body expression, so handle that...
+            parse_body(state.step_back(), &mut vec![], None)
+                .map(|(expr, state)| (Expression::new_body(expr), state))
+        }
     }
 }
 
