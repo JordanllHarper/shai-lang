@@ -119,7 +119,7 @@ pub fn map_binding_to_string(
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
     match binding {
         EnvironmentBinding::Value(v) => map_value_to_string(state, v),
-        EnvironmentBinding::Function(f) => Err(EvaluatorError::NotYetImplemented),
+        EnvironmentBinding::Function(f) => todo!(),
         EnvironmentBinding::Identifier(i) => match state.get_local_binding(i) {
             Some(binding) => map_binding_to_string(state, &binding),
             None => Err(EvaluatorError::NoSuchIdentifier),
@@ -159,8 +159,8 @@ pub fn map_expression_to_binding(
             let binding = get_identifier_binding(&state, &i)?;
             Ok((state, binding))
         }
-        Expression::Evaluation(_) => Err(EvaluatorError::NotYetImplemented),
-        Expression::FunctionCall(_) => Err(EvaluatorError::NotYetImplemented),
+        Expression::Evaluation(_) => todo!(),
+        Expression::FunctionCall(_) => todo!(),
         Expression::Body(e) => {
             let (state, body_value) = evaluate_body(state, e)?;
             Ok((state, EnvironmentBinding::Value(body_value)))
@@ -195,7 +195,14 @@ pub fn map_expression_to_binding(
             let (state, value) = evaluate_operation(state, o)?;
             Ok((state, EnvironmentBinding::Value(value)))
         }
-        _ => Err(EvaluatorError::NotYetImplemented),
+        Expression::Index(_) => todo!(),
+        Expression::Statement(_) => todo!(),
+        Expression::Function(_) => todo!(),
+        Expression::If(_) => todo!(),
+        Expression::While(_) => todo!(),
+        Expression::For(_) => todo!(),
+        Expression::Assignment(a) => evaluate_assignment(state, a)
+            .map(|(state, value)| (state, EnvironmentBinding::Value(value))),
     }
 }
 

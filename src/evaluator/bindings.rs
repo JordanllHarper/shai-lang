@@ -1,3 +1,5 @@
+use crate::dbg;
+
 #[derive(Debug, Clone)]
 pub enum RustBinding {
     Print(Print),
@@ -6,5 +8,7 @@ pub enum RustBinding {
 
 pub type Print = fn(Vec<String>);
 pub fn std_rust_print(s: Vec<String>) {
-    println!("{}", s.join(" "))
+    let s = s.join(" ");
+    dbg!("STDOUT: {}", &s);
+    println!("{}", s)
 }

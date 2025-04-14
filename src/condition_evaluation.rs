@@ -44,8 +44,8 @@ pub fn should_evaluate(
                     Value::ValueLiteral(ValueLiteral::Bool(b)) => b,
                     _ => return Err(EvaluatorError::NotABooleanValue),
                 },
-                EnvironmentBinding::Function(_) => return Err(EvaluatorError::NotYetImplemented),
-                EnvironmentBinding::Identifier(_) => return Err(EvaluatorError::NotYetImplemented),
+                EnvironmentBinding::Function(_) => todo!(),
+                EnvironmentBinding::Identifier(_) => todo!(),
             }
         }
 

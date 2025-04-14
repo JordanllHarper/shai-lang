@@ -229,22 +229,20 @@ fn evaluate_body(
     Ok((next_state, next_value))
 }
 
-fn evaluate_assignment_expression(
+fn evaluate_assignment(
     state: EnvironmentState,
-    expr: Expression,
-) -> Result<(EnvironmentState, EnvironmentBinding), EvaluatorError> {
-    match expr {
-        Expression::ValueLiteral(v) => {
-            Ok((state, (EnvironmentBinding::Value(Value::ValueLiteral(v)))))
-        }
+    a: Assignment,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    let (state, binding) = match *a.rhs {
+        Expression::ValueLiteral(v) => (state, (EnvironmentBinding::Value(Value::ValueLiteral(v)))),
         Expression::Identifier(i) => {
             let get_identifier_binding = get_identifier_binding(&state, &i)?;
-            Ok((state, get_identifier_binding))
+            (state, get_identifier_binding)
         }
         Expression::Statement(_) => todo!(),
         Expression::MathOperation(math_op) => {
             let (state, value) = evaluate_operation(state, math_op)?;
-            Ok((state, EnvironmentBinding::Value(value)))
+            (state, EnvironmentBinding::Value(value))
         }
         Expression::Evaluation(eval) => {
             let (state, lhs) = map_expression_to_binding(state, *eval.lhs)?;
@@ -256,35 +254,30 @@ fn evaluate_assignment_expression(
             };
 
             let (state, eval) = evaluate_bindings(state, lhs, rhs, eval.evaluation_op)?;
-            Ok((state, EnvironmentBinding::new_bool(eval)))
+            (state, EnvironmentBinding::new_bool(eval))
         }
         Expression::Function(_) => todo!(),
         Expression::If(_) => todo!(),
         Expression::While(_) => todo!(),
         Expression::For(_) => todo!(),
-        Expression::Body(_) => todo!(),
+        Expression::Body(b) => evaluate_body(state, b)
+            .map(|(state, value)| (state, EnvironmentBinding::Value(value)))?,
         Expression::Range(r) => {
             let (state, value) = evaluate_range(state, r)?;
-            Ok((state, EnvironmentBinding::Value(value)))
+            (state, EnvironmentBinding::Value(value))
         }
         Expression::Assignment(_) => todo!(),
         Expression::FunctionCall(fc) => {
             let (state, value) = evaluate_function_call(state, fc)?;
-            Ok((state, EnvironmentBinding::Value(value)))
+            (state, EnvironmentBinding::Value(value))
         }
         Expression::Index(index) => {
             let (state, value) = evaluate_index(state, index)?;
-            Ok((state, EnvironmentBinding::Value(value)))
+            (state, EnvironmentBinding::Value(value))
         }
-    }
-}
+    };
 
-fn evaluate_assignment(
-    state: EnvironmentState,
-    a: Assignment,
-) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let (new_state, binding) = evaluate_assignment_expression(state, *a.rhs)?;
-    add_binding_or_error(new_state, &a.identifier, binding)
+    add_binding_or_error(state, &a.identifier, binding)
 }
 
 fn evaluate_function(
@@ -395,21 +388,6 @@ pub fn handle_rust_binding_with_args(
             }
         }
     }
-}
-
-fn resolve_function_arguments_to_string(
-    state: EnvironmentState,
-    args: Vec<Expression>,
-) -> Result<(EnvironmentState, Vec<String>), EvaluatorError> {
-    let mut new_state = state.clone();
-    let mut s_args: Vec<String> = vec![];
-    for arg in args {
-        let (maybe_state, value) = map_expression_to_value(new_state, arg)?;
-        let (maybe_state, s) = map_value_to_string(maybe_state, &value)?;
-        s_args.push(s);
-        new_state = maybe_state;
-    }
-    Ok((new_state, s_args))
 }
 
 fn evaluate_function_call(

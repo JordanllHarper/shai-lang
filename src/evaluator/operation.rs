@@ -2,6 +2,7 @@ use util::map_expression_to_binding;
 use util::map_value_to_string;
 
 use super::environment::*;
+use crate::dbg;
 use crate::evaluator::*;
 use crate::language::*;
 
@@ -45,6 +46,7 @@ fn handle_add(
     state: EnvironmentState,
     values: (Value, Value),
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    dbg!(&values);
     match values {
         (Value::ValueLiteral(ValueLiteral::CharacterBased(c)), other) => {
             handle_concatenation(state, c, other, false)
@@ -57,7 +59,15 @@ fn handle_add(
             Value::ValueLiteral(ValueLiteral::Numeric(n1)),
             Value::ValueLiteral(ValueLiteral::Numeric(n2)),
         ) => Ok((state, Value::new_numeric(n1 + n2))),
-        _ => Err(EvaluatorError::InvalidOperationValue),
+        (Value::ValueLiteral(_), Value::Range(_)) => todo!(),
+        (Value::ValueLiteral(_), Value::Void) => todo!(),
+        (Value::Range(_), Value::ValueLiteral(_)) => todo!(),
+        (Value::Range(_), Value::Range(_)) => todo!(),
+        (Value::Range(_), Value::Void) => todo!(),
+        (Value::Void, Value::ValueLiteral(_)) => todo!(),
+        (Value::Void, Value::Range(_)) => todo!(),
+        (Value::Void, Value::Void) => todo!(),
+        _ => todo!(),
     }
 }
 
