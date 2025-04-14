@@ -44,7 +44,9 @@ pub fn evaluate(
         Expression::MathOperation(m) => evaluate_operation(state, m),
         Expression::Evaluation(b) => evaluate_evaluation(state, b),
         Expression::Function(f) => {
-            add_binding_or_error(state, &f.ident.clone(), EnvironmentBinding::Function(f))
+            let (state, binding) =
+                add_binding_or_error(state, &f.ident.clone(), EnvironmentBinding::Function(f))?;
+            Ok((state, Value::Void))
         }
         Expression::If(if_expression) => evaluate_if(state, if_expression),
         Expression::While(w) => evaluate_while(state, w),
@@ -277,7 +279,8 @@ fn evaluate_assignment(
         }
     };
 
-    add_binding_or_error(state, &a.identifier, binding)
+    let (state, binding) = add_binding_or_error(state, &a.identifier, binding)?;
+    map_binding_to_value(state, binding, vec![])
 }
 
 fn evaluate_function(
@@ -285,6 +288,8 @@ fn evaluate_function(
     f: Function,
     args: Vec<Expression>,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    dbg!(&f);
+    dbg!(&args);
     if args.len() != f.params.len() {
         return Err(EvaluatorError::InvalidNumberOfArguments);
     }
@@ -295,7 +300,7 @@ fn evaluate_function(
         let (mut maybe_state, binding) = map_expression_to_binding(new_state, arg)?;
 
         let error = maybe_state.add_or_mutate_symbols(&parameter.ident, binding);
-        if let Some(e) = error {
+        if let Err(e) = error {
             return Err(match e {
                 MutateBindingError::InvalidRedeclaration => EvaluatorError::InvalidRedeclaration,
                 MutateBindingError::NoIdentifier => EvaluatorError::NoSuchIdentifier,
@@ -394,9 +399,7 @@ fn evaluate_function_call(
     state: EnvironmentState,
     fc: FunctionCall,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let maybe_std_fn = state.std_lib_symbols.get(&fc.identifier).cloned();
-
-    if let Some(std) = maybe_std_fn {
+    if let Some(std) = state.std_lib_symbols.get(&fc.identifier).cloned() {
         let (state, result) = handle_rust_binding_with_args(state, &std, fc.args)?;
         return Ok((state, result));
     }
@@ -415,15 +418,15 @@ fn add_binding_or_error(
     state: EnvironmentState,
     symbol: &str,
     binding: EnvironmentBinding,
-) -> Result<(EnvironmentState, Value), EvaluatorError> {
+) -> Result<(EnvironmentState, EnvironmentBinding), EvaluatorError> {
     let mut maybe_state = state.clone();
     let error = maybe_state.add_or_mutate_symbols(symbol, binding);
     match error {
-        Some(e) => Err(match e {
+        Err(e) => Err(match e {
             MutateBindingError::InvalidRedeclaration => EvaluatorError::InvalidRedeclaration,
             MutateBindingError::NoIdentifier => EvaluatorError::NoSuchIdentifier,
         }),
 
-        None => Ok((maybe_state, Value::Void)),
+        Ok(binding) => Ok((maybe_state, binding)),
     }
 }

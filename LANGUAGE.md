@@ -16,7 +16,7 @@ Below is an overview of the language.
 ## Comments
 
 ```
-// I won't get executed
+// Hi!
 
 /*
     I am multiple lines!

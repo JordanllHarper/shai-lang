@@ -14,8 +14,8 @@ pub fn evaluate_operation(
     let (new_state, lh_binding) = map_expression_to_binding(new_state, *m.lhs)?;
     let (new_state, rh_binding) = map_expression_to_binding(new_state, *m.rhs)?;
 
-    let (new_state, left_value) = map_binding_to_value(new_state, lh_binding)?;
-    let (new_state, right_value) = map_binding_to_value(new_state, rh_binding)?;
+    let (new_state, left_value) = map_binding_to_value(new_state, lh_binding, vec![])?;
+    let (new_state, right_value) = map_binding_to_value(new_state, rh_binding, vec![])?;
     let values = (left_value, right_value);
 
     match m.operation {

@@ -225,6 +225,7 @@ fn parse_body(
     previous: Option<Expression>,
 ) -> ParseResult<BodyState> {
     let peek = state.peek();
+
     match peek {
         Some(Token::Symbol(Symbol::BraceClose)) => return Ok((body.to_vec(), state.advance())),
         // WARNING: This might be a bug passing previous through
@@ -328,7 +329,9 @@ fn parse_dict_literal(
             let (t, state) = state.next();
             match t {
                 Some(Token::Symbol(Symbol::Colon)) => {
+                    let key = parse_dict_key(l)?;
                     let (rhs, state) = parse_expression(state, None, None)?;
+                    dict.insert(key, rhs);
                     let (t, state) = state.next();
                     match t {
                         Some(Token::Symbol(Symbol::Comma))
@@ -461,17 +464,29 @@ fn parse_assignment(
 }
 
 fn parse_brace_open(state: ParseState) -> ParseResult<(Expression, ParseState)> {
-    let state = state.advance();
+    let peek = state.peek();
+    if let Some(Token::Symbol(Symbol::Newline)) = peek {
+        return parse_brace_open(state.advance());
+    }
+    let (next, state) = state.next();
+    if let Some(Token::Symbol(Symbol::Colon)) = next {
+        return Ok((Expression::new_dict(HashMap::new()), state.advance()));
+    }
 
+    println!("Start of something {:?}", next);
     match state.peek() {
+        Some(Token::Symbol(Symbol::Newline)) => parse_brace_open(state),
         Some(Token::Symbol(Symbol::Colon)) => {
             parse_dict_literal(state.step_back(), &mut HashMap::new())
         }
-        _ => {
+        Some(t) => {
+            println!("Start of something {:?}", t);
             // previous is part of a body expression, so handle that...
             parse_body(state.step_back(), &mut vec![], None)
                 .map(|(expr, state)| (Expression::new_body(expr), state))
         }
+        None => parse_body(state.step_back(), &mut vec![], None)
+            .map(|(expr, state)| (Expression::new_body(expr), state)),
     }
 }
 
@@ -1786,6 +1801,37 @@ mod tests {
     }
 
     #[test]
+    fn function_declaration_params_body() {
+        test(
+            "function_declaration_params_body",
+            vec![
+                Token::Ident("say_hi".to_string()),
+                Token::Symbol(Symbol::ParenOpen),
+                Token::Ident("name".to_string()),
+                Token::Symbol(Symbol::ParenClose),
+                Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Newline),
+                Token::Ident("print".to_string()),
+                Token::Literal(Literal::String("Hi".to_string())),
+                Token::Ident("name".to_string()),
+                Token::Symbol(Symbol::Newline),
+                Token::Symbol(Symbol::BraceClose),
+            ],
+            Expression::new_body(vec![Expression::new_function(
+                "say_hi",
+                vec![Parameter::new("name", None)],
+                None,
+                Expression::new_body(vec![Expression::new_function_call(
+                    "print",
+                    vec![
+                        Expression::new_string("Hi"),
+                        Expression::new_identifier("name"),
+                    ],
+                )]),
+            )]),
+        )
+    }
+    #[test]
     fn function_declaration_params_return() {
         // do_nothing (numOne, numTwo) -> int {\n
         // \n
@@ -2194,7 +2240,7 @@ mod tests {
     }
     #[test]
     fn dictionary_literals() {
-        // x dict = {}
+        // x dict = {"hello": "world"}
         test(
             "Assigment empty dict with type",
             vec![
@@ -2202,6 +2248,7 @@ mod tests {
                 Token::Kwd(Kwd::DataType(DataTypeKwd::Dict)),
                 Token::Symbol(Symbol::Equals),
                 Token::Symbol(Symbol::BraceOpen),
+                Token::Symbol(Symbol::Colon),
                 Token::Symbol(Symbol::BraceClose),
             ],
             Expression::new_body(vec![Expression::new_assignment(

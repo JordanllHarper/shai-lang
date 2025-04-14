@@ -155,18 +155,17 @@ fn mutate_local_binding_recursive(
     scope: &mut Scope,
     symbol: &str,
     binding: EnvironmentBinding,
-) -> Option<MutateBindingError> {
+) -> Result<EnvironmentBinding, MutateBindingError> {
     match scope.local_symbols.get(symbol) {
-        Some(EnvironmentBinding::Function(_)) => Some(MutateBindingError::InvalidRedeclaration),
+        Some(EnvironmentBinding::Function(_)) => Err(MutateBindingError::InvalidRedeclaration),
         _ => {
-            scope
+            let _ = scope
                 .local_symbols
                 .insert(symbol.to_string(), binding.clone());
             match &mut scope.parent {
                 Some(p) => mutate_local_binding_recursive(p, symbol, binding),
-                None => None,
-            };
-            None
+                None => Ok(binding),
+            }
         }
     }
 }
@@ -190,7 +189,7 @@ impl EnvironmentState {
         &mut self,
         symbol: &str,
         binding: EnvironmentBinding,
-    ) -> Option<MutateBindingError> {
+    ) -> Result<EnvironmentBinding, MutateBindingError> {
         mutate_local_binding_recursive(&mut self.current_scope, symbol, binding)
     }
 }

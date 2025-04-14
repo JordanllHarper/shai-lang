@@ -209,10 +209,11 @@ pub fn map_expression_to_binding(
 pub fn map_binding_to_value(
     state: EnvironmentState,
     binding: EnvironmentBinding,
+    args: Vec<Expression>,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     match binding {
         EnvironmentBinding::Value(v) => Ok((state, v)),
-        EnvironmentBinding::Function(f) => evaluate_function(state, f, vec![]),
+        EnvironmentBinding::Function(f) => evaluate_function(state, f, args),
         EnvironmentBinding::Identifier(i) => {
             let value = get_identifier_binding_recursively(&state, &i)?;
             Ok((state, value))
@@ -225,18 +226,19 @@ pub fn map_expression_to_value(
     expr: Expression,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     let (state, binding) = map_expression_to_binding(state, expr)?;
-    let (state, value) = map_binding_to_value(state, binding)?;
+    let (state, value) = map_binding_to_value(state, binding, vec![])?;
     Ok((state, value))
 }
 
 pub fn map_identifier_to_value(
     state: EnvironmentState,
     ident: &str,
+    args: Vec<Expression>,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     let binding = state
         .get_local_binding(ident)
         .ok_or(EvaluatorError::NoSuchIdentifier)?;
-    map_binding_to_value(state, binding)
+    map_binding_to_value(state, binding, args)
 }
 
 pub fn map_dictionary_key_to_value(
@@ -247,7 +249,7 @@ pub fn map_dictionary_key_to_value(
         DictionaryKey::String(s) => Ok((state, Value::new_string(&s))),
         DictionaryKey::Int(i) => Ok((state, Value::new_numeric(NumericLiteral::Int(i)))),
         DictionaryKey::Bool(b) => Ok((state, Value::new_bool(b))),
-        DictionaryKey::Identifier(i) => map_identifier_to_value(state, &i),
+        DictionaryKey::Identifier(i) => map_identifier_to_value(state, &i, vec![]),
         DictionaryKey::Char(c) => Ok((state, Value::new_char(c))),
     }
 }
