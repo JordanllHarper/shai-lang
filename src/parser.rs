@@ -2377,87 +2377,52 @@ mod tests {
         );
 
         test(
-            "fibonacci with variable store",
+            "fibonacci with stored variable",
             vec![
                 Token::new_ident("fib"),
                 Token::Symbol(Symbol::ParenOpen),
                 Token::new_ident("num"),
                 Token::Symbol(Symbol::ParenClose),
-                Token::whitespace(),
                 Token::Symbol(Symbol::BraceOpen),
                 Token::Symbol(Symbol::Newline),
-                // tab
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                //
+                // if condition
                 Token::Kwd(Kwd::If),
                 Token::new_ident("num"),
-                Token::whitespace(),
                 Token::Symbol(Symbol::Evaluation(EvaluationSymbol::LzEq)),
-                Token::whitespace(),
                 Token::Literal(Literal::Int(1)),
-                Token::whitespace(),
+                // if body
                 Token::Symbol(Symbol::BraceOpen),
-                // body
-                //
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                //
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                //
                 Token::Kwd(Kwd::Return),
-                Token::whitespace(),
-                Token::Literal(Literal::Int(1)),
+                Token::Ident("num".to_string()),
                 Token::Symbol(Symbol::BraceClose),
+                //
                 Token::Kwd(Kwd::Else),
-                Token::whitespace(),
+                // else body
                 Token::Symbol(Symbol::BraceOpen),
-                //
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                //
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                Token::whitespace(),
-                //
-                Token::Ident("new_num".to_string()),
+                Token::Symbol(Symbol::Newline),
+                Token::new_ident("new_num"),
                 Token::Symbol(Symbol::Equals),
-                Token::whitespace(),
                 Token::Symbol(Symbol::BraceOpen),
-                Token::whitespace(),
+                Token::new_ident("fib"),
+                Token::Symbol(Symbol::BraceOpen),
                 Token::new_ident("num"),
-                Token::whitespace(),
                 Token::Symbol(Symbol::Op(OpSymbol::Minus)),
-                Token::whitespace(),
                 Token::Literal(Literal::Int(1)),
-                Token::whitespace(),
                 Token::Symbol(Symbol::BraceClose),
-                Token::whitespace(),
+                Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Op(OpSymbol::Plus)),
-                Token::whitespace(),
                 Token::Symbol(Symbol::BraceOpen),
-                Token::whitespace(),
+                Token::new_ident("fib"),
+                Token::Symbol(Symbol::BraceOpen),
                 Token::new_ident("num"),
-                Token::whitespace(),
                 Token::Symbol(Symbol::Op(OpSymbol::Minus)),
-                Token::whitespace(),
                 Token::Literal(Literal::Int(2)),
-                Token::whitespace(),
+                Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::Newline),
                 Token::Kwd(Kwd::Return),
-                Token::Ident("new_num".to_string()),
-                Token::Symbol(Symbol::BraceClose),
+                Token::new_ident("new_num"),
+                Token::Symbol(Symbol::Newline),
                 Token::Symbol(Symbol::BraceClose),
                 Token::Symbol(Symbol::BraceClose),
             ],
@@ -2472,29 +2437,45 @@ mod tests {
                         EvaluationOperator::NumericOnly(EvaluationNumericOnly::LzEq),
                     ),
                     Expression::new_body(vec![Expression::Statement(Statement::new(
-                        Some(Expression::new_int(1)),
+                        Some(Expression::new_identifier("num")),
                         StatementOperator::Return,
                     ))]),
                     // on false evaluation
-                    Some(Expression::new_body(vec![Expression::new_assignment(
-                        "new_num",
-                        Expression::new_math_expression(
-                            Expression::new_body(vec![Expression::new_math_expression(
-                                Expression::new_identifier("num"),
-                                Expression::new_int(1),
-                                Operator::Subtract,
-                            )]),
-                            Expression::new_body(vec![Expression::new_math_expression(
-                                Expression::new_identifier("num"),
-                                Expression::new_int(2),
-                                Operator::Subtract,
-                            )]),
-                            Operator::Add,
+                    Some(Expression::new_body(vec![
+                        Expression::new_assignment(
+                            "new_num",
+                            Expression::new_math_expression(
+                                Expression::new_body(vec![Expression::new_function_call(
+                                    "fib",
+                                    vec![Expression::new_body(vec![
+                                        Expression::new_math_expression(
+                                            Expression::new_identifier("num"),
+                                            Expression::new_int(1),
+                                            Operator::Subtract,
+                                        ),
+                                    ])],
+                                )]),
+                                Expression::new_body(vec![Expression::new_function_call(
+                                    "fib",
+                                    vec![Expression::new_body(vec![
+                                        Expression::new_math_expression(
+                                            Expression::new_identifier("num"),
+                                            Expression::new_int(2),
+                                            Operator::Subtract,
+                                        ),
+                                    ])],
+                                )]),
+                                Operator::Add,
+                            ),
+                            None,
+                            None,
+                            false,
                         ),
-                        None,
-                        None,
-                        false,
-                    )])),
+                        Expression::new_statement(
+                            Some(Expression::new_identifier("new_num")),
+                            StatementOperator::Return,
+                        ),
+                    ])),
                 )]),
             )]),
         );
