@@ -2546,6 +2546,35 @@ mod tests {
                 Expression::new_int(5),
                 Operator::Add,
             )]),
-        )
+        );
+
+        // x = 3 * 4 + 5
+        test(
+            "operator_precedence with assignment",
+            vec![
+                Token::Ident("x".to_string()),
+                Token::Symbol(Symbol::Equals),
+                Token::Literal(Literal::Int(3)),
+                Token::Symbol(Symbol::Op(OpSymbol::Asterisk)),
+                Token::Literal(Literal::Int(4)),
+                Token::Symbol(Symbol::Op(OpSymbol::Plus)),
+                Token::Literal(Literal::Int(5)),
+            ],
+            Expression::new_body(vec![Expression::new_assignment(
+                "x",
+                Expression::new_math_expression(
+                    Expression::new_math_expression(
+                        Expression::new_int(3),
+                        Expression::new_int(4),
+                        Operator::Multiply,
+                    ),
+                    Expression::new_int(5),
+                    Operator::Add,
+                ),
+                None,
+                None,
+                false,
+            )]),
+        );
     }
 }
