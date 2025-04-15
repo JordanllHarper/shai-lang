@@ -409,58 +409,37 @@ fn parse_assignment(
 ) -> ParseResult<(Expression, ParseState)> {
     let (t, state) = state.next();
 
-    match t {
-        Some(Token::Symbol(Symbol::Op(OpSymbol::Minus))) => {
-            let (minus, state) = parse_minus(state)?;
-            Ok((
-                Expression::new_assignment(ident, minus, None, type_assertion, false),
-                state,
-            ))
-        }
-        Some(Token::Literal(l)) => {
-            let (vl, state) = parse_literal(state, l, None)?;
-            Ok((
-                Expression::new_assignment(ident, vl, None, type_assertion, false),
-                state,
-            ))
-        }
-        Some(Token::Symbol(Symbol::AngOpen)) => {
-            let (expr, state) = parse_array_literal(state, &mut vec![])?;
-            Ok((
-                Expression::new_assignment(ident, expr, None, type_assertion, false),
-                state,
-            ))
-        }
-        Some(Token::Symbol(Symbol::BraceOpen)) => {
-            let (expr, state) = parse_brace_open(state)?;
-            Ok((
-                Expression::new_assignment(ident, expr, None, type_assertion, false),
-                state,
-            ))
-        }
+    let (rhs, state) = match t {
+        Some(Token::Symbol(Symbol::Op(OpSymbol::Minus))) => parse_minus(state)?,
+        Some(Token::Literal(l)) => parse_literal(state, l, None)?,
+        Some(Token::Symbol(Symbol::AngOpen)) => parse_array_literal(state, &mut vec![])?,
+        Some(Token::Symbol(Symbol::BraceOpen)) => parse_brace_open(state)?,
         Some(Token::Ident(i)) => {
             let is_evaluation = matches!(state.peek(), Some(Token::Symbol(Symbol::Evaluation(_))));
 
-            let (rhs, state) = if is_evaluation {
+            if is_evaluation {
                 parse_evaluation(state, Expression::new_identifier(&i))?
             } else {
                 parse_identifier(state, &i)?
-            };
-
-            Ok((
-                Expression::new_assignment(ident, rhs, None, type_assertion, false),
-                state,
-            ))
+            }
         }
-        Some(t) => Err(ParseError::InvalidSyntax {
-            message: "Expected a valid assignment: literal value, identifier, or array syntax"
-                .to_string(),
-            token_context: t,
-        }),
-        None => Err(ParseError::NoMoreTokens {
-            context: "on_assignment".to_string(),
-        }),
-    }
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected a valid assignment: literal value, identifier, or array syntax"
+                    .to_string(),
+                token_context: t,
+            })
+        }
+        None => {
+            return Err(ParseError::NoMoreTokens {
+                context: "on_assignment".to_string(),
+            })
+        }
+    };
+    Ok((
+        Expression::new_assignment(ident, rhs, None, type_assertion, false),
+        state,
+    ))
 }
 
 fn parse_brace_open(state: ParseState) -> ParseResult<(Expression, ParseState)> {
