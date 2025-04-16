@@ -164,7 +164,7 @@ pub fn map_expression_to_binding(
         Expression::Evaluation(_) => todo!(),
         Expression::FunctionCall(_) => todo!(),
         Expression::Body(e) => {
-            let (state, body_value) = evaluate_body(state, e, 0, Value::Void)?;
+            let (state, body_value) = evaluate_body(state, e)?;
             Ok((state, EnvironmentBinding::Value(body_value)))
         }
         // NOTE: This generates a list of numbers for the user. An optimization here could be to

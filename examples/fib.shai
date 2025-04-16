@@ -2,7 +2,8 @@
 
 fib (num) {
     if num <= 1 {
-        return num
+        new_num = num
+        return new_num
     } else {
         new_num = { fib { num - 1 } } + { fib { num - 2 } }
         return new_num

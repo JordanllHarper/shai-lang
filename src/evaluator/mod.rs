@@ -51,7 +51,7 @@ pub fn evaluate(
         Expression::If(if_expression) => evaluate_if(state, if_expression),
         Expression::While(w) => evaluate_while(state, w),
         Expression::For(f) => evaluate_for(state, f),
-        Expression::Body(b) => evaluate_body(state, b, 0, Value::Void),
+        Expression::Body(b) => evaluate_body(state, b),
         Expression::Range(r) => evaluate_range(state, r),
         Expression::Assignment(a) => evaluate_assignment(state, a),
         Expression::FunctionCall(f) => evaluate_function_call(state, f),
@@ -175,7 +175,7 @@ fn evaluate_while(
 
         match v {
             Value::ValueLiteral(ValueLiteral::Bool(true)) => {
-                let (maybe_state, _) = evaluate_body(maybe_state, w.body.clone(), 0, Value::Void)?;
+                let (maybe_state, _) = evaluate_body(maybe_state, w.body.clone())?;
                 new_state = maybe_state;
             }
             _ => return Ok((state, Value::Void)),
@@ -220,15 +220,12 @@ fn evaluate_evaluation(
 fn evaluate_body(
     state: EnvironmentState,
     body: Body,
-    index: usize,
-    value: Value,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    if index > body.len() - 1 {
-        Ok((state, value))
-    } else {
-        let (state, result) = evaluate(state, body.get(index).unwrap().clone())?;
-        evaluate_body(state, body, index + 1, result)
+    let (mut state, mut value) = (state.clone(), Value::Void);
+    for expr in body {
+        (state, value) = evaluate(state, expr)?;
     }
+    Ok((state, value))
 }
 
 fn evaluate_assignment(
@@ -268,7 +265,7 @@ fn evaluate_assignment(
         Expression::If(_) => todo!(),
         Expression::While(_) => todo!(),
         Expression::For(_) => todo!(),
-        Expression::Body(b) => evaluate_body(state, b, 0, Value::Void)
+        Expression::Body(b) => evaluate_body(state, b)
             .map(|(state, value)| (state, EnvironmentBinding::Value(value)))?,
         Expression::Range(r) => {
             let (state, value) = evaluate_range(state, r)?;
