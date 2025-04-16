@@ -616,15 +616,14 @@ fn parse_operator(
     // This will then get returned back up to us to construct our expression
 
     let (rhs, state) = parse_expression(state, Some(lhs.clone()), Some(current.clone()))?;
-    dbg!("Precedence Rhs {:?}", &rhs);
-    let new_lhs = Expression::new_math_expression(lhs, rhs, current);
-    dbg!("{:?}", &new_lhs);
-    if state.end() {
-        return Ok((new_lhs, state));
-    }
-    match state.peek() {
-        Some(Token::Symbol(Symbol::Newline)) | None => Ok((new_lhs, state)),
-        _ => parse_expression(state, Some(new_lhs), None),
+    let new_lhs = Expression::new_math_expression(lhs, rhs, current.clone());
+
+    let peek = state.peek().cloned();
+    match peek {
+        Some(Token::Symbol(Symbol::Op(op))) => {
+            parse_operator(state, Operator::from_token(&op), None, new_lhs)
+        }
+        _ => Ok((new_lhs, state)),
     }
 }
 
