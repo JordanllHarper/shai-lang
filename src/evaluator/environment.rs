@@ -144,10 +144,13 @@ fn get_local_binding_recursive(symbol: &str, current_scope: &Scope) -> Option<En
 
     match local_symbol {
         Some(v) => Some(v.clone()),
-        None => match &current_scope.parent {
-            Some(p) => get_local_binding_recursive(symbol, p),
-            None => None,
-        },
+        None => {
+            if let Some(p) = &current_scope.parent {
+                get_local_binding_recursive(symbol, p)
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -158,6 +161,12 @@ fn mutate_local_binding_recursive(
 ) -> Result<EnvironmentBinding, EvaluatorError> {
     match scope.local_symbols.get(symbol) {
         Some(EnvironmentBinding::Function(_)) => Err(EvaluatorError::InvalidRedeclaration),
+        Some(EnvironmentBinding::Identifier(_)) => {
+            let _ = scope
+                .local_symbols
+                .insert(symbol.to_string(), binding.clone());
+            Ok(binding)
+        }
         _ => {
             let _ = scope
                 .local_symbols
@@ -177,6 +186,7 @@ impl EnvironmentState {
             std_lib_symbols: HashMap::from([
                 ("print".to_string(), RustBinding::Print(std_rust_print)),
                 ("len".to_string(), RustBinding::Len),
+                ("append".to_string(), RustBinding::Append),
             ]),
         }
     }

@@ -306,6 +306,7 @@ pub enum Operator {
     Subtract,
     Multiply,
     Divide,
+    Mod,
 }
 
 /// These are normally special operations such as breaking a loop or

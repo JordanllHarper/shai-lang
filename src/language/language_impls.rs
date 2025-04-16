@@ -252,12 +252,13 @@ impl Expression {
 }
 
 impl Operator {
-    pub fn from_token(t: &OpSymbol) -> Self {
+    pub fn from_op_symbol(t: &OpSymbol) -> Self {
         match t {
             OpSymbol::FwdSlash => Self::Divide,
             OpSymbol::Asterisk => Self::Multiply,
             OpSymbol::Plus => Self::Add,
             OpSymbol::Minus => Self::Subtract,
+            OpSymbol::Modulus => Self::Mod,
         }
     }
 }

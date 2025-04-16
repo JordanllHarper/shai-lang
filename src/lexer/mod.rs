@@ -265,7 +265,7 @@ impl Iterator for Lexer {
                 '}' => Token::Symbol(Symbol::BraceClose),
                 '[' => Token::Symbol(Symbol::AngOpen),
                 ']' => Token::Symbol(Symbol::AngClose),
-                '%' => Token::Symbol(Symbol::Modulus),
+                '%' => Token::Symbol(Symbol::Op(OpSymbol::Modulus)),
                 '\'' => Token::Symbol(Symbol::Apstr),
                 ',' => Token::Symbol(Symbol::Comma),
                 '\\' => {
@@ -495,7 +495,7 @@ hello
         test_char(']', Token::Symbol(Symbol::AngClose));
         test_char('{', Token::Symbol(Symbol::BraceOpen));
         test_char('}', Token::Symbol(Symbol::BraceClose));
-        test_char('%', Token::Symbol(Symbol::Modulus));
+        test_char('%', Token::Symbol(Symbol::Op(OpSymbol::Modulus)));
         // test_char('\"', Token::Symbol(Symbol::Quote));
         test_char('\'', Token::Symbol(Symbol::Apstr));
         test_char(',', Token::Symbol(Symbol::Comma));

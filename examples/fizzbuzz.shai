@@ -1,0 +1,17 @@
+fizzbuzz (n) {
+    results = []
+    for i in 1..=n {
+        print i
+        if i % 3 == 0 {
+            results = append results "Fizz"
+        } else if i % 5 == 0 {
+            results = append results "Buzz"
+        } else {
+            results = append results i
+        }
+    }
+    return results
+}
+
+result = fizzbuzz 10
+print result

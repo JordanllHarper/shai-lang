@@ -19,7 +19,7 @@ use util::*;
 pub enum EvaluatorError {
     InvalidRedeclaration,
     NoSuchIdentifier { ident: String },
-    InvalidFunctionCall,
+    InvalidFunctionCall { ident: String },
     InvalidEvaluation,
     NotYetImplemented,
     NotABooleanValue,
@@ -31,6 +31,7 @@ pub enum EvaluatorError {
     InvalidIndex,
     NotACollection,
     InvalidDictionaryKey,
+    InvalidArgumentType,
 }
 
 pub fn evaluate(
@@ -389,6 +390,31 @@ pub fn handle_rust_binding_with_args(
                 ))
             }
         }
+        RustBinding::Append => {
+            let list = args.first();
+            let item = args.last();
+            match (list, item) {
+                (Some(l), Some(i)) => {
+                    let (state, array_value) = map_expression_to_value(state, l.clone())?;
+
+                    if let Value::ValueLiteral(ValueLiteral::Array(mut a)) = array_value {
+                        let (state, value) = map_expression_to_value(state, i.clone())?;
+
+                        let new_expr = if let Value::ValueLiteral(vl) = value {
+                            Expression::ValueLiteral(vl)
+                        } else {
+                            return Err(EvaluatorError::InvalidArgumentType);
+                        };
+
+                        a.push(new_expr);
+                        Ok((state, Value::ValueLiteral(ValueLiteral::Array(a))))
+                    } else {
+                        Err(EvaluatorError::InvalidArgumentType)
+                    }
+                }
+                _ => Err(EvaluatorError::InvalidNumberOfArguments),
+            }
+        }
     }
 }
 
@@ -401,13 +427,12 @@ fn evaluate_function_call(
         return Ok((state, result));
     }
 
-    if let Some(f) = state.get_local_binding(&fc.identifier) {
-        match f {
-            EnvironmentBinding::Function(f) => evaluate_function(state, f, fc.args),
-            _ => Err(EvaluatorError::InvalidFunctionCall),
-        }
+    if let Some(EnvironmentBinding::Function(f)) = state.get_local_binding(&fc.identifier) {
+        evaluate_function(state, f, fc.args)
     } else {
-        Err(EvaluatorError::InvalidFunctionCall)
+        Err(EvaluatorError::InvalidFunctionCall {
+            ident: fc.identifier,
+        })
     }
 }
 

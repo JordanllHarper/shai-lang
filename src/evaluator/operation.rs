@@ -19,8 +19,22 @@ pub fn evaluate_operation(
         Operator::Subtract => handle_subtract(new_state, values),
         Operator::Multiply => handle_multiply(new_state, values),
         Operator::Divide => handle_divide(new_state, values),
+        Operator::Mod => handle_mod(new_state, values),
     }?;
     Ok((state, result))
+}
+
+fn handle_mod(
+    state: EnvironmentState,
+    values: (Value, Value),
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    match values {
+        (
+            Value::ValueLiteral(ValueLiteral::Numeric(n1)),
+            Value::ValueLiteral(ValueLiteral::Numeric(n2)),
+        ) => Ok((state, Value::new_numeric(n1 % n2))),
+        _ => Err(EvaluatorError::InvalidOperationValue),
+    }
 }
 
 fn handle_concatenation(

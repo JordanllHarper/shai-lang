@@ -4,6 +4,7 @@ use crate::dbg;
 pub enum RustBinding {
     Print(Print),
     Len,
+    Append,
 }
 
 pub type Print = fn(Vec<String>);

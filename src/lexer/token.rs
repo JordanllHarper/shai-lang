@@ -22,6 +22,7 @@ pub enum OpSymbol {
     Plus,
     Asterisk,
     FwdSlash,
+    Modulus,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -45,7 +46,6 @@ pub enum Symbol {
     BraceOpen,
     BraceClose,
     Equals,
-    Modulus,
     Quote,
     Apstr,
     Comma,
@@ -174,7 +174,6 @@ impl Display for Symbol {
             Symbol::BraceOpen => "{",
             Symbol::BraceClose => "}",
             Symbol::Equals => "=",
-            Symbol::Modulus => "%",
             Symbol::Quote => "\"",
             Symbol::Apstr => "\'",
             Symbol::Comma => ",",
@@ -215,6 +214,7 @@ impl Display for OpSymbol {
             OpSymbol::Plus => "+",
             OpSymbol::Asterisk => "*",
             OpSymbol::FwdSlash => "/",
+            OpSymbol::Modulus => "%",
         };
 
         f.write_str(str)

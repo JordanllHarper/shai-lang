@@ -396,7 +396,7 @@ fn parse_minus(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         Some(Token::Symbol(Symbol::Op(op))) => {
             let op = op.clone();
             let state = state.advance();
-            parse_operator(state, Operator::from_token(&op), None, neg_num)
+            parse_operator(state, Operator::from_op_symbol(&op), None, neg_num)
         }
         _ => Ok((neg_num, state)),
     }
@@ -439,7 +439,7 @@ fn parse_assignment(
     dbg!("{:?}", &rhs);
     let (rhs, state) = match state.peek().cloned() {
         Some(Token::Symbol(Symbol::Op(op))) => {
-            parse_operator(state.advance(), Operator::from_token(&op), None, rhs)?
+            parse_operator(state.advance(), Operator::from_op_symbol(&op), None, rhs)?
         }
         _ => (rhs, state),
     };
@@ -489,7 +489,7 @@ fn parse_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, 
         Some(Token::Symbol(Symbol::Equals)) => parse_assignment(state, ident, None),
         Some(Token::Symbol(Symbol::Op(t))) => parse_operator(
             state,
-            Operator::from_token(&t),
+            Operator::from_op_symbol(&t),
             None,
             Expression::new_identifier(ident),
         ),
@@ -627,7 +627,7 @@ fn parse_operator(
     let peek = state.peek().cloned();
     match peek {
         Some(Token::Symbol(Symbol::Op(op))) => {
-            parse_operator(state, Operator::from_token(&op), None, new_lhs)
+            parse_operator(state, Operator::from_op_symbol(&op), None, new_lhs)
         }
         _ => Ok((new_lhs, state)),
     }
@@ -713,7 +713,7 @@ fn parse_expression(
         Some(Token::Symbol(Symbol::Newline)) => parse_expression(state, lhs, previous_op.clone())?,
         Some(Token::Symbol(Symbol::Op(op))) => parse_operator(
             state,
-            Operator::from_token(&op),
+            Operator::from_op_symbol(&op),
             previous_op.clone(),
             lhs.ok_or(ParseError::ExpectedLhs)?,
         )?,
@@ -757,7 +757,7 @@ fn parse_literal(
         }
         Some(Token::Symbol(Symbol::Op(m))) => parse_operator(
             state.advance(),
-            Operator::from_token(&m),
+            Operator::from_op_symbol(&m),
             previous_op,
             Expression::new_from_literal(&l),
         ),
@@ -1012,31 +1012,31 @@ fn parse_else(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 }
 
 fn parse_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
-    let (t, state) = state.next();
-    let (lhs, state) = match t {
-        Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![], None)
-            .map(|(body, state)| (Expression::new_body(body), state))?,
-        Some(Token::Ident(i)) => (Expression::new_identifier(&i), state),
-        Some(Token::Literal(l)) => (Expression::new_from_literal(&l), state),
-        Some(t) => {
-            return Err(ParseError::InvalidSyntax {
-                message: "Expected a symbol, ident or literal".to_string(),
-                token_context: t.to_owned(),
-            })
-        }
-        None => {
-            return Err(ParseError::NoMoreTokens {
-                context: "on_if".to_string(),
-            })
-        }
-    };
+    // let (t, state) = state.next();
+    let (lhs, state) = parse_expression(state, None, None)?;
+    // let (lhs, state) = match t {
+    //     Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![], None)
+    //         .map(|(body, state)| (Expression::new_body(body), state))?,
+    //     Some(Token::Ident(i)) => (Expression::new_identifier(&i), state),
+    //     Some(Token::Literal(l)) => (Expression::new_from_literal(&l), state),
+    //     Some(t) => {
+    //         return Err(ParseError::InvalidSyntax {
+    //             message: "Expected a symbol, ident or literal".to_string(),
+    //             token_context: t.to_owned(),
+    //         })
+    //     }
+    //     None => {
+    //         return Err(ParseError::NoMoreTokens {
+    //             context: "on_if".to_string(),
+    //         })
+    //     }
+    // };
 
     let (evaluation, state) = parse_evaluation(state, lhs)?;
     let (next, state) = state.next();
 
     match next {
-        Some(Token::Symbol(Symbol::BraceOpen)) | Some(Token::Symbol(Symbol::Newline)) => { /* Continue */
-        }
+        Some(Token::Symbol(Symbol::BraceOpen)) | Some(Token::Symbol(Symbol::Newline)) => (),
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected an opening brace".to_string(),

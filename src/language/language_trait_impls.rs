@@ -8,7 +8,8 @@ impl PartialEq for NumericLiteral {
         match (self, other) {
             (Self::Int(l0), Self::Int(r0)) => l0 == r0,
             (Self::Float(l0), Self::Float(r0)) => l0 == r0,
-            _ => false,
+            (Self::Float(l0), Self::Int(r0)) => *l0 == *r0 as f64,
+            (Self::Int(l0), Self::Float(r0)) => *l0 as f64 == *r0,
         }
     }
 }

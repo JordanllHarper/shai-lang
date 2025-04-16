@@ -22,7 +22,7 @@ pub fn iterate_array(
     let mut new_state = state.clone();
     for expr in arr {
         let (mut maybe_state, value) = map_expression_to_value(new_state, expr)?;
-        let result = maybe_state
+        let _ = maybe_state
             .add_or_mutate_symbols(&scoped_identifier, EnvironmentBinding::Value(value))?;
         let (maybe_state, _) = evaluate_body(maybe_state, body.clone())?;
         new_state = maybe_state;

@@ -1,6 +1,6 @@
 use std::{
     cmp::Ordering,
-    ops::{Add, Div, Mul, Sub},
+    ops::{Add, Div, Mul, Rem, Sub},
 };
 
 use super::{NumericLiteral, Operator};
@@ -91,6 +91,9 @@ impl PartialOrd for Operator {
 impl Ord for Operator {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
+            (Operator::Mod, Operator::Mod) => Ordering::Greater,
+            (Operator::Mod, _) => Ordering::Greater,
+            (_, Operator::Mod) => Ordering::Less,
             (Operator::Divide, Operator::Divide) => Ordering::Equal,
             (Operator::Divide, _) => Ordering::Greater,
             (Operator::Multiply, Operator::Multiply) => Ordering::Equal,
@@ -107,5 +110,25 @@ impl Ord for Operator {
             (Operator::Subtract, Operator::Divide) => Ordering::Less,
         }
     }
-    // add code here
+}
+
+impl Rem for NumericLiteral {
+    type Output = NumericLiteral;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (NumericLiteral::Int(i1), NumericLiteral::Int(i2)) => {
+                NumericLiteral::Float(i1 as f64 % i2 as f64)
+            }
+            (NumericLiteral::Int(i1), NumericLiteral::Float(f1)) => {
+                NumericLiteral::Float(i1 as f64 % f1)
+            }
+            (NumericLiteral::Float(f1), NumericLiteral::Int(i1)) => {
+                NumericLiteral::Float(f1 % i1 as f64)
+            }
+            (NumericLiteral::Float(f1), NumericLiteral::Float(f2)) => {
+                NumericLiteral::Float(f1 % f2)
+            }
+        }
+    }
 }
