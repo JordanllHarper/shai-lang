@@ -437,6 +437,12 @@ fn parse_assignment(
         }
     };
     dbg!("{:?}", &rhs);
+    let (rhs, state) = match state.peek().cloned() {
+        Some(Token::Symbol(Symbol::Op(op))) => {
+            parse_operator(state.advance(), Operator::from_token(&op), None, rhs)?
+        }
+        _ => (rhs, state),
+    };
     Ok((
         Expression::new_assignment(ident, rhs, None, type_assertion, false),
         state,
