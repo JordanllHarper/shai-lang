@@ -19,7 +19,7 @@ You can then invoke using `shai` followed by your script name.
 $ shai hello.shai
 ```
 
-> ![NOTE]
+> [!NOTE]
 > You can either invoke it directly or add it to your `$PATH`. 
 
 ### From source
