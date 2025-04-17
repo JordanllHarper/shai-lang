@@ -4,7 +4,7 @@ This document outlines what constitutes "done". It gives the requirements for th
 
 Shai-Lang's first version will be considered "done" when the language:
 
-- [ ] The Interpreter can be a standalone binary or built from source using Rust tooling.
+- [x] The Interpreter can be a standalone binary or built from source using Rust tooling.
 - [x] Shai scripts can be run using the CLI tooling.
 - [x] Language features:
     - [x] Print to standard output
