@@ -114,7 +114,7 @@ fn parse_arguments(state: ParseState, args: &mut Vec<Expression>) -> ParseResult
         }
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
-                message: "Expected parameter notation".to_string(),
+                message: "Expected argument notation".to_string(),
                 token_context: t,
             })
         }
@@ -519,7 +519,7 @@ fn parse_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, 
         }
         Some(Token::Ident(i)) => parse_function_call(state, ident, Expression::new_identifier(&i)),
         Some(Token::Kwd(Kwd::DataType(d))) => parse_variable_type_assertion(state, ident, d),
-        _ => Ok((Expression::new_identifier(ident), state)),
+        _ => Ok((Expression::new_identifier(ident), state.step_back())),
     }
 }
 
@@ -1017,25 +1017,20 @@ fn parse_else(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 }
 
 fn parse_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
-    // let (t, state) = state.next();
-    let (lhs, state) = parse_expression(state, None, None)?;
-    // let (lhs, state) = match t {
-    //     Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![], None)
-    //         .map(|(body, state)| (Expression::new_body(body), state))?,
-    //     Some(Token::Ident(i)) => (Expression::new_identifier(&i), state),
-    //     Some(Token::Literal(l)) => (Expression::new_from_literal(&l), state),
-    //     Some(t) => {
-    //         return Err(ParseError::InvalidSyntax {
-    //             message: "Expected a symbol, ident or literal".to_string(),
-    //             token_context: t.to_owned(),
-    //         })
-    //     }
-    //     None => {
-    //         return Err(ParseError::NoMoreTokens {
-    //             context: "on_if".to_string(),
-    //         })
-    //     }
-    // };
+    let (next, state) = state.next();
+    let (lhs, state) = match next {
+        Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![], None)
+            .map(|(b, state)| (Expression::new_body(b), state))?,
+        Some(Token::Ident(i)) => (Expression::new_identifier(&i), state),
+        Some(Token::Literal(l)) => parse_literal(state, l, None)?,
+        Some(t) => {
+            return Err(ParseError::InvalidSyntax {
+                message: "Expected a literal, identifier or body".to_string(),
+                token_context: t,
+            })
+        }
+        None => return Err(ParseError::ExpectedLhs),
+    };
 
     let (evaluation, state) = parse_evaluation(state, lhs)?;
     let (next, state) = state.next();
