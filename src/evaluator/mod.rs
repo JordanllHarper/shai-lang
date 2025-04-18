@@ -32,6 +32,7 @@ pub enum EvaluatorError {
     NotACollection,
     InvalidDictionaryKey,
     InvalidArgumentType,
+    InvalidAssignment,
 }
 
 pub fn evaluate(
@@ -240,7 +241,7 @@ fn evaluate_assignment(
 
             (state, EnvironmentBinding::Value(get_identifier_binding))
         }
-        Expression::Statement(_) => todo!(),
+        Expression::Statement(_) => return Err(EvaluatorError::InvalidAssignment),
         Expression::MathOperation(math_op) => {
             let (state, value) = evaluate_operation(state, math_op)?;
             let (state, _) = add_binding_or_error(
@@ -262,17 +263,16 @@ fn evaluate_assignment(
             let (state, eval) = evaluate_bindings(state, lhs, rhs, eval.evaluation_op)?;
             (state, EnvironmentBinding::new_bool(eval))
         }
-        Expression::Function(_) => todo!(),
-        Expression::If(_) => todo!(),
-        Expression::While(_) => todo!(),
-        Expression::For(_) => todo!(),
+        Expression::If(i) => {
+            let (state, v) = evaluate_if(state, i)?;
+            (state, EnvironmentBinding::Value(v))
+        }
         Expression::Body(b) => evaluate_body(state, b)
             .map(|(state, value)| (state, EnvironmentBinding::Value(value)))?,
         Expression::Range(r) => {
             let (state, value) = evaluate_range(state, r)?;
             (state, EnvironmentBinding::Value(value))
         }
-        Expression::Assignment(_) => todo!(),
         Expression::FunctionCall(fc) => {
             let (state, value) = evaluate_function_call(state, fc)?;
             (state, EnvironmentBinding::Value(value))
@@ -281,6 +281,7 @@ fn evaluate_assignment(
             let (state, value) = evaluate_index(state, index)?;
             (state, EnvironmentBinding::Value(value))
         }
+        _ => return Err(EvaluatorError::InvalidAssignment),
     };
 
     let (state, binding) = add_binding_or_error(state, &a.identifier, binding)?;
@@ -301,7 +302,7 @@ fn evaluate_function(
     for (arg, parameter) in args.into_iter().zip(f.params) {
         let (mut maybe_state, binding) = map_expression_to_binding(new_state, arg)?;
 
-        let binding = maybe_state.add_or_mutate_symbols(&parameter.ident, binding)?;
+        let _ = maybe_state.add_or_mutate_symbols(&parameter.ident, binding)?;
         new_state = maybe_state;
     }
     let (_, result) = evaluate(new_state, *f.body)?;
