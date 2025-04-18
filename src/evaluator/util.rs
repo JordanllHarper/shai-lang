@@ -119,7 +119,7 @@ pub fn map_binding_to_string(
 ) -> Result<(EnvironmentState, String), EvaluatorError> {
     match binding {
         EnvironmentBinding::Value(v) => map_value_to_string(state, v),
-        EnvironmentBinding::Function(f) => todo!(),
+        EnvironmentBinding::Function(f) => Ok((state, f.to_string())),
         EnvironmentBinding::Identifier(i) => match state.get_local_binding(i) {
             Some(binding) => map_binding_to_string(state, &binding),
             None => Err(EvaluatorError::NoSuchIdentifier {

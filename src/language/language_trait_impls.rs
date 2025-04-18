@@ -69,3 +69,60 @@ impl Display for NumericLiteral {
     }
     // add code here
 }
+
+impl Display for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = format!(
+            "{} ({}) {}",
+            self.ident,
+            {
+                if let Some((head_list, l)) = self.params.split_last() {
+                    let l = l
+                        .iter()
+                        .fold(String::new(), |acc, p| format!("{}, {}", acc, p));
+                    format!("{}{}", l, head_list)
+                } else {
+                    "".to_string()
+                }
+            },
+            match &self.return_type {
+                Some(nt) => format!("-> {}", nt.to_string()),
+                None => "".to_string(),
+            }
+        );
+        f.write_str(&s)
+    }
+}
+
+impl Display for Parameter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = format!(
+            "{}{}",
+            self.ident,
+            match self.native_type {
+                Some(ref n) => format!(":{}", n.to_string()),
+                None => "".to_string(),
+            }
+        );
+
+        f.write_str(&s)
+    }
+}
+
+impl Display for NativeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            NativeType::Void => "void",
+            NativeType::Char => "char",
+            NativeType::Int => "int",
+            NativeType::String => "string",
+            NativeType::Float => "float",
+            NativeType::Bool => "bool",
+            NativeType::Array => "arr",
+            NativeType::Dictionary => "dict",
+            NativeType::Function => "func",
+        };
+
+        f.write_str(s)
+    }
+}
