@@ -1,7 +1,6 @@
 fizzbuzz (n) {
     results = []
     for i in 1..=n {
-        print i
         if i % 3 == 0 {
             results = append results "Fizz"
         } else if i % 5 == 0 {
@@ -14,4 +13,9 @@ fizzbuzz (n) {
 }
 
 result = fizzbuzz 10
-print result
+
+result_len = len result
+for i in 0..result_len {
+    r = result[i]
+    print {i + 1} "->" r
+}
