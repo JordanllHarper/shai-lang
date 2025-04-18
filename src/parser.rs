@@ -420,7 +420,7 @@ fn parse_assignment(
             if is_evaluation {
                 parse_evaluation(state, Expression::new_identifier(&i))?
             } else {
-                parse_identifier(state, &i)?
+                parse_identifier(state, &i, false)?
             }
         }
         Some(t) => {
@@ -474,7 +474,11 @@ fn parse_brace_open(state: ParseState) -> ParseResult<(Expression, ParseState)> 
     }
 }
 
-fn parse_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, ParseState)> {
+fn parse_identifier(
+    state: ParseState,
+    ident: &str,
+    in_if_statement: bool,
+) -> ParseResult<(Expression, ParseState)> {
     let t = state.peek();
 
     match t {
@@ -497,8 +501,12 @@ fn parse_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, 
             Expression::new_identifier(ident),
         ),
         Some(Token::Symbol(Symbol::BraceOpen)) => {
-            let (body, state) = parse_body(state, &mut vec![], None)?;
-            parse_function_call(state, ident, Expression::new_body(body))
+            if in_if_statement {
+                Ok((Expression::new_identifier(ident), state.step_back()))
+            } else {
+                let (body, state) = parse_body(state, &mut vec![], None)?;
+                parse_function_call(state, ident, Expression::new_body(body))
+            }
         }
         // Operations
         // Function call if value literal or string
@@ -533,7 +541,7 @@ fn parse_collection_index(
             let (body, state) = parse_body(state, &mut vec![], None)?;
             (Expression::new_body(body), state)
         }
-        Some(Token::Ident(i)) => parse_identifier(state, &i)?,
+        Some(Token::Ident(i)) => parse_identifier(state, &i, false)?,
         Some(Token::Literal(l)) => parse_literal(state, l, None)?,
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
@@ -710,7 +718,7 @@ fn parse_expression(
     let (next, state) = state.next();
     dbg!("Expr {:?}", &next);
     let (expr, state) = match next {
-        Some(Token::Ident(ident)) => parse_identifier(state, &ident)?,
+        Some(Token::Ident(ident)) => parse_identifier(state, &ident, false)?,
         Some(Token::Kwd(k)) => parse_keyword(state, &k)?,
         Some(Token::Literal(l)) => parse_literal(state, l, previous_op.clone())?,
         Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![], lhs)
@@ -1021,7 +1029,7 @@ fn parse_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
     let (lhs, state) = match next {
         Some(Token::Symbol(Symbol::BraceOpen)) => parse_body(state, &mut vec![], None)
             .map(|(b, state)| (Expression::new_body(b), state))?,
-        Some(Token::Ident(i)) => (Expression::new_identifier(&i), state),
+        Some(Token::Ident(ident)) => parse_identifier(state, &ident, true)?,
         Some(Token::Literal(l)) => parse_literal(state, l, None)?,
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
