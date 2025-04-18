@@ -21,7 +21,7 @@ pub enum EvaluatorError {
     NoSuchIdentifier { ident: String },
     InvalidFunctionCall { ident: String },
     InvalidEvaluation,
-    NotYetImplemented,
+    NotYetImplemented { msg: String },
     NotABooleanValue,
     InvalidNumberOfArguments,
     InvalidOperationValue,
@@ -338,10 +338,12 @@ fn evaluate_statement(
     s: Statement,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     match s.operation {
-        StatementOperator::Break => todo!(),
-        StatementOperator::Continue => todo!(),
+        StatementOperator::Break => Ok((state, Value::Void)),
+        StatementOperator::Continue => Ok((state, Value::Void)),
         StatementOperator::Return => evaluate_return(state, s.expression.as_deref().cloned()),
-        StatementOperator::Include => todo!(),
+        StatementOperator::Include => Err(EvaluatorError::NotYetImplemented {
+            msg: "include statements are not yet supported".to_string(),
+        }),
     }
 }
 
@@ -378,7 +380,11 @@ pub fn handle_rust_binding_with_args(
                 let (new_state, value) = map_expression_to_value(state, expr)?;
                 let len = match value {
                     Value::ValueLiteral(ValueLiteral::Array(a)) => a.len(),
-                    _ => todo!(),
+                    Value::ValueLiteral(ValueLiteral::Dictionary(d)) => d.len(),
+                    Value::ValueLiteral(ValueLiteral::CharacterBased(
+                        CharacterBasedLiteral::String(s),
+                    )) => s.len(),
+                    _ => return Err(EvaluatorError::InvalidArgumentType),
                 };
                 Ok((
                     new_state,
