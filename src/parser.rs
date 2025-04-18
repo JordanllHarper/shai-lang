@@ -464,7 +464,7 @@ fn parse_brace_open(state: ParseState) -> ParseResult<(Expression, ParseState)> 
         Some(Token::Symbol(Symbol::Colon)) => {
             parse_dict_literal(state.step_back(), &mut HashMap::new())
         }
-        Some(t) => {
+        Some(_) => {
             // previous is part of a body expression, so handle that...
             parse_body(state.step_back(), &mut vec![], None)
                 .map(|(expr, state)| (Expression::new_body(expr), state))
@@ -1096,7 +1096,6 @@ fn is_new_body(t: Option<&Token>) -> bool {
 #[cfg(test)]
 mod tests {
 
-    use core::num;
     use std::{collections::HashMap, vec};
 
     use super::*;

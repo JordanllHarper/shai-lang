@@ -35,23 +35,26 @@ pub fn iterate_dict(
     scoped_variable: ScopedVariable,
     body: Body,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let idents = match scoped_variable {
-        ScopedVariable::Single(_) => return Err(EvaluatorError::InvalidForLoopIdentifier),
-        ScopedVariable::Multiple(idents) => idents,
+    let idents = if let ScopedVariable::Multiple(idents) = scoped_variable {
+        idents
+    } else {
+        return Err(EvaluatorError::InvalidForLoopIdentifier);
     };
 
-    let (key_ident, value_ident) = match (idents.first(), idents.last()) {
-        (Some(k), Some(v)) => (k, v),
-        _ => return Err(EvaluatorError::InvalidIterable),
+    let (key_ident, value_ident) = if let (Some(k), Some(v)) = (idents.first(), idents.last()) {
+        (k, v)
+    } else {
+        return Err(EvaluatorError::InvalidIterable);
     };
 
     let mut new_state = state.clone();
 
     for (key, value) in dict {
         let (mut maybe_state, key_value) = map_dictionary_key_to_value(new_state, key)?;
-        maybe_state.add_or_mutate_symbols(key_ident, EnvironmentBinding::Value(key_value));
+        let _ =
+            maybe_state.add_or_mutate_symbols(key_ident, EnvironmentBinding::Value(key_value))?;
         let (mut maybe_state, value_binding) = map_expression_to_binding(maybe_state, value)?;
-        maybe_state.add_or_mutate_symbols(value_ident, value_binding);
+        let _ = maybe_state.add_or_mutate_symbols(value_ident, value_binding)?;
         let (maybe_state, _) = evaluate_body(maybe_state, body.clone())?;
         new_state = maybe_state;
     }
