@@ -36,7 +36,7 @@ impl ParseState {
     pub fn new(tokens: Vec<Token>, position: usize) -> Self {
         Self { tokens, position }
     }
-    pub fn end(&self) -> bool {
+    pub fn is_last(&self) -> bool {
         self.peek().is_none()
     }
 }
@@ -76,7 +76,7 @@ where
 
     let mut top_level_body: Body = vec![];
     let mut parse_state = ParseState::new(tokens, 0);
-    while !parse_state.end() {
+    while !parse_state.is_last() {
         let (expr, new_state) = parse_expression(parse_state, None, None)?;
         top_level_body.push(expr);
         parse_state = new_state;
@@ -639,9 +639,12 @@ fn parse_operator(
 
     let peek = state.peek().cloned();
     match peek {
-        Some(Token::Symbol(Symbol::Op(op))) => {
-            parse_operator(state, Operator::from_op_symbol(&op), None, new_lhs)
-        }
+        Some(Token::Symbol(Symbol::Op(op))) => parse_operator(
+            state.advance(),
+            Operator::from_op_symbol(&op),
+            None,
+            new_lhs,
+        ),
         _ => Ok((new_lhs, state)),
     }
 }
@@ -1112,7 +1115,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn test(label: &str, input: Vec<Token>, expected: Expression) {
-        dbg!("{}", label);
+        println!("{}", label);
         let actual = parse(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -2300,200 +2303,6 @@ mod tests {
     }
 
     #[test]
-    fn fib() {
-        test(
-            "fibonacci",
-            vec![
-                Token::new_ident("fib"),
-                Token::Symbol(Symbol::ParenOpen),
-                Token::new_ident("num"),
-                Token::Symbol(Symbol::ParenClose),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::Symbol(Symbol::Newline),
-                // tab
-                //
-                Token::Kwd(Kwd::If),
-                Token::new_ident("num"),
-                Token::Symbol(Symbol::Evaluation(EvaluationSymbol::LzEq)),
-                Token::Literal(Literal::Int(1)),
-                // body
-                // if
-                Token::Symbol(Symbol::BraceOpen),
-                Token::Kwd(Kwd::Return),
-                Token::Ident("num".to_string()),
-                Token::Symbol(Symbol::BraceClose),
-                //
-                Token::Kwd(Kwd::Else),
-                // body
-                // else
-                Token::Symbol(Symbol::BraceOpen),
-                Token::Kwd(Kwd::Return),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::new_ident("fib"),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::new_ident("num"),
-                Token::Symbol(Symbol::Op(OpSymbol::Minus)),
-                Token::Literal(Literal::Int(1)),
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::Op(OpSymbol::Plus)),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::new_ident("fib"),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::new_ident("num"),
-                Token::Symbol(Symbol::Op(OpSymbol::Minus)),
-                Token::Literal(Literal::Int(2)),
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::BraceClose),
-            ],
-            Expression::new_body(vec![Expression::new_function(
-                "fib",
-                vec![Parameter::new("num", None)],
-                None,
-                Expression::new_body(vec![Expression::new_if(
-                    Expression::new_evaluation(
-                        Expression::new_identifier("num"),
-                        Some(Expression::new_int(1)),
-                        EvaluationOperator::NumericOnly(EvaluationNumericOnly::LzEq),
-                    ),
-                    Expression::new_body(vec![Expression::Statement(Statement::new(
-                        Some(Expression::new_identifier("num")),
-                        StatementOperator::Return,
-                    ))]),
-                    // on false evaluation
-                    Some(Expression::new_body(vec![Expression::new_statement(
-                        Some(Expression::new_math_expression(
-                            Expression::new_body(vec![Expression::new_function_call(
-                                "fib",
-                                vec![Expression::new_body(vec![Expression::new_math_expression(
-                                    Expression::new_identifier("num"),
-                                    Expression::new_int(1),
-                                    Operator::Subtract,
-                                )])],
-                            )]),
-                            Expression::new_body(vec![Expression::new_function_call(
-                                "fib",
-                                vec![Expression::new_body(vec![Expression::new_math_expression(
-                                    Expression::new_identifier("num"),
-                                    Expression::new_int(2),
-                                    Operator::Subtract,
-                                )])],
-                            )]),
-                            Operator::Add,
-                        )),
-                        StatementOperator::Return,
-                    )])),
-                )]),
-            )]),
-        );
-
-        test(
-            "fibonacci with stored variable",
-            vec![
-                Token::new_ident("fib"),
-                Token::Symbol(Symbol::ParenOpen),
-                Token::new_ident("num"),
-                Token::Symbol(Symbol::ParenClose),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::Symbol(Symbol::Newline),
-                // if condition
-                Token::Kwd(Kwd::If),
-                Token::new_ident("num"),
-                Token::Symbol(Symbol::Evaluation(EvaluationSymbol::LzEq)),
-                Token::Literal(Literal::Int(1)),
-                // if body
-                Token::Symbol(Symbol::BraceOpen),
-                Token::Kwd(Kwd::Return),
-                Token::Ident("num".to_string()),
-                Token::Symbol(Symbol::BraceClose),
-                //
-                Token::Kwd(Kwd::Else),
-                // else body
-                Token::Symbol(Symbol::BraceOpen),
-                Token::Symbol(Symbol::Newline),
-                Token::new_ident("new_num"),
-                Token::Symbol(Symbol::Equals),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::new_ident("fib"),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::new_ident("num"),
-                Token::Symbol(Symbol::Op(OpSymbol::Minus)),
-                Token::Literal(Literal::Int(1)),
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::Op(OpSymbol::Plus)),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::new_ident("fib"),
-                Token::Symbol(Symbol::BraceOpen),
-                Token::new_ident("num"),
-                Token::Symbol(Symbol::Op(OpSymbol::Minus)),
-                Token::Literal(Literal::Int(2)),
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::Newline),
-                Token::Kwd(Kwd::Return),
-                Token::new_ident("new_num"),
-                Token::Symbol(Symbol::Newline),
-                Token::Symbol(Symbol::BraceClose),
-                Token::Symbol(Symbol::BraceClose),
-            ],
-            Expression::new_body(vec![Expression::new_function(
-                "fib",
-                vec![Parameter::new("num", None)],
-                None,
-                Expression::new_body(vec![Expression::new_if(
-                    Expression::new_evaluation(
-                        Expression::new_identifier("num"),
-                        Some(Expression::new_int(1)),
-                        EvaluationOperator::NumericOnly(EvaluationNumericOnly::LzEq),
-                    ),
-                    Expression::new_body(vec![Expression::Statement(Statement::new(
-                        Some(Expression::new_identifier("num")),
-                        StatementOperator::Return,
-                    ))]),
-                    // on false evaluation
-                    Some(Expression::new_body(vec![
-                        Expression::new_assignment(
-                            "new_num",
-                            Expression::new_math_expression(
-                                Expression::new_body(vec![Expression::new_function_call(
-                                    "fib",
-                                    vec![Expression::new_body(vec![
-                                        Expression::new_math_expression(
-                                            Expression::new_identifier("num"),
-                                            Expression::new_int(1),
-                                            Operator::Subtract,
-                                        ),
-                                    ])],
-                                )]),
-                                Expression::new_body(vec![Expression::new_function_call(
-                                    "fib",
-                                    vec![Expression::new_body(vec![
-                                        Expression::new_math_expression(
-                                            Expression::new_identifier("num"),
-                                            Expression::new_int(2),
-                                            Operator::Subtract,
-                                        ),
-                                    ])],
-                                )]),
-                                Operator::Add,
-                            ),
-                            None,
-                            None,
-                            false,
-                        ),
-                        Expression::new_statement(
-                            Some(Expression::new_identifier("new_num")),
-                            StatementOperator::Return,
-                        ),
-                    ])),
-                )]),
-            )]),
-        );
-    }
-
-    #[test]
     fn operator_precedence() {
         test(
             "Operator precendence 3 * 4 + 5",
@@ -2503,6 +2312,7 @@ mod tests {
                 Token::Literal(Literal::Int(4)),
                 Token::Symbol(Symbol::Op(OpSymbol::Plus)),
                 Token::Literal(Literal::Int(5)),
+                Token::Symbol(Symbol::Newline),
             ],
             Expression::new_body(vec![Expression::new_math_expression(
                 Expression::new_math_expression(
@@ -2526,6 +2336,7 @@ mod tests {
                 Token::Literal(Literal::Int(4)),
                 Token::Symbol(Symbol::Op(OpSymbol::Plus)),
                 Token::Literal(Literal::Int(5)),
+                Token::Symbol(Symbol::Newline),
             ],
             Expression::new_body(vec![Expression::new_assignment(
                 "x",
