@@ -481,6 +481,9 @@ fn parse_identifier(state: ParseState, ident: &str) -> ParseResult<(Expression, 
         Some(Token::Kwd(Kwd::In)) | Some(Token::Symbol(Symbol::Comma)) => {
             return Ok((Expression::Identifier(ident.to_string()), state));
         }
+        Some(Token::Symbol(Symbol::AngClose)) => {
+            return Ok((Expression::new_identifier(ident), state))
+        }
         _ => { /* Continue */ }
     };
     let (t, state) = state.next();
@@ -544,6 +547,8 @@ fn parse_collection_index(
             })
         }
     };
+
+    dbg!(&index);
 
     let (next, state) = state.next();
     match next {
