@@ -99,7 +99,7 @@ impl Value {
         Value::ValueLiteral(ValueLiteral::Bool(b))
     }
 
-    pub(crate) fn new_char(c: char) -> Value {
+    pub fn new_char(c: char) -> Value {
         Value::ValueLiteral(ValueLiteral::CharacterBased(CharacterBasedLiteral::Char(c)))
     }
 }
