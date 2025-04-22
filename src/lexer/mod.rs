@@ -1,3 +1,5 @@
+use token::Token;
+
 mod lexer_impl;
 pub mod token;
 
@@ -6,16 +8,27 @@ pub mod token;
 ///
 /// Usage:
 ///
-/// ```
+/// ```rust
+///
 /// let token_iterator = Lexer::new(input)
-/// // Get a Vec of Tokens.
-/// let tokens = token_iterator.collect::<Vec<Token>>();
+/// token_iterator.next();
+/// token_iterator.advance(); // to advance the lexer without
+/// token_iterator.step_back(); // to step back a token
+/// token_iterator.peek(); // peek token
 ///
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Lexer {
     position: usize,
     input: Vec<char>,
+}
+
+impl Iterator for Lexer {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_token()
+    }
 }
 
 impl Lexer {
@@ -26,17 +39,17 @@ impl Lexer {
             input: allocated_chars,
         }
     }
-    /// Advances the lexer a single position, returning an optional char in the process.
-    fn advance(&mut self) -> Option<char> {
-        self.position += 1;
-        self.input.get(self.position).copied()
-    }
 
-    /// Steps the lexer back one step
-    fn step_back(&mut self) {
+    pub fn step_back(&mut self) {
         if self.position == 0 {
             return;
         }
         self.position -= 1;
+    }
+
+    pub fn peek(&mut self) -> Option<Token> {
+        let t = self.next_token();
+        self.step_back();
+        t
     }
 }

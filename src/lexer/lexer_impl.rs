@@ -3,10 +3,13 @@ use std::collections::HashSet;
 use super::token::*;
 use super::Lexer;
 
-impl Iterator for Lexer {
-    type Item = Token;
+impl Lexer {
+    fn advance(&mut self) -> Option<char> {
+        self.position += 1;
+        self.input.get(self.position).copied()
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
+    pub fn next_token(&mut self) -> Option<Token> {
         let input = &self.input;
         let position = self.position;
         let current = input.get(position);
