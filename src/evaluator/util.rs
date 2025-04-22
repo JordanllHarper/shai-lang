@@ -79,24 +79,6 @@ pub fn map_value_to_string(
     Ok((state, s))
 }
 
-pub fn map_body_to_string(
-    state: EnvironmentState,
-    b: Vec<Expression>,
-) -> Result<(EnvironmentState, String), EvaluatorError> {
-    let mut new_state = state.clone();
-    let mut s = String::new();
-    for expr in b {
-        let (maybe_state, value) = evaluate(new_state, expr)?;
-
-        let (maybe_state, new_s) = map_value_to_string(maybe_state, &value)?;
-
-        s = format!("{}{}", s, new_s);
-        new_state = maybe_state;
-    }
-
-    Ok((new_state, s))
-}
-
 pub fn map_expression_vec_to_string(
     state: EnvironmentState,
     exprs: Vec<Expression>,

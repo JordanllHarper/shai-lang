@@ -1,9 +1,9 @@
-pub mod bindings;
+mod bindings;
 pub mod environment;
-pub mod evaluation;
-pub mod iterate;
-pub mod operation;
-pub mod util;
+mod evaluation;
+mod iterate;
+mod operation;
+mod util;
 
 use std::collections::HashMap;
 

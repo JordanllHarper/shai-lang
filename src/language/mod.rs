@@ -1,6 +1,6 @@
-pub mod language_impls;
-pub mod language_trait_impls;
-pub mod math_trait_impls;
+mod language_impls;
+mod language_trait_impls;
+mod math_trait_impls;
 
 use std::collections::HashMap;
 

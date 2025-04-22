@@ -86,7 +86,7 @@ impl Display for Function {
                 }
             },
             match &self.return_type {
-                Some(nt) => format!("-> {}", nt.to_string()),
+                Some(nt) => format!("-> {}", nt),
                 None => "".to_string(),
             }
         );
@@ -100,7 +100,7 @@ impl Display for Parameter {
             "{}{}",
             self.ident,
             match self.native_type {
-                Some(ref n) => format!(":{}", n.to_string()),
+                Some(ref n) => format!(":{}", n),
                 None => "".to_string(),
             }
         );
