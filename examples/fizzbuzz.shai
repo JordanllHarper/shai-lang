@@ -15,7 +15,10 @@ fizzbuzz (n) {
 result = fizzbuzz 10
 
 result_len = len result
+
 for i in 0..result_len {
     r = result[i]
     print {i + 1} "->" r
 }
+
+result

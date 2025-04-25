@@ -1,4 +1,4 @@
-use crate::dbg;
+use macros::dbg;
 
 #[derive(Debug, Clone)]
 pub enum RustBinding {

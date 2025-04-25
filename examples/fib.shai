@@ -2,16 +2,21 @@
 
 fib (num) {
     if num <= 1 {
-        new_num = num
-        return new_num
+        return num
     } else {
         new_num = { fib { num - 1 } } + { fib { num - 2 } }
         return new_num
     }
 }
 
+fibonacci_nums = []
+
 for i in 0..10 {
-    print { fib i }
+    result = fib i
+    print "Result ->" result
+    fibonacci_nums = append fibonacci_nums result
 }
 
+print fibonacci_nums
 
+fibonacci_nums

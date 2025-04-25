@@ -10,9 +10,10 @@ pub mod token;
 ///
 /// ```rust
 ///
-/// let token_iterator = Lexer::new(input)
+/// # let input = "test";
+/// # use shai::lexer::Lexer;
+/// let mut token_iterator = Lexer::new(input);
 /// token_iterator.next();
-/// token_iterator.advance(); // to advance the lexer without
 /// token_iterator.step_back(); // to step back a token
 /// token_iterator.peek(); // peek token
 ///

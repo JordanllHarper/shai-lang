@@ -117,7 +117,7 @@ pub enum NumericLiteral {
 ///
 /// Examples:
 ///
-/// ```
+/// ```shai
 /// add (numOne, numTwo) {  
 ///     /* start of function *body* */
 /// }
@@ -127,10 +127,14 @@ pub type Body = Vec<Expression>;
 /// A While loop construct. Executes a body while some condition resolves to true.
 ///
 /// e.g.
+/// ```shai
 ///
 /// while true {
 ///     print "Hello"
 /// }
+///
+/// ```
+///
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct While {
     pub condition: Option<Box<Expression>>,
@@ -141,7 +145,7 @@ pub struct While {
 ///
 /// e.g.
 ///
-/// ```
+/// ```shai
 ///     my_range = 0..5 // 0 to (but not including) 5
 ///     my_inclusive_range = 0..=5 // 0 to and including 5
 /// ```
@@ -163,7 +167,7 @@ pub enum ScopedVariable {
 ///
 /// e.g.
 ///
-/// ```
+/// ```shai
 /// for i in 0..5 {
 ///     print "Hello!"
 /// }
@@ -179,7 +183,7 @@ pub struct For {
 ///
 /// Example:
 ///
-/// ```
+/// ```shai
 /// add(x, y) -> int {
 ///     return x + y
 /// }
@@ -192,7 +196,7 @@ pub struct For {
 /// int = return type
 /// { return x + y } = Expression
 ///
-/// ```
+/// ```shai
 ///
 /// add(x, y) = return x + y
 ///
@@ -245,7 +249,7 @@ pub struct Operations {
 /// Represents a function call with arguments.
 ///
 /// Example:
-/// ```
+/// ```shai
 /// print "Hello" "World" 5 // Hello World 5
 ///
 /// print "Hello" {
@@ -274,7 +278,7 @@ pub struct Statement {
 ///
 /// Given on_false_evaluation is *not* None, this represents an else branch:
 ///
-/// ```
+/// ```shai
 /// if true {
 ///     ...
 /// } else {

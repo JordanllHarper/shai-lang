@@ -2,6 +2,9 @@ use std::collections::HashMap;
 
 use super::*;
 use crate::language::*;
+
+use macros::dbg;
+
 type ArgumentsState = (Vec<Expression>, ParseState);
 fn parse_arguments(state: ParseState, args: &mut Vec<Expression>) -> ParseResult<ArgumentsState> {
     let peek = state.peek();
@@ -1026,7 +1029,6 @@ mod tests {
     use std::{collections::HashMap, vec};
 
     use super::*;
-    use crate::dbg;
 
     use pretty_assertions::assert_eq;
 
@@ -2197,7 +2199,7 @@ mod tests {
             )]),
         );
         // x = {"hello": "world",,}
-        dbg!("Error");
+        macros::dbg!("Error");
         test_err(
             vec![
                 Token::Ident("x".to_string()),

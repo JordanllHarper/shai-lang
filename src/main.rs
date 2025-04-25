@@ -3,26 +3,7 @@ pub mod language;
 pub mod lexer;
 pub mod parser;
 
-use std::{collections::HashMap, env};
-
-use evaluator::environment::EnvironmentState;
-use lexer::Lexer;
-
-#[macro_export]
-macro_rules! dbg {
-    ($($x:tt)*) => {
-        {
-            #[cfg(debug_assertions)]
-            {
-                std::dbg!($($x)*)
-            }
-            #[cfg(not(debug_assertions))]
-            {
-                ($($x)*)
-            }
-        }
-    }
-}
+use std::env;
 
 fn main() {
     let args = env::args();
@@ -32,35 +13,23 @@ fn main() {
         println!("Error! No source file specified");
         return;
     };
+
+    println!("Path {:?}", path);
     let input = match std::fs::read_to_string(&path) {
         Ok(v) => v,
-        Err(_) => {
-            println!("Error! Invalid input file: {}", path);
-            return;
-        }
-    };
-
-    let state = EnvironmentState::new(HashMap::new());
-
-    dbg!("Input: {}", &input);
-    let tokens = Lexer::new(&input);
-
-    dbg!("Token stream: {:?}", &tokens);
-
-    let ast = match parser::parse(tokens) {
-        Ok(v) => v,
         Err(e) => {
-            println!("Error!: {:?}", e);
+            println!("Error! Invalid input file: {}", path);
+            println!("Error was {:?}", e);
             return;
         }
     };
 
-    dbg!("Generated AST: {:?}", &ast);
+    let result = shai::run(&input);
 
-    let result = evaluator::evaluate(state, ast);
     match result {
-        Ok((state, _)) => {
-            dbg!("State: {:?}", state);
+        Ok((state, value)) => {
+            macros::dbg!("State", state);
+            macros::dbg!("Return value", value);
         }
 
         Err(e) => {
