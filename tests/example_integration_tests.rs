@@ -37,6 +37,7 @@ fn fib() {
     test(
         "fib",
         Value::ValueLiteral(shai::language::ValueLiteral::Array(vec![
+            Expression::new_int(0),
             Expression::new_int(1),
             Expression::new_int(1),
             Expression::new_int(2),

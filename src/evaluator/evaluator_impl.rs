@@ -250,7 +250,7 @@ pub fn evaluate_function(
         return Err(EvaluatorError::InvalidNumberOfArguments);
     }
 
-    let mut new_state = state.clone().push_scope();
+    let mut new_state = state.clone();
 
     for (arg, parameter) in args.into_iter().zip(f.params) {
         let (mut maybe_state, binding) = map_expression_to_binding(new_state, arg)?;
@@ -258,9 +258,9 @@ pub fn evaluate_function(
         let _ = maybe_state.add_or_mutate_symbols(&parameter.ident, binding)?;
         new_state = maybe_state;
     }
-    let (mut new_state, result) = evaluate(new_state, *f.body)?;
+    let (new_state, result) = evaluate(new_state, *f.body)?;
 
-    Ok((new_state.pop_scope(), result))
+    Ok((state, result))
 }
 
 pub fn evaluate_identifier(
