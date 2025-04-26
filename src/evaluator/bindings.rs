@@ -1,5 +1,3 @@
-use macros::dbg;
-
 #[derive(Debug, Clone)]
 pub enum RustBinding {
     Print(Print),
@@ -10,6 +8,6 @@ pub enum RustBinding {
 pub type Print = fn(Vec<String>);
 pub fn std_rust_print(s: Vec<String>) {
     let s = s.join(" ");
-    dbg!("STDOUT: {}", &s);
+    macros::dbg!("STDOUT: {}", &s);
     println!("{}", s)
 }

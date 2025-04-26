@@ -46,7 +46,7 @@ pub fn evaluate(
         Expression::Function(f) => {
             let (state, _) =
                 add_binding_or_error(state, &f.ident.clone(), EnvironmentBinding::Function(f))?;
-            dbg!("Function state", &state);
+            macros::dbg!("Function state", &state);
             Ok((state, Value::Void))
         }
         Expression::If(if_expression) => evaluate_if(state, if_expression),

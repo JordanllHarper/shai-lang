@@ -17,14 +17,14 @@ pub enum ShaiError {
 pub fn run(input: &str) -> Result<(EnvironmentState, Value), ShaiError> {
     let state = EnvironmentState::new(HashMap::new());
 
-    dbg!("Input: {}", &input);
+    macros::dbg!("Input: {}", &input);
     let tokens = Lexer::new(input);
 
-    dbg!("Token stream: {:?}", &tokens);
+    macros::dbg!("Token stream: {:?}", &tokens);
 
     let ast = parser::parse(tokens).map_err(ShaiError::Parse)?;
 
-    dbg!("Generated AST: {:?}", &ast);
+    macros::dbg!("Generated AST: {:?}", &ast);
 
     let result = evaluator::evaluate(state, ast);
     result.map_err(ShaiError::Evaluator)

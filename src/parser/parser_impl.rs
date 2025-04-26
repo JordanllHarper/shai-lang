@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use super::*;
 use crate::language::*;
 
-use macros::dbg;
-
 type ArgumentsState = (Vec<Expression>, ParseState);
 fn parse_arguments(state: ParseState, args: &mut Vec<Expression>) -> ParseResult<ArgumentsState> {
     let peek = state.peek();
@@ -153,7 +151,7 @@ fn parse_body(
     }
 
     let (expression, state) = parse_expression(state, previous, None)?;
-    dbg!("Body statement", &expression);
+    macros::dbg!("Body statement", &expression);
     match state.peek() {
         Some(Token::Symbol(Symbol::Op(_))) => parse_body(state, body, Some(expression)),
         _ => {
@@ -355,7 +353,7 @@ fn parse_assignment(
             })
         }
     };
-    dbg!("{:?}", &rhs);
+    macros::dbg!("{:?}", &rhs);
     let (rhs, state) = match state.peek().cloned() {
         Some(Token::Symbol(Symbol::Op(op))) => {
             parse_operator(state.advance(), Operator::from_op_symbol(&op), None, rhs)?
@@ -475,7 +473,7 @@ fn parse_collection_index(
         }
     };
 
-    dbg!(&index);
+    macros::dbg!(&index);
 
     let (next, state) = state.next();
     match next {
@@ -541,10 +539,10 @@ fn parse_operator(
     if let Some(prev) = previous_op.clone() {
         let precedence = current > prev;
         if !precedence {
-            dbg!("Precedence Current {:?} < Prev {:?}", &current, prev);
+            macros::dbg!("Precedence Current {:?} < Prev {:?}", &current, prev);
             // the previous op has greater precedence
             // therefore, we want to give it's rhs (or our lhs in this case).
-            dbg!("Returning {:?}", &lhs);
+            macros::dbg!("Returning {:?}", &lhs);
             return Ok((lhs, state.step_back()));
         }
     }
@@ -638,7 +636,7 @@ pub fn parse_expression(
     previous_op: Option<Operator>,
 ) -> ParseResult<(Expression, ParseState)> {
     let (next, state) = state.next();
-    dbg!("Expr {:?}", &next);
+    macros::dbg!("Expr {:?}", &next);
     let (expr, state) = match next {
         Some(Token::Ident(ident)) => parse_identifier(state, &ident, false)?,
         Some(Token::Kwd(k)) => parse_keyword(state, &k)?,
@@ -741,7 +739,7 @@ fn parse_keyword(state: ParseState, k: &Kwd) -> ParseResult<(Expression, ParseSt
         }
     };
 
-    dbg!("Parse keyword expr {}", &expr);
+    macros::dbg!("Parse keyword expr {}", &expr);
 
     Ok((expr, state))
 }
@@ -1015,7 +1013,7 @@ fn parse_return(state: ParseState) -> ParseResult<(Expression, ParseState)> {
         )),
     };
 
-    dbg!("Parse return statement{}", &statement);
+    macros::dbg!("Parse return statement{}", &statement);
     statement
 }
 
