@@ -105,6 +105,7 @@ pub enum Kwd {
     Include,
     Else,
     Const,
+    Continue,
 }
 
 impl Token {
@@ -144,6 +145,7 @@ impl Display for Kwd {
             Kwd::Include => "include",
             Kwd::Else => "else",
             Kwd::Const => "const",
+            Kwd::Continue => "continue",
         };
         f.write_str(str)
     }

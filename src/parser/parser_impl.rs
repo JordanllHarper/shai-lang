@@ -731,6 +731,10 @@ fn parse_keyword(state: ParseState, k: &Kwd) -> ParseResult<(Expression, ParseSt
         Kwd::Include => parse_include(state)?,
         Kwd::Else => parse_else(state)?,
         Kwd::Const => parse_const(state)?,
+        Kwd::Continue => (
+            Expression::new_statement(None, StatementOperator::Continue),
+            state,
+        ),
         t => {
             return Err(ParseError::InvalidSyntax {
                 message: "Invalid use of keyword, this should be used in for loop".to_string(),
@@ -965,6 +969,11 @@ fn parse_if(state: ParseState) -> ParseResult<(Expression, ParseState)> {
 
     match next {
         Some(Token::Symbol(Symbol::BraceOpen)) | Some(Token::Symbol(Symbol::Newline)) => (),
+        Some(Token::Symbol(Symbol::And)) => {
+            // todo boolean sum the previous expression and this one
+
+            todo!()
+        }
         Some(t) => {
             return Err(ParseError::InvalidSyntax {
                 message: "Expected an opening brace".to_string(),

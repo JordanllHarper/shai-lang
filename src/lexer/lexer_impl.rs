@@ -157,6 +157,7 @@ fn next_kwd(lexer: &mut Lexer) -> Option<Token> {
         "return" => Token::Kwd(Kwd::Return),
         "in" => Token::Kwd(Kwd::In),
         "break" => Token::Kwd(Kwd::Break),
+        "continue" => Token::Kwd(Kwd::Continue),
         "include" => Token::Kwd(Kwd::Include),
         "const" => Token::Kwd(Kwd::Const),
         "true" => Token::Literal(Literal::Bool(true)),
