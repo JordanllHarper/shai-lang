@@ -182,6 +182,26 @@ pub fn evaluate_body(
     Ok((state, value))
 }
 
+pub fn evaluate_operation(
+    state: EnvironmentState,
+    m: Operations,
+) -> Result<(EnvironmentState, Value), EvaluatorError> {
+    let new_state = state.clone();
+    let (new_state, left_value) = map_expression_to_value(new_state, *m.lhs)?;
+    let (new_state, right_value) = map_expression_to_value(new_state, *m.rhs)?;
+
+    let values = (left_value, right_value);
+
+    let (_, result) = match m.operation {
+        Operator::Add => handle_add(new_state, values),
+        Operator::Subtract => handle_subtract(new_state, values),
+        Operator::Multiply => handle_multiply(new_state, values),
+        Operator::Divide => handle_divide(new_state, values),
+        Operator::Mod => handle_mod(new_state, values),
+    }?;
+    Ok((state, result))
+}
+
 pub fn evaluate_assignment(
     state: EnvironmentState,
     a: Assignment,

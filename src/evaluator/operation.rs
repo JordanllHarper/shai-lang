@@ -3,27 +3,7 @@ use util::map_value_to_string;
 use super::environment::*;
 use crate::evaluator::*;
 
-pub fn evaluate_operation(
-    state: EnvironmentState,
-    m: Operations,
-) -> Result<(EnvironmentState, Value), EvaluatorError> {
-    let new_state = state.clone();
-    let (new_state, left_value) = map_expression_to_value(new_state, *m.lhs)?;
-    let (new_state, right_value) = map_expression_to_value(new_state, *m.rhs)?;
-
-    let values = (left_value, right_value);
-
-    let (_, result) = match m.operation {
-        Operator::Add => handle_add(new_state, values),
-        Operator::Subtract => handle_subtract(new_state, values),
-        Operator::Multiply => handle_multiply(new_state, values),
-        Operator::Divide => handle_divide(new_state, values),
-        Operator::Mod => handle_mod(new_state, values),
-    }?;
-    Ok((state, result))
-}
-
-fn handle_mod(
+pub fn handle_mod(
     state: EnvironmentState,
     values: (Value, Value),
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
@@ -36,7 +16,7 @@ fn handle_mod(
     }
 }
 
-fn handle_concatenation(
+pub fn handle_concatenation(
     state: EnvironmentState,
     c: CharacterBasedLiteral,
     other: Value,
@@ -52,7 +32,7 @@ fn handle_concatenation(
     Ok((new_state, Value::new_string(&(format))))
 }
 
-fn handle_add(
+pub fn handle_add(
     state: EnvironmentState,
     values: (Value, Value),
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
@@ -83,7 +63,7 @@ fn handle_add(
     }
 }
 
-fn handle_subtract(
+pub fn handle_subtract(
     state: EnvironmentState,
     values: (Value, Value),
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
@@ -96,7 +76,7 @@ fn handle_subtract(
     }
 }
 
-fn handle_divide(
+pub fn handle_divide(
     state: EnvironmentState,
     values: (Value, Value),
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
@@ -110,7 +90,7 @@ fn handle_divide(
     }
 }
 
-fn handle_multiply(
+pub fn handle_multiply(
     state: EnvironmentState,
     values: (Value, Value),
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
