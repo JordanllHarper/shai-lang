@@ -1,4 +1,4 @@
-fizzbuzz (n) {
+fizzbuzz_subset (n) {
     results = []
     for i in 1..=n {
         if i % 3 == 0 {
@@ -12,7 +12,7 @@ fizzbuzz (n) {
     return results
 }
 
-result = fizzbuzz 10
+result = fizzbuzz_subset 10
 
 result_len = len result
 
