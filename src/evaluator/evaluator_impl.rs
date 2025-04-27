@@ -258,7 +258,7 @@ pub fn evaluate_function(
         let _ = maybe_state.add_or_mutate_symbols(&parameter.ident, binding)?;
         new_state = maybe_state;
     }
-    let (new_state, result) = evaluate(new_state, *f.body)?;
+    let (_, result) = evaluate(new_state, *f.body)?;
 
     Ok((state, result))
 }
