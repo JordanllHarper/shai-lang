@@ -291,8 +291,12 @@ pub fn evaluate_statement(
     s: Statement,
 ) -> Result<(EnvironmentState, Value), EvaluatorError> {
     match s.operation {
-        StatementOperator::Break => Ok((state, Value::Void)),
-        StatementOperator::Continue => Ok((state, Value::Void)),
+        StatementOperator::Break => Err(EvaluatorError::NotYetImplemented {
+            msg: "Break statements are not yet supported".to_string(),
+        }),
+        StatementOperator::Continue => Err(EvaluatorError::NotYetImplemented {
+            msg: "Continue statements are not yet implemented".to_string(),
+        }),
         StatementOperator::Return => evaluate_return(state, s.expression.as_deref().cloned()),
         StatementOperator::Include => Err(EvaluatorError::NotYetImplemented {
             msg: "include statements are not yet supported".to_string(),
