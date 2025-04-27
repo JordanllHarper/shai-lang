@@ -8,7 +8,7 @@ pub fn evaluate_bindings(
     right: Option<EnvironmentBinding>,
     evaluation_op: EvaluationOperator,
 ) -> Result<(EnvironmentState, bool), EvaluatorError> {
-    let result: bool = match (left, right, evaluation_op) {
+    let result = match (left, right, evaluation_op) {
         (
             EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(lhs))),
             Some(EnvironmentBinding::Value(Value::ValueLiteral(ValueLiteral::Numeric(rhs)))),
