@@ -14,7 +14,7 @@ fn main() {
         return;
     };
 
-    println!("Path {:?}", path);
+    macros::dbg!(&path);
     let input = match std::fs::read_to_string(&path) {
         Ok(v) => v,
         Err(e) => {
