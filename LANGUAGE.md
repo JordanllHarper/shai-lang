@@ -47,7 +47,6 @@ The supported data types of the language are:
 - `int`
 - `string`
 - `float`
-- `char`
 - `arr`
 - `dict`
 
@@ -60,8 +59,6 @@ my_num = 5 // int
 name = "Bob" // string
 
 pi = 3.14 // float
-
-my_initial = 'J' // char
 
 my_empty_array = [] // array (empty)
 
